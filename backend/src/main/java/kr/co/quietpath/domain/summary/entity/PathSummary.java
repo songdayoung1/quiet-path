@@ -1,0 +1,94 @@
+package kr.co.quietpath.domain.summary.entity;
+
+import jakarta.persistence.*;
+import kr.co.quietpath.domain.path.entity.Path;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "path_summaries",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_path_prompt", columnNames = {"path_id", "prompt_version"})
+    },
+    indexes = {
+        @Index(name = "idx_path_status_updated", columnList = "path_id, status, updated_at")
+    }
+)
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class PathSummary {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "path_id", nullable = false)
+    private Path path;
+
+    @Column(nullable = false, length = 20)
+    private String status;
+
+    @Column(nullable = false, length = 20)
+    private String format;
+
+    @Column(columnDefinition = "MEDIUMTEXT")
+    private String content;
+
+    @Column(length = 30)
+    private String promptVersion;
+
+    @Column(length = 50)
+    private String model;
+
+    @Column(length = 64)
+    private String inputHash;
+
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Builder
+    public PathSummary(
+        Path path,
+        String promptVersion,
+        String model,
+        String inputHash
+    ) {
+        this.path = path;
+        this.status = "PENDING";
+        this.format = "MARKDOWN";
+        this.promptVersion = promptVersion;
+        this.model = model;
+        this.inputHash = inputHash;
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void startProcessing() {
+        this.status = "PROCESSING";
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void complete(String content) {
+        this.status = "DONE";
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void fail() {
+        this.status = "FAILED";
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void updateContent(String content) {
+        this.content = content;
+        this.updatedAt = LocalDateTime.now();
+    }
+}
