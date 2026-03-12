@@ -533,3 +533,69 @@ export const VisualTrace: React.FC<{ index: number }> = ({ index }) => {
     />
   );
 };
+// ── Water Drop Micro-interaction Overlay ──
+export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({ leaving = false }) => {
+  // 8 droplets scattered in different directions
+  const droplets = [
+    { dx: '-28px', dy: '-36px', delay: '0.28s', size: 'w-2 h-2' },
+    { dx: '32px',  dy: '-30px', delay: '0.32s', size: 'w-1.5 h-1.5' },
+    { dx: '40px',  dy: '20px',  delay: '0.30s', size: 'w-2 h-2' },
+    { dx: '22px',  dy: '38px',  delay: '0.35s', size: 'w-1 h-1' },
+    { dx: '-38px', dy: '24px',  delay: '0.26s', size: 'w-1.5 h-1.5' },
+    { dx: '-20px', dy: '40px',  delay: '0.33s', size: 'w-1 h-1' },
+    { dx: '14px',  dy: '-42px', delay: '0.29s', size: 'w-1 h-1' },
+    { dx: '-42px', dy: '-14px', delay: '0.31s', size: 'w-1.5 h-1.5' },
+  ];
+
+  return (
+    <div
+      className={`water-drop-overlay${leaving ? ' leaving' : ''} absolute inset-0 z-50 flex flex-col items-center justify-center`}
+      style={{ background: 'rgba(245,243,255,0.92)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
+    >
+      {/* Ripple rings */}
+      <div className="relative flex items-center justify-center">
+        {[0, 1, 2].map(i => (
+          <span
+            key={i}
+            className="ripple-ring absolute rounded-full border border-point-300/50"
+            style={{
+              width: '64px',
+              height: '64px',
+              animationDelay: `${i * 0.18}s`,
+            }}
+          />
+        ))}
+
+        {/* Main drop icon */}
+        <span className="drop-icon relative z-10 text-5xl select-none" style={{ lineHeight: 1 }}>
+          💧
+        </span>
+
+        {/* Scattered droplets */}
+        {droplets.map((d, i) => (
+          <span
+            key={i}
+            className={`droplet absolute rounded-full bg-point-300`}
+            style={{
+              '--dx': d.dx,
+              '--dy': d.dy,
+              animationDelay: d.delay,
+              width: d.size.split(' ')[0].replace('w-', '') === '2' ? '8px'
+                   : d.size.split(' ')[0].replace('w-', '') === '1.5' ? '6px' : '4px',
+              height: d.size.split(' ')[0].replace('w-', '') === '2' ? '8px'
+                    : d.size.split(' ')[0].replace('w-', '') === '1.5' ? '6px' : '4px',
+            } as React.CSSProperties}
+          />
+        ))}
+      </div>
+
+      {/* Success text */}
+      <p className="success-text mt-8 text-base font-semibold text-point-600 tracking-wide">
+        오늘의 장면이 담겼어요
+      </p>
+      <p className="success-text mt-1 text-xs text-mist-400" style={{ animationDelay: '0.65s' }}>
+        하루를 잘 기록했어요 ✨
+      </p>
+    </div>
+  );
+};

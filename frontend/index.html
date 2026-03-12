@@ -166,6 +166,53 @@
         user-select: none;
         filter: blur(4px);
       }
+
+      /* ── Water Drop Micro-interaction ── */
+      @keyframes dropFall {
+        0%   { transform: translateY(-40px) scale(0.7); opacity: 0; }
+        55%  { transform: translateY(6px)  scale(1.12); opacity: 1; }
+        75%  { transform: translateY(-3px) scale(0.96); }
+        100% { transform: translateY(0)    scale(1);    opacity: 1; }
+      }
+      @keyframes ripple {
+        0%   { transform: scale(0.3); opacity: 0.55; }
+        100% { transform: scale(4);   opacity: 0; }
+      }
+      @keyframes dropletFly {
+        0%   { transform: translate(0, 0) scale(1);   opacity: 1; }
+        100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+      }
+      @keyframes successFadeUp {
+        0%   { opacity: 0; transform: translateY(12px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes overlayIn {
+        0%   { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      @keyframes overlayOut {
+        0%   { opacity: 1; }
+        100% { opacity: 0; }
+      }
+      .water-drop-overlay {
+        animation: overlayIn 0.25s ease-out forwards;
+      }
+      .water-drop-overlay.leaving {
+        animation: overlayOut 0.35s ease-in forwards;
+      }
+      .drop-icon {
+        animation: dropFall 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+      }
+      .ripple-ring {
+        animation: ripple 0.9s ease-out forwards;
+      }
+      .droplet {
+        animation: dropletFly 0.7s ease-out forwards;
+      }
+      .success-text {
+        animation: successFadeUp 0.45s ease-out 0.5s forwards;
+        opacity: 0;
+      }
     </style>
   <script type="importmap">
 {

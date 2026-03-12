@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { AppState, Record as RecordType, Direction } from '../types';
 import { createLogId } from '../storage';
-import { SoftButton, AutoTextArea, MoodSticker } from '../components/UI';
+import { SoftButton, AutoTextArea, MoodSticker, WaterDropOverlay } from '../components/UI';
 import { X, Check, Image as ImageIcon } from 'lucide-react';
 import { MOOD_STICKERS } from '../constants';
 
@@ -18,30 +18,38 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
   const [moodCode, setMoodCode] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
   
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'animating' | 'leaving'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { currentDirection } = state;
 
   const handleSubmit = () => {
-    if (!action.trim()) return;
-    setIsSaving(true);
+    if (!action.trim() || saveState !== 'idle') return;
 
+    const newRecord: RecordType = {
+      id: createLogId(),
+      date: new Date().toISOString(),
+      timestamp: Date.now(),
+      directionQuestion: currentDirection?.question || '방향 없음',
+      action: action.trim(),
+      oneWordText: oneWordText.trim() || undefined,
+      tomorrowText: tomorrowText.trim() || undefined,
+      moodCode: moodCode || undefined,
+      imageUrl: imageUrl || undefined,
+    };
+
+    // 1) 물방울 오버레이 등장
+    setSaveState('animating');
+
+    // 2) 1.4s 후 페이드아웃 시작
     setTimeout(() => {
-        const newRecord: RecordType = {
-        id: createLogId(),
-        date: new Date().toISOString(),
-        timestamp: Date.now(),
-        directionQuestion: currentDirection?.question || '방향 없음',
-        action: action.trim(),
-        oneWordText: oneWordText.trim() || undefined,
-        tomorrowText: tomorrowText.trim() || undefined,
-        moodCode: moodCode || undefined,
-        imageUrl: imageUrl || undefined,
-        };
+      setSaveState('leaving');
+    }, 1400);
 
-        onSave(newRecord);
-    }, 600); // 딜레이를 주어 체크마크 피드백 감상
+    // 3) 페이드아웃 완료(0.35s) 후 실제 저장
+    setTimeout(() => {
+      onSave(newRecord);
+    }, 1750);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +60,8 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
       setImageUrl(url);
     }
   };
+
+  const isSaving = saveState !== 'idle';
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col animate-fade-in bg-[#E8EDF2]/95 backdrop-blur-xl">
@@ -172,16 +182,21 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
       {/* Footer Action */}
       <div className="absolute bottom-0 left-0 w-full flex justify-center bg-gradient-to-t from-[#E8EDF2] via-[#E8EDF2]/90 to-transparent z-20 pb-[env(safe-area-inset-bottom)]">
         <div className="w-full max-w-md px-6 pb-8 pt-8">
-            <SoftButton 
-              onClick={handleSubmit} 
+            <SoftButton
+              onClick={handleSubmit}
               disabled={!action.trim() || isSaving}
-              className={`shadow-xl transition-all duration-300 ${isSaving ? 'bg-point-400 text-white shadow-point-200/50 scale-[1.02]' : 'shadow-point-200/50'} py-4 text-base font-bold`}
+              className={`shadow-xl transition-all duration-300 shadow-point-200/50 py-4 text-base font-bold`}
             >
-              <Check size={20} className={isSaving ? 'animate-bounce' : ''} />
-              <span>{isSaving ? '완료되었습니다' : '흔적 남기기'}</span>
+              <Check size={20} />
+              <span>흔적 남기기</span>
             </SoftButton>
         </div>
       </div>
+
+      {/* Water Drop Micro-interaction */}
+      {isSaving && (
+        <WaterDropOverlay leaving={saveState === 'leaving'} />
+      )}
     </div>
   );
 };
