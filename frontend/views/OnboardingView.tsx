@@ -135,6 +135,8 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete, onLo
             id: createDirectionId(),
             question: customQuestion,
             description: customTitle,
+            categoryId: selectedCategory.id,
+            categoryLabel: selectedCategory.label,
             createdAt: Date.now(),
             reviewAt: reviewDate ? new Date(reviewDate).getTime() : undefined,
             isActive: true,

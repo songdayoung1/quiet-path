@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { TreeDeciduous, TreePine, Shrub, Mountain, Cloud, Star, Sparkles, Flower, Tent } from 'lucide-react';
+import { MOOD_STICKERS } from '../constants';
 
 // Enhanced Card with Depth, Gradient, and optional Traces
 export const Card: React.FC<{ 
@@ -116,6 +117,36 @@ export const PageHeader: React.FC<{ title: string; subtitle?: string }> = ({ tit
     {subtitle && <p className="text-mist-400 text-sm mt-2 font-normal leading-loose opacity-80">{subtitle}</p>}
   </div>
 );
+
+// Mood Sticker Component for v1.5
+export const MoodSticker: React.FC<{
+  code: string;
+  selected?: boolean;
+  onClick?: () => void;
+  className?: string;
+}> = ({ code, selected = false, onClick, className = '' }) => {
+  const sticker = MOOD_STICKERS.find(s => s.code === code) || { label: code, color: 'bg-mist-100 text-mist-500 border-mist-200' };
+  
+  return (
+    <button
+      onClick={onClick}
+      disabled={!onClick}
+      className={`
+        px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-all duration-300
+        border-2 border-white
+        ${sticker.color}
+        ${selected ? 'scale-110 ring-2 ring-white/50 ring-offset-1 opacity-100 rotate-2 origin-bottom-right z-10' : 'opacity-90 hover:opacity-100 hover:rotate-2 hover:scale-105 origin-bottom-right'}
+        ${!onClick ? 'cursor-default' : ''}
+        ${className}
+      `}
+      style={{
+          boxShadow: selected ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255,255,255,0.5)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255,255,255,0.5)'
+      }}
+    >
+      {sticker.label}
+    </button>
+  );
+};
 
 // Quote Styled Title - 5. Typography Rhythm (Wider Tracking)
 export const QuoteHeader: React.FC<{ text: string; className?: string }> = ({ text, className = '' }) => {
@@ -323,6 +354,162 @@ export const ForestObject: React.FC<{ index: number; type: string; isLocked: boo
       {/* Tooltip on Hover */}
       <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg text-[8px] whitespace-nowrap shadow-sm text-mist-500 pointer-events-none z-50">
           Step {index + 1}
+      </div>
+    </div>
+  );
+};
+
+// Streak Heatmap: 30-day record visualization (GitHub-style)
+export const StreakHeatmap: React.FC<{
+  records: { timestamp: number; isHidden?: boolean; moodCode?: string }[];
+  className?: string;
+}> = ({ records, className = '' }) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Build 35-day grid (5 weeks) ending today
+  const days: { date: Date; hasRecord: boolean; moodCode?: string; isToday: boolean; isFuture: boolean }[] = [];
+
+  // Calculate start: go back to fill complete weeks
+  const todayDay = today.getDay(); // 0=Sun
+  const totalCells = 35; // 5 weeks
+  const daysBack = totalCells - 1 - (6 - todayDay); // align so today falls on correct weekday
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - (totalCells - 1));
+  // Align to Sunday
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+
+  const activeRecords = records.filter(r => !r.isHidden);
+  const recordDateMap = new Map<string, string>();
+  activeRecords.forEach(r => {
+    const d = new Date(r.timestamp);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    if (r.moodCode) recordDateMap.set(key, r.moodCode);
+    else recordDateMap.set(key, '__recorded__');
+  });
+
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + i);
+    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+    days.push({
+      date: d,
+      hasRecord: recordDateMap.has(key),
+      moodCode: recordDateMap.get(key) === '__recorded__' ? undefined : recordDateMap.get(key),
+      isToday: key === todayKey,
+      isFuture: d > today,
+    });
+  }
+
+  // Calculate current streak
+  let currentStreak = 0;
+  const checkDate = new Date(today);
+  while (true) {
+    const key = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`;
+    if (recordDateMap.has(key)) {
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  // Count total recorded days in last 30 days
+  const thirtyDaysAgo = new Date(today);
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+  const last30Records = days.filter(d => d.hasRecord && d.date >= thirtyDaysAgo && !d.isFuture).length;
+
+  const weekLabels = ['일', '월', '화', '수', '목', '금', '토'];
+
+  // Mood to color mapping
+  const getMoodColor = (moodCode?: string, hasRecord?: boolean) => {
+    if (!hasRecord) return '';
+    if (!moodCode) return 'bg-point-300';
+    const map: Record<string, string> = {
+      '포근': 'bg-point-400',
+      '멍함': 'bg-mist-300',
+      '반짝': 'bg-lavender-400',
+      '잔잔': 'bg-blue-300',
+      '버팀': 'bg-green-400',
+      '두근': 'bg-rose-400',
+    };
+    return map[moodCode] || 'bg-point-300';
+  };
+
+  return (
+    <div className={`${className}`}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-point-500">{currentStreak}</span>
+            <span className="text-xs font-medium text-mist-400">일 연속</span>
+          </div>
+          <div className="w-px h-5 bg-mist-200" />
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-sm font-bold text-mist-600">{last30Records}</span>
+            <span className="text-[10px] text-mist-300">/30일</span>
+          </div>
+        </div>
+        <span className="text-[10px] font-bold text-mist-300 uppercase tracking-widest">Streak</span>
+      </div>
+
+      {/* Weekday labels */}
+      <div className="grid grid-cols-7 gap-[5px] mb-1.5">
+        {weekLabels.map(label => (
+          <div key={label} className="text-center text-[9px] font-medium text-mist-300 tracking-wide">
+            {label}
+          </div>
+        ))}
+      </div>
+
+      {/* Heatmap grid */}
+      <div className="grid grid-cols-7 gap-[5px]">
+        {days.map((day, i) => {
+          const color = getMoodColor(day.moodCode, day.hasRecord);
+          return (
+            <div
+              key={i}
+              className={`
+                aspect-square rounded-lg transition-all duration-300
+                ${day.isFuture
+                  ? 'bg-transparent'
+                  : day.hasRecord
+                    ? `${color} shadow-sm`
+                    : 'bg-mist-100/60'
+                }
+                ${day.isToday ? 'ring-2 ring-point-300 ring-offset-1' : ''}
+              `}
+              title={`${day.date.getMonth() + 1}/${day.date.getDate()}`}
+            >
+              {day.isToday && !day.hasRecord && (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-point-400 animate-pulse" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Mood legend */}
+      <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 rounded-sm bg-mist-100/60" />
+          <span className="text-[9px] text-mist-300">없음</span>
+        </div>
+        {[
+          { code: '포근', color: 'bg-point-400' },
+          { code: '반짝', color: 'bg-lavender-400' },
+          { code: '잔잔', color: 'bg-blue-300' },
+          { code: '버팀', color: 'bg-green-400' },
+          { code: '두근', color: 'bg-rose-400' },
+        ].map(m => (
+          <div key={m.code} className="flex items-center gap-1">
+            <div className={`w-2.5 h-2.5 rounded-sm ${m.color}`} />
+            <span className="text-[9px] text-mist-400">{m.code}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

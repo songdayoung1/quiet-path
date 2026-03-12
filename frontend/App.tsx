@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppState, ViewState, LogEntry, Direction } from './types';
+import { AppState, ViewState, Record, Direction } from './types';
 import { loadState, saveState, createDirectionId } from './storage';
 import { HomeView } from './views/HomeView';
 import { RecordsView } from './views/RecordsView';
@@ -15,7 +15,7 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     currentDirection: null,
     pastDirections: [],
-    logs: [],
+    records: [],
     hasLoggedToday: false,
     hasSeenOnboarding: false,
     userLevel: 'Beginning',
@@ -54,7 +54,7 @@ const App: React.FC = () => {
       setCurrentView('NOW');
   };
 
-  const handleSaveLog = (log: LogEntry, directionUpdate?: Partial<Direction>) => {
+  const handleSaveLog = (record: Record, directionUpdate?: Partial<Direction>) => {
     setState(prev => {
         let currentDirection = prev.currentDirection;
         if (currentDirection && directionUpdate) {
@@ -63,7 +63,7 @@ const App: React.FC = () => {
 
         return {
             ...prev,
-            logs: [log, ...prev.logs],
+            records: [record, ...prev.records],
             currentDirection,
             hasLoggedToday: true
         };
@@ -71,10 +71,10 @@ const App: React.FC = () => {
     setCurrentView('NOW');
   };
 
-  const handleUpdateLog = (updatedLog: LogEntry) => {
+  const handleUpdateLog = (updatedRecord: Record) => {
     setState(prev => ({
         ...prev,
-        logs: prev.logs.map(log => log.id === updatedLog.id ? updatedLog : log)
+        records: prev.records.map(r => r.id === updatedRecord.id ? updatedRecord : r)
     }));
   };
 
@@ -89,7 +89,10 @@ const App: React.FC = () => {
         id: createDirectionId(),
         question: updates.question || '',
         description: updates.description || '',
+        categoryId: updates.categoryId,
+        categoryLabel: updates.categoryLabel,
         createdAt: Date.now(),
+        reviewAt: updates.reviewAt,
         isActive: true
       };
       
@@ -171,30 +174,32 @@ const App: React.FC = () => {
             state={state} 
             onLogClick={() => setCurrentView('WRITE_LOG')}
             onHistoryClick={() => setCurrentView('PAST_DIRECTIONS')}
+            onRecordsClick={() => setCurrentView('RECORDS')}
           />
         )}
         {currentView === 'RECORDS' && (
           <RecordsView 
-            logs={state.logs} 
+            records={state.records} 
             currentDirection={state.currentDirection}
             pastDirections={state.pastDirections}
-            onUpdateLog={handleUpdateLog} 
+            onUpdateRecord={handleUpdateLog} 
           />
         )}
         {currentView === 'DIRECTION' && (
           <DirectionView 
             currentDirection={state.currentDirection} 
+            records={state.records}
             onUpdateDirection={handleUpdateDirection}
             onHistoryClick={() => setCurrentView('PAST_DIRECTIONS')}
           />
         )}
         {currentView === 'COMMUNITY' && (
-           <CommunityView logs={state.logs} />
+           <CommunityView records={state.records} />
         )}
         {currentView === 'PAST_DIRECTIONS' && (
             <PastDirectionsView 
                 pastDirections={state.pastDirections} 
-                logs={state.logs}
+                records={state.records}
                 onBack={() => setCurrentView('DIRECTION')} 
             />
         )}

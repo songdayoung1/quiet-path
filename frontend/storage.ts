@@ -1,4 +1,4 @@
-import { AppState, Direction, LogEntry, UserLevel, DailyTone, ToneType } from './types';
+import { AppState, Direction, Record, UserLevel, DailyTone, ToneType } from './types';
 
 const STORAGE_KEY = 'quiet_path_data_v1';
 
@@ -13,14 +13,14 @@ const DEFAULT_DIRECTION: Direction = {
 const INITIAL_STATE: AppState = {
   currentDirection: DEFAULT_DIRECTION,
   pastDirections: [],
-  logs: [],
+  records: [],
   hasLoggedToday: false,
   hasSeenOnboarding: false,
   userLevel: 'Beginning'
 };
 
 // TONE DATA DEFINITION
-const TONES: Record<ToneType, DailyTone> = {
+const TONES: { [key in ToneType]: DailyTone } = {
   Fact: {
     type: 'Fact',
     label: 'Fact Check',
@@ -63,29 +63,57 @@ export const getDailyTone = (): DailyTone => {
   return TONES[currentToneKey];
 };
 
-const calculateLevel = (logCount: number): UserLevel => {
-  if (logCount >= 50) return 'Reflector'; // 성찰자
-  if (logCount >= 30) return 'Maintainer'; // 유지자
-  if (logCount >= 10) return 'Observer'; // 관찰자
-  if (logCount >= 3) return 'Recorder'; // 기록자
+const calculateLevel = (recordCount: number): UserLevel => {
+  if (recordCount >= 50) return 'Reflector'; // 성찰자
+  if (recordCount >= 30) return 'Maintainer'; // 유지자
+  if (recordCount >= 10) return 'Observer'; // 관찰자
+  if (recordCount >= 3) return 'Recorder'; // 기록자
   return 'Beginning';
 };
 
 export const loadState = (): AppState => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return INITIAL_STATE;
-    
-    const parsed = JSON.parse(saved);
+    let parsed = saved ? JSON.parse(saved) : null;
+
+    // Inject dummy data if no records exist so the user can see the UI filled
+    if (!parsed || !parsed.records || parsed.records.length === 0) {
+        parsed = {
+            ...(parsed || INITIAL_STATE),
+            records: [
+                {
+                    id: 'dummy_1',
+                    date: new Date().toISOString(),
+                    timestamp: Date.now(),
+                    directionQuestion: '조용한 일상을 찾아서',
+                    action: '따뜻한 커피 한 잔과 함께 온전히 나에게 집중했던 시간.',
+                    oneWordText: '평온',
+                    moodCode: '포근',
+                    imageUrl: 'https://images.unsplash.com/photo-1544716278-e513176f20b5?auto=format&fit=crop&q=80&w=600'
+                },
+                {
+                    id: 'dummy_2',
+                    date: new Date(Date.now() - 86400000).toISOString(),
+                    timestamp: Date.now() - 86400000,
+                    directionQuestion: '조용한 일상을 찾아서',
+                    action: '오랜만에 공원에 나가 바람을 쐬었다. 초록색이 주는 위안.',
+                    oneWordText: '초록빛 한숨',
+                    moodCode: '잔잔',
+                    imageUrl: 'https://images.unsplash.com/photo-1506744626753-1fa44df3133f?auto=format&fit=crop&q=80&w=600'
+                }
+            ]
+        };
+        saveState(parsed);
+    }
     
     // Check if logged today
-    const lastLog = parsed.logs && parsed.logs.length > 0 ? parsed.logs[0] : null;
-    const isToday = lastLog 
-      ? new Date(lastLog.timestamp).toDateString() === new Date().toDateString()
+    const lastRecord = parsed.records && parsed.records.length > 0 ? parsed.records[0] : null;
+    const isToday = lastRecord 
+      ? new Date(lastRecord.timestamp).toDateString() === new Date().toDateString()
       : false;
 
     // Recalculate level ensuring it exists
-    const level = calculateLevel(parsed.logs?.length || 0);
+    const level = calculateLevel(parsed.records?.length || 0);
 
     return {
       ...INITIAL_STATE, // Ensure shape

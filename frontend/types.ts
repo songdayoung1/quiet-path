@@ -1,22 +1,59 @@
-export interface LogEntry {
+export interface Record {
   id: string;
   date: string; // ISO String
   timestamp: number;
   directionQuestion: string; // The question active at the time
-  reflection: string; // The "sogam" (one line feeling)
-  action: string; // What was actually done
-  plan?: string; // Optional plan summary
+  action: string; // 오늘의 장면 (Scene)
+  oneWordText?: string; // 오늘을 한 단어로
+  tomorrowText?: string; // 내일의 한 걸음
+  reflection?: string; // Legacy
+  plan?: string; // Legacy
   isHidden?: boolean; // Soft delete
   isPinned?: boolean; // "Important Moment"
-  mood?: string; // Emoji
-  imageUrl?: string; // Mock attachment
+  moodCode?: string; // Mood Sticker Code
+  imageUrl?: string; // Image Attachment
   isShared?: boolean; // Shared to Community
+}
+
+export interface RecordDetail extends Record {
+  tags?: string[];
+}
+
+export interface RecordSummary {
+  id: string;
+  date: string;
+  moodCode?: string;
+  oneWordText?: string;
+  action: string;
+  imageUrl?: string;
+}
+
+export interface MonthlyReportResponse {
+  year: number;
+  month: number;
+  records: RecordSummary[];
+  topMoods: string[];
+  retentionRate?: number;
+}
+
+export interface PathActiveResponse {
+  currentPath: Direction;
+  recordsCount: number;
+  startDate: string;
+}
+
+export interface PathSummaryResponse {
+  path: Direction;
+  aiSummary: string;
+  records: RecordSummary[];
 }
 
 export interface Direction {
   id: string;
   question: string; // e.g., "Am I moving towards peace?"
   description: string; // Subtle context
+  categoryId?: string;
+  categoryLabel?: string;
   createdAt: number;
   endedAt?: number; // When this direction was archived
   reviewAt?: number; // Time Anchor: When to review this flow
@@ -42,7 +79,7 @@ export interface DailyTone {
 export interface AppState {
   currentDirection: Direction | null;
   pastDirections: Direction[];
-  logs: LogEntry[];
+  records: Record[]; // Renamed from logs
   hasLoggedToday: boolean;
   hasSeenOnboarding: boolean;
   userLevel: UserLevel;
