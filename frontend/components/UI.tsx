@@ -599,3 +599,54 @@ export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({ leaving = fa
     </div>
   );
 };
+
+// ─────────────────────────────────────────────
+// CategoryIcon: iOS 앱 아이콘 스타일의 카테고리 뱃지
+// ─────────────────────────────────────────────
+import { Briefcase, BookOpen as BookOpenIcon, Dumbbell, Palette, Award } from 'lucide-react';
+import { CATEGORIES } from '../constants';
+
+const CATEGORY_ICON_MAP: Record<string, React.FC<{ size?: number; color?: string; strokeWidth?: number }>> = {
+  Briefcase,
+  BookOpen: BookOpenIcon,
+  Dumbbell,
+  Palette,
+  Award,
+};
+
+export const CategoryIcon: React.FC<{
+  categoryId?: string;
+  size?: 'sm' | 'md' | 'lg';
+  className?: string;
+}> = ({ categoryId, size = 'md', className = '' }) => {
+  const cat = CATEGORIES.find(c => c.id === categoryId);
+
+  const sizeMap = {
+    sm: { outer: 'w-9 h-9', iconSize: 12, radius: 'rounded-xl' },
+    md: { outer: 'w-12 h-12', iconSize: 16, radius: 'rounded-2xl' },
+    lg: { outer: 'w-16 h-16', iconSize: 22, radius: 'rounded-3xl' },
+  };
+  const { outer, iconSize, radius } = sizeMap[size];
+
+  if (!cat) {
+    return (
+      <div
+        className={`${outer} ${radius} flex items-center justify-center shadow-sm shrink-0 ${className}`}
+        style={{ background: 'linear-gradient(135deg, #E4E7EB, #CBD2D9)' }}
+      >
+        <Briefcase size={iconSize} color="#9AA5B1" strokeWidth={1.8} />
+      </div>
+    );
+  }
+
+  const IconComponent = CATEGORY_ICON_MAP[cat.icon] ?? Briefcase;
+
+  return (
+    <div
+      className={`${outer} ${radius} flex items-center justify-center shadow-sm shrink-0 ${className}`}
+      style={{ background: `linear-gradient(135deg, ${cat.gradientFrom}, ${cat.gradientTo})` }}
+    >
+      <IconComponent size={iconSize} color={cat.accent} strokeWidth={2} />
+    </div>
+  );
+};

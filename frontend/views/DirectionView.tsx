@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Direction, Record as RecordType } from '../types';
-import { Card, PageHeader, SoftButton, SoftInput, SoftTextArea, MoodSticker } from '../components/UI';
+import { Card, PageHeader, SoftButton, SoftInput, SoftTextArea, MoodSticker, CategoryIcon } from '../components/UI';
 import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight } from 'lucide-react';
 import { CATEGORIES } from '../constants';
 
@@ -95,16 +95,16 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                   setDescription(cat.defaultTitle);
                   setShowCategorySelect(false);
                 }}
-                className="!p-5 cursor-pointer bg-white/70 hover:bg-white active:scale-[0.98] border border-white transition-all shadow-sm hover:shadow-md"
+                className="!p-5 cursor-pointer hover:bg-white active:scale-[0.98] border border-white transition-all shadow-sm hover:shadow-md"
+                style={{ background: `linear-gradient(135deg, ${cat.accentBg}CC, white)` } as React.CSSProperties}
               >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-mist-600 font-bold text-base mb-1">{cat.label}</h3>
+                <div className="flex items-center gap-4">
+                  <CategoryIcon categoryId={cat.id} size="md" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-base mb-0.5" style={{ color: cat.accent }}>{cat.label}</h3>
                     <p className="text-mist-400 text-xs">{cat.desc}</p>
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-mist-50 flex items-center justify-center">
-                    <Play size={14} className="text-mist-400 ml-0.5" />
-                  </div>
+                  <ArrowRight size={16} className="text-mist-300 shrink-0" />
                 </div>
               </Card>
             ))}
@@ -199,10 +199,15 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
             {currentDirection ? (
               <div className="py-2">
                 <div className="space-y-3">
-                  {currentDirection.categoryLabel && (
-                    <span className="inline-flex items-center rounded-full bg-mist-50 px-3 py-1.5 text-[11px] font-semibold text-mist-500">
-                      {currentDirection.categoryLabel}
-                    </span>
+                  {/* 카테고리 아이콘 + 라벨 */}
+                  {currentDirection.categoryId && (
+                    <div className="flex items-center gap-3">
+                      <CategoryIcon categoryId={currentDirection.categoryId} size="sm" />
+                      <span className="text-[11px] font-bold tracking-wide"
+                        style={{ color: CATEGORIES.find(c => c.id === currentDirection.categoryId)?.accent ?? '#9AA5B1' }}>
+                        {currentDirection.categoryLabel}
+                      </span>
+                    </div>
                   )}
                   <h2 className="text-xl md:text-2xl text-mist-600 font-bold leading-relaxed tracking-wide">
                     {currentDirection.description || '지금의 여정'}
