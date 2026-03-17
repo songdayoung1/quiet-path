@@ -280,52 +280,66 @@ export const RecordsView: React.FC<RecordsViewProps> = ({ records, currentDirect
       ) : (
           <div className="flex flex-col gap-8">
               {activeTab === 'album' ? (
-                  <div className="px-2">
-                      <div className="px-3 mb-4 flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
-                              <ImageIcon size={16} className="text-mist-400" />
-                              <h3 className="text-xs font-bold text-mist-500 uppercase tracking-widest">Monthly Photo Timeline</h3>
-                          </div>
-                          {displayedPhotoRecords.length > 0 && (
-                              <span className="text-[11px] text-mist-300">{displayedPhotoRecords.length}개의 장면</span>
-                          )}
-                      </div>
+                  <div className="px-3 pb-6">
                       {displayedPhotoRecords.length > 0 ? (
-                          <div className="grid grid-cols-2 gap-4 px-3 pb-6">
-                              {displayedPhotoRecords.map(record => (
-                                  <button
-                                       key={`photo-${record.id}`}
-                                       type="button"
-                                       className="relative group aspect-[4/5] bg-white p-2 pb-10 rounded-2xl shadow-sm border border-mist-100/50 text-left transform transition-all duration-300 hover:-translate-y-1 hover:shadow-md"
-                                       onClick={() => setSelectedRecordForDetail(record)}
-                                  >
-                                      <div className="w-full h-full rounded-xl overflow-hidden bg-mist-50">
-                                          <img src={record.imageUrl} alt="Scene Board element" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                                      </div>
-                                      <div className="absolute font-bold bottom-2 left-3 right-3 pointer-events-none">
-                                          <div className="flex items-center justify-between gap-2">
-                                              <span className="text-[11px] text-mist-500 tracking-wider bg-white/80 px-2 py-1 rounded-full shadow-sm">
-                                                  {new Date(record.timestamp).getDate()}일
-                                              </span>
-                                              {record.moodCode && <MoodSticker code={record.moodCode} className="scale-75 origin-right shadow-none" />}
-                                          </div>
-                                          {record.oneWordText && (
-                                              <p className="mt-2 text-[11px] text-mist-500 truncate px-1">{record.oneWordText}</p>
+                          <div className="flex flex-col gap-3">
+                              {/* 첫 번째 사진: 전체 너비 히어로 */}
+                              {(() => {
+                                  const hero = displayedPhotoRecords[displayedPhotoRecords.length - 1];
+                                  const rest = displayedPhotoRecords.slice(0, -1).reverse();
+                                  const formatDate = (ts: number) => {
+                                      const d = new Date(ts);
+                                      return `${d.getMonth() + 1}월 ${d.getDate()}일 ${['일','월','화','수','목','금','토'][d.getDay()]}`;
+                                  };
+                                  return (
+                                      <>
+                                          <button
+                                              type="button"
+                                              className="relative w-full aspect-[4/3] rounded-3xl overflow-hidden shadow-md group"
+                                              onClick={() => setSelectedRecordForDetail(hero)}
+                                          >
+                                              <img src={hero.imageUrl} alt="hero scene" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                                              <div className="absolute bottom-0 left-0 right-0 p-4 flex items-end justify-between">
+                                                  <div>
+                                                      <p className="text-white/70 text-[10px] font-medium tracking-wide mb-0.5">{formatDate(hero.timestamp)}</p>
+                                                      {hero.oneWordText && <p className="text-white font-bold text-base leading-tight">"{hero.oneWordText}"</p>}
+                                                  </div>
+                                                  {hero.moodCode && <MoodSticker code={hero.moodCode} className="opacity-100 shadow-md" />}
+                                              </div>
+                                          </button>
+                                          {/* 나머지 사진: 2열 그리드 */}
+                                          {rest.length > 0 && (
+                                              <div className="grid grid-cols-2 gap-3">
+                                                  {rest.map(record => (
+                                                      <button
+                                                          key={`photo-${record.id}`}
+                                                          type="button"
+                                                          className="relative aspect-square rounded-2xl overflow-hidden shadow-sm group"
+                                                          onClick={() => setSelectedRecordForDetail(record)}
+                                                      >
+                                                          <img src={record.imageUrl} alt="scene" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                                                          <div className="absolute bottom-0 left-0 right-0 p-2.5 flex items-end justify-between">
+                                                              <p className="text-white/80 text-[10px] font-medium">{formatDate(record.timestamp)}</p>
+                                                              {record.moodCode && <MoodSticker code={record.moodCode} className="opacity-100 scale-75 origin-right shadow-none" />}
+                                                          </div>
+                                                      </button>
+                                                  ))}
+                                              </div>
                                           )}
-                                      </div>
-                                  </button>
-                              ))}
+                                      </>
+                                  );
+                              })()}
                           </div>
                       ) : (
-                          <div className="mx-3 mb-8 bg-white/50 border-2 border-dashed border-white rounded-3xl p-8 flex flex-col items-center justify-center text-center shadow-sm">
+                          <div className="mb-8 bg-white/50 border-2 border-dashed border-white rounded-3xl p-8 flex flex-col items-center justify-center text-center shadow-sm">
                               <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-3">
                                   <ImageIcon size={20} className="text-mist-300" />
                               </div>
                               <p className="text-sm font-bold text-mist-500 mb-1.5">아직 이번 달 장면이 없어요</p>
                               <p className="text-[11px] text-mist-400 leading-relaxed max-w-[220px]">
-                                  기록을 남길 때 사진을 첨부하면
-                                  <br />
-                                  이곳에 장면 타임라인이 차곡차곡 쌓입니다.
+                                  기록을 남길 때 사진을 첨부하면<br />이곳에 장면이 차곡차곡 쌓입니다.
                               </p>
                           </div>
                       )}
@@ -437,25 +451,17 @@ export const RecordsView: React.FC<RecordsViewProps> = ({ records, currentDirect
                   </div>
               ) : (
                   <div className="px-4">
-                      <div className="flex items-center justify-between gap-3 mb-4 px-1">
-                          <div className="flex items-center gap-2">
-                              <Calendar size={16} className="text-mist-400" />
-                              <h3 className="text-xs font-bold text-mist-500 uppercase tracking-widest">Calendar View</h3>
-                          </div>
-                          <span className="text-[11px] text-mist-300">날짜별 빠른 탐색</span>
-                      </div>
-                      <p className="px-1 text-sm text-mist-400 leading-relaxed mb-5">
-                        특정 날짜의 기록, 무드, 사진 유무를 빠르게 확인하고 바로 열어볼 수 있어요.
-                      </p>
                       <Card className="!p-5 !rounded-[2rem] bg-white/75 border border-white/60 shadow-sm">
-                          <div className="grid grid-cols-7 gap-2 mb-4">
-                              {weekdayLabels.map((label) => (
-                                  <div key={label} className="text-center text-[11px] font-bold text-mist-300 uppercase tracking-widest py-2">
+                          {/* 요일 헤더 */}
+                          <div className="grid grid-cols-7 gap-1.5 mb-2">
+                              {weekdayLabels.map((label, i) => (
+                                  <div key={label} className={`text-center text-[10px] font-bold py-1.5 rounded-lg ${i === 0 ? 'text-rose-400' : i === 6 ? 'text-point-400' : 'text-mist-300'}`}>
                                       {label}
                                   </div>
                               ))}
                           </div>
-                          <div className="grid grid-cols-7 gap-2">
+                          {/* 날짜 셀 */}
+                          <div className="grid grid-cols-7 gap-1.5">
                               {calendarCells.map((cell, index) => {
                                   if (cell.type === 'empty') {
                                       return <div key={`empty-${index}`} className="aspect-square" />;
@@ -464,39 +470,49 @@ export const RecordsView: React.FC<RecordsViewProps> = ({ records, currentDirect
                                   const record = cell.record;
                                   const isToday = cell.day === new Date().getDate() && targetMonth === new Date().getMonth() && targetYear === new Date().getFullYear();
 
+                                  // 무드별 배경색
+                                  const moodBg: Record<string, string> = {
+                                      '포근': 'bg-point-100',
+                                      '멍함': 'bg-mist-100',
+                                      '반짝': 'bg-lavender-100',
+                                      '잔잔': 'bg-blue-50',
+                                      '버팀': 'bg-green-50',
+                                      '두근': 'bg-rose-50',
+                                  };
+                                  const cellBg = record
+                                      ? (record.moodCode ? (moodBg[record.moodCode] ?? 'bg-point-50') : 'bg-point-50')
+                                      : 'bg-mist-50/40';
+
                                   return (
                                       <button
                                         key={`day-${cell.day}`}
                                         type="button"
                                         onClick={() => record && setSelectedRecordForDetail(record)}
-                                        className={`aspect-square rounded-2xl border text-left p-2 transition-all ${
-                                          record
-                                            ? 'bg-white border-mist-100 shadow-sm hover:-translate-y-0.5 hover:shadow-md'
-                                            : 'bg-mist-50/60 border-transparent'
-                                        } ${isToday ? 'ring-2 ring-point-100' : ''}`}
+                                        className={`aspect-square rounded-xl flex flex-col items-center justify-start pt-1.5 gap-0.5 transition-all relative
+                                          ${record ? `${cellBg} shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer` : 'bg-mist-50/40 cursor-default'}
+                                        `}
                                       >
-                                        <div className="flex h-full flex-col justify-between">
-                                            <div className="flex items-start justify-between gap-1">
-                                                <span className={`text-xs font-bold ${record ? 'text-mist-600' : 'text-mist-300'}`}>{cell.day}</span>
-                                                {record?.imageUrl && (
-                                                    <span className="w-2 h-2 rounded-full bg-point-300 shrink-0 mt-1"></span>
-                                                )}
-                                            </div>
-                                            {record ? (
-                                                <div className="space-y-1">
-                                                    {record.moodCode ? (
-                                                        <MoodSticker code={record.moodCode} className="scale-75 origin-left shadow-none px-2 py-1" />
-                                                    ) : (
-                                                        <div className="h-6"></div>
-                                                    )}
-                                                    <p className="text-[10px] text-mist-400 line-clamp-2">
-                                                        {record.oneWordText || '기록 있음'}
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                <span className="text-[10px] text-mist-200">-</span>
-                                            )}
-                                        </div>
+                                        {/* 날짜 숫자 */}
+                                        <span className={`text-[11px] font-bold leading-none
+                                          ${isToday ? 'w-5 h-5 flex items-center justify-center rounded-full bg-point-500 text-white' : record ? 'text-mist-600' : 'text-mist-300'}
+                                        `}>{cell.day}</span>
+
+                                        {/* 무드 점 */}
+                                        {record?.moodCode && (
+                                            <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
+                                                record.moodCode === '포근' ? 'bg-point-400' :
+                                                record.moodCode === '멍함' ? 'bg-mist-400' :
+                                                record.moodCode === '반짝' ? 'bg-lavender-400' :
+                                                record.moodCode === '잔잔' ? 'bg-blue-400' :
+                                                record.moodCode === '버팀' ? 'bg-green-400' :
+                                                record.moodCode === '두근' ? 'bg-rose-400' : 'bg-point-300'
+                                            }`} />
+                                        )}
+
+                                        {/* 사진 있는 날 카메라 점 */}
+                                        {record?.imageUrl && (
+                                            <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-point-300" />
+                                        )}
                                       </button>
                                   );
                               })}
