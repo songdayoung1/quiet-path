@@ -3,16 +3,18 @@ import { TreeDeciduous, TreePine, Shrub, Mountain, Cloud, Star, Sparkles, Flower
 import { MOOD_STICKERS } from '../constants';
 
 // Enhanced Card with Depth, Gradient, and optional Traces
-export const Card: React.FC<{ 
-  children: React.ReactNode; 
-  className?: string; 
+export const Card: React.FC<{
+  children: React.ReactNode;
+  className?: string;
   onClick?: () => void;
   breathe?: boolean;
   withTraces?: boolean;
-}> = ({ children, className = '', onClick, breathe = false, withTraces = false }) => {
+  style?: React.CSSProperties;
+}> = ({ children, className = '', onClick, breathe = false, withTraces = false, style }) => {
   return (
-    <div 
+    <div
       onClick={onClick}
+      style={style}
       className={`
         glass-panel rounded-[2rem] p-6 transition-all duration-700 ease-out 
         relative overflow-hidden
@@ -534,17 +536,18 @@ export const VisualTrace: React.FC<{ index: number }> = ({ index }) => {
   );
 };
 // ── Water Drop Micro-interaction Overlay ──
+import { WaterDropCharacter } from './WaterDropCharacter';
+
 export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({ leaving = false }) => {
-  // 8 droplets scattered in different directions
   const droplets = [
-    { dx: '-28px', dy: '-36px', delay: '0.28s', size: 'w-2 h-2' },
-    { dx: '32px',  dy: '-30px', delay: '0.32s', size: 'w-1.5 h-1.5' },
-    { dx: '40px',  dy: '20px',  delay: '0.30s', size: 'w-2 h-2' },
-    { dx: '22px',  dy: '38px',  delay: '0.35s', size: 'w-1 h-1' },
-    { dx: '-38px', dy: '24px',  delay: '0.26s', size: 'w-1.5 h-1.5' },
-    { dx: '-20px', dy: '40px',  delay: '0.33s', size: 'w-1 h-1' },
-    { dx: '14px',  dy: '-42px', delay: '0.29s', size: 'w-1 h-1' },
-    { dx: '-42px', dy: '-14px', delay: '0.31s', size: 'w-1.5 h-1.5' },
+    { dx: '-28px', dy: '-36px', delay: '0.28s', size: 8 },
+    { dx: '32px',  dy: '-30px', delay: '0.32s', size: 6 },
+    { dx: '40px',  dy: '20px',  delay: '0.30s', size: 8 },
+    { dx: '22px',  dy: '38px',  delay: '0.35s', size: 4 },
+    { dx: '-38px', dy: '24px',  delay: '0.26s', size: 6 },
+    { dx: '-20px', dy: '40px',  delay: '0.33s', size: 4 },
+    { dx: '14px',  dy: '-42px', delay: '0.29s', size: 4 },
+    { dx: '-42px', dy: '-14px', delay: '0.31s', size: 6 },
   ];
 
   return (
@@ -552,44 +555,36 @@ export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({ leaving = fa
       className={`water-drop-overlay${leaving ? ' leaving' : ''} absolute inset-0 z-50 flex flex-col items-center justify-center`}
       style={{ background: 'rgba(245,243,255,0.92)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
     >
-      {/* Ripple rings */}
+      {/* Character + ripples */}
       <div className="relative flex items-center justify-center">
         {[0, 1, 2].map(i => (
           <span
             key={i}
             className="ripple-ring absolute rounded-full border border-point-300/50"
-            style={{
-              width: '64px',
-              height: '64px',
-              animationDelay: `${i * 0.18}s`,
-            }}
+            style={{ width: '80px', height: '80px', animationDelay: `${i * 0.18}s` }}
           />
         ))}
 
-        {/* Main drop icon */}
-        <span className="drop-icon relative z-10 text-5xl select-none" style={{ lineHeight: 1 }}>
-          💧
-        </span>
+        {/* Happy character instead of plain emoji */}
+        <div className="drop-icon relative z-10">
+          <WaterDropCharacter size={72} mood="happy" animate={false} />
+        </div>
 
-        {/* Scattered droplets */}
         {droplets.map((d, i) => (
           <span
             key={i}
-            className={`droplet absolute rounded-full bg-point-300`}
+            className="droplet absolute rounded-full bg-point-300"
             style={{
               '--dx': d.dx,
               '--dy': d.dy,
               animationDelay: d.delay,
-              width: d.size.split(' ')[0].replace('w-', '') === '2' ? '8px'
-                   : d.size.split(' ')[0].replace('w-', '') === '1.5' ? '6px' : '4px',
-              height: d.size.split(' ')[0].replace('w-', '') === '2' ? '8px'
-                    : d.size.split(' ')[0].replace('w-', '') === '1.5' ? '6px' : '4px',
+              width: `${d.size}px`,
+              height: `${d.size}px`,
             } as React.CSSProperties}
           />
         ))}
       </div>
 
-      {/* Success text */}
       <p className="success-text mt-8 text-base font-semibold text-point-600 tracking-wide">
         오늘의 장면이 담겼어요
       </p>

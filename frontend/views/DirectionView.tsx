@@ -17,7 +17,20 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   const [question, setQuestion] = useState('');
   const [description, setDescription] = useState('');
   const [durationDays, setDurationDays] = useState<number | null>(null);
+  const [customReviewDate, setCustomReviewDate] = useState('');
+  const [showDateInput, setShowDateInput] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[number] | null>(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const getReviewAt = () => {
+    if (customReviewDate) return new Date(customReviewDate + 'T00:00:00').getTime();
+    if (durationDays) { const d = new Date(); d.setDate(d.getDate() + durationDays); return d.getTime(); }
+    return undefined;
+  };
+  const reviewDateDisplay = (() => {
+    const ts = getReviewAt();
+    return ts ? new Date(ts).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : null;
+  })();
 
   const handleStartEdit = () => {
     setIsEditing(true);
@@ -25,6 +38,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
     setQuestion('');
     setDescription('');
     setDurationDays(null);
+    setCustomReviewDate('');
+    setShowDateInput(false);
     setSelectedCategory(null);
   };
 
@@ -33,13 +48,14 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   };
 
   const handleSubmit = () => {
-    if (!question.trim() || !durationDays) return;
+    const reviewAt = getReviewAt();
+    if (!description.trim() || !reviewAt) return;
     onUpdateDirection({
-      question,
+      question: question.trim() || '이 방향으로 나는 어떻게 걸어가고 있을까?',
       description,
       categoryId: selectedCategory?.id,
       categoryLabel: selectedCategory?.label,
-      reviewAt: Date.now() + durationDays * 24 * 60 * 60 * 1000
+      reviewAt,
     });
     setIsEditing(false);
   };
@@ -114,55 +130,88 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
           </div>
         ) : (
           <Card className="flex flex-col gap-6 !bg-white/80 shadow-md border-white/80">
+            {/* 선택된 카테고리 뱃지 */}
+            {selectedCategory && (
+              <div className="flex items-center gap-3 pb-2 border-b border-mist-100">
+                <CategoryIcon categoryId={selectedCategory.id} size="sm" />
+                <span className="text-sm font-bold" style={{ color: selectedCategory.accent }}>{selectedCategory.label}</span>
+              </div>
+            )}
+
+            {/* 1. 이름/제목 먼저 (카드에서 큰 제목으로 표시되는 것) */}
             <div>
-              <label className="block text-[11px] font-bold text-mist-400 uppercase tracking-widest mb-3 ml-1">핵심 질문</label>
+              <label className="block text-xs font-bold text-mist-500 mb-2 ml-1">이 여정의 이름</label>
               <SoftInput
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="예: 조금 더 여유를 가질 수 있을까?"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="예: 하루 1시간, 나만의 공부 루틴"
                 autoFocus
                 className="bg-white"
               />
+              <p className="text-[10px] text-mist-300 mt-1.5 ml-1">카드에 큰 제목으로 보입니다</p>
             </div>
 
+            {/* 2. 질문 (카드에서 본문으로 표시되는 것) */}
             <div>
-              <label className="block text-[11px] font-bold text-mist-400 uppercase tracking-widest mb-3 ml-1">Path 이름</label>
-              <SoftTextArea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="단순하고 명확하게 적어보세요."
-                rows={3}
-                className="text-sm bg-white"
+              <label className="block text-xs font-bold text-mist-500 mb-2 ml-1">나에게 던지는 질문 <span className="text-mist-300 font-normal">(선택)</span></label>
+              <SoftInput
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="예: 나는 꾸준히 배우고 있을까?"
+                className="bg-white"
               />
+              <p className="text-[10px] text-mist-300 mt-1.5 ml-1">이 기간이 끝날 때 스스로 돌아볼 질문이에요</p>
             </div>
 
+            {/* 3. 언제 돌아볼까요 */}
             <div>
-              <label className="block text-[11px] font-bold text-mist-400 uppercase tracking-widest mb-3 ml-1">여정의 길이</label>
-              <div className="flex flex-wrap gap-2">
+              <label className="block text-xs font-bold text-mist-500 mb-3 ml-1">언제 돌아볼까요?</label>
+              <div className="flex gap-2 flex-wrap">
                 {[7, 14, 30].map((days) => (
                   <button
                     key={days}
-                    onClick={() => setDurationDays(days)}
-                    className={`px-5 py-3 rounded-2xl text-sm font-semibold transition-all ${
-                      durationDays === days ? 'bg-point-500 text-white shadow-md shadow-point-200/50 scale-105' : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
+                    onClick={() => { setDurationDays(days); setCustomReviewDate(''); setShowDateInput(false); }}
+                    className={`px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                      durationDays === days && !customReviewDate
+                        ? 'bg-point-500 text-white shadow-md shadow-point-200/50 scale-105'
+                        : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
                     }`}
                   >
                     {days}일
                   </button>
                 ))}
-                <div className="w-full h-2"></div>
-                {durationDays && (
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-white border border-mist-100 text-mist-600 text-sm shadow-sm w-full">
-                    <Calendar size={16} className="text-point-400" />
-                    <span className="font-medium">{new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toLocaleDateString()}</span>
-                    <span className="text-mist-400 text-xs ml-auto">회고 예정</span>
-                  </div>
-                )}
+                <button
+                  onClick={() => { setShowDateInput(!showDateInput); setDurationDays(null); }}
+                  className={`px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                    showDateInput || customReviewDate
+                      ? 'bg-point-500 text-white shadow-md shadow-point-200/50'
+                      : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
+                  }`}
+                >
+                  <Calendar size={14} />
+                  직접 선택
+                </button>
               </div>
+              {showDateInput && (
+                <input
+                  type="date"
+                  min={todayStr}
+                  value={customReviewDate}
+                  onChange={(e) => { setCustomReviewDate(e.target.value); setDurationDays(null); }}
+                  className="mt-3 w-full bg-white border border-mist-100 rounded-2xl px-4 py-3 text-sm text-mist-600 outline-none focus:ring-1 focus:ring-point-300 transition-all"
+                />
+              )}
+              {reviewDateDisplay && (
+                <div className="mt-3 flex items-center gap-2 px-4 py-3 rounded-2xl bg-point-50 border border-point-100 text-point-600 text-sm">
+                  <Calendar size={15} className="text-point-400 shrink-0" />
+                  <span className="font-semibold">{reviewDateDisplay}</span>
+                  <span className="text-point-400 text-xs ml-auto">에 돌아볼게요</span>
+                </div>
+              )}
             </div>
 
-            <div className="flex flex-col gap-3 mt-6">
-              <SoftButton onClick={handleSubmit} disabled={!question.trim() || !durationDays} className="py-4 text-base font-bold shadow-point-200/50">
+            <div className="flex flex-col gap-3 pt-2">
+              <SoftButton onClick={handleSubmit} disabled={!description.trim() || !getReviewAt()} className="py-4 text-base font-bold shadow-point-200/50">
                 여정 시작하기
               </SoftButton>
               <SoftButton variant="secondary" onClick={handleCancel} className="bg-transparent border-none hover:bg-mist-50 shadow-none text-mist-400">
