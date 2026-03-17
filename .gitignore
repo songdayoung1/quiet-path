@@ -34,3 +34,7 @@ backend/.gradle/
 
 # Local tool metadata
 .claude/
+
+# Root docs: keep only canonical ERD
+docs/*
+!docs/DATABASE_ERD.md
