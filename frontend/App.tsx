@@ -178,11 +178,13 @@ const App: React.FC = () => {
           />
         )}
         {currentView === 'RECORDS' && (
-          <RecordsView 
-            records={state.records} 
+          <RecordsView
+            records={state.records}
             currentDirection={state.currentDirection}
             pastDirections={state.pastDirections}
-            onUpdateRecord={handleUpdateLog} 
+            onUpdateRecord={handleUpdateLog}
+            hasLoggedToday={state.hasLoggedToday}
+            onLogClick={() => setCurrentView('WRITE_LOG')}
           />
         )}
         {currentView === 'DIRECTION' && (
@@ -226,10 +228,10 @@ const App: React.FC = () => {
       {currentView !== 'WRITE_LOG' && (
         <div className="fixed bottom-8 left-0 w-full flex justify-center z-20 px-4 pointer-events-none">
            <nav className="h-16 px-6 bg-white/80 backdrop-blur-xl border border-white/60 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex items-center gap-6 md:gap-8 justify-between w-full max-w-[340px] pointer-events-auto">
-            <NavItem view="NOW" icon={Home} label="Now" />
-            <NavItem view="RECORDS" icon={BookOpen} label="Journal" />
-            <NavItem view="COMMUNITY" icon={Users} label="Flow" />
-            <NavItem view="DIRECTION" icon={Compass} label="Path" />
+            <NavItem view="NOW" icon={Home} label="오늘" />
+            <NavItem view="RECORDS" icon={BookOpen} label="기록" />
+            <NavItem view="COMMUNITY" icon={Users} label="둘러보기" />
+            <NavItem view="DIRECTION" icon={Compass} label="여정" />
           </nav>
         </div>
       )}

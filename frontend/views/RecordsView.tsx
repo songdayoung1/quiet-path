@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Record as RecordType, Direction } from '../types';
 import { Card, PageHeader, SoftButton, MoodSticker } from '../components/UI';
+import { TodaysCard } from '../components/TodaysCard';
 import { MoreHorizontal, EyeOff, Pin, Calendar, Lock, Share2, Globe2, Image as ImageIcon, ChevronLeft, ChevronRight, BookOpenText } from 'lucide-react';
 
 interface RecordsViewProps {
@@ -8,14 +9,23 @@ interface RecordsViewProps {
   currentDirection: Direction | null;
   pastDirections: Direction[];
   onUpdateRecord: (record: RecordType) => void;
+  hasLoggedToday: boolean;
+  onLogClick: () => void;
 }
 
-export const RecordsView: React.FC<RecordsViewProps> = ({ records, currentDirection, onUpdateRecord }) => {
+export const RecordsView: React.FC<RecordsViewProps> = ({ records, currentDirection, onUpdateRecord, hasLoggedToday, onLogClick }) => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<RecordType | null>(null);
   const [activeTab, setActiveTab] = useState<'album' | 'records' | 'calendar'>('album');
 
   const activeRecords = useMemo(() => records.filter(r => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp), [records]);
+
+  // 오늘의 기록 카드
+  const todayDateStr = new Date().toLocaleDateString('ko-KR');
+  const todayRecord = useMemo(() =>
+    activeRecords.find(r => new Date(r.timestamp).toLocaleDateString('ko-KR') === todayDateStr) || null,
+    [activeRecords, todayDateStr]
+  );
 
   const [selectedMonthDate, setSelectedMonthDate] = useState<Date>(() => {
     if (activeRecords.length > 0) {
@@ -166,6 +176,17 @@ export const RecordsView: React.FC<RecordsViewProps> = ({ records, currentDirect
   // MONTHLY VIEW
   return (
     <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen" onClick={() => setActiveMenuId(null)}>
+
+      {/* 0. Today's Card — 오늘 기록 카드 */}
+      <div className="px-4 mb-6">
+        <TodaysCard
+          hasLoggedToday={hasLoggedToday}
+          todayRecord={todayRecord}
+          onLogClick={onLogClick}
+          onEditClick={onLogClick}
+        />
+      </div>
+
       {/* 1. 상단: 월간 요약 */}
       <div className="px-4 mb-6">
          <div className="flex items-center justify-between gap-3">
