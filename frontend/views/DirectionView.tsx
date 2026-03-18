@@ -1,27 +1,48 @@
-import React, { useState } from 'react';
-import { AppState, Direction } from '../types';
-import { Card, PageHeader, SoftButton, SoftInput, QuoteHeader, SoftTextArea } from '../components/UI';
-import { Compass, Archive, CheckCircle2, History, Calendar } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Direction, Record as RecordType } from '../types';
+import { Card, PageHeader, SoftButton, SoftInput, SoftTextArea, MoodSticker, CategoryIcon } from '../components/UI';
+import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight } from 'lucide-react';
 import { CATEGORIES } from '../constants';
 
 interface DirectionViewProps {
   currentDirection: Direction | null;
+  records: RecordType[];
   onUpdateDirection: (newDirection: Partial<Direction>) => void;
   onHistoryClick: () => void;
 }
 
-export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, onUpdateDirection, onHistoryClick }) => {
+export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, records, onUpdateDirection, onHistoryClick }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showCategorySelect, setShowCategorySelect] = useState(false);
   const [question, setQuestion] = useState('');
   const [description, setDescription] = useState('');
-  const [durationDays, setDurationDays] = useState<number | null>(null); // No Default
+  const [durationDays, setDurationDays] = useState<number | null>(null);
+  const [customReviewDate, setCustomReviewDate] = useState('');
+  const [showDateInput, setShowDateInput] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[number] | null>(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const getReviewAt = () => {
+    if (customReviewDate) return new Date(customReviewDate + 'T00:00:00').getTime();
+    if (durationDays) { const d = new Date(); d.setDate(d.getDate() + durationDays); return d.getTime(); }
+    return undefined;
+  };
+  const reviewDateDisplay = (() => {
+    const ts = getReviewAt();
+    return ts ? new Date(ts).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : null;
+  })();
+  const isTitleMissing = !description.trim();
+  const canSubmit = !isTitleMissing && !!getReviewAt();
 
   const handleStartEdit = () => {
     setIsEditing(true);
     setShowCategorySelect(true);
     setQuestion('');
     setDescription('');
+    setDurationDays(null);
+    setCustomReviewDate('');
+    setShowDateInput(false);
+    setSelectedCategory(null);
   };
 
   const handleCancel = () => {
@@ -29,133 +50,184 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   };
 
   const handleSubmit = () => {
-    if (!question.trim() || !durationDays) return;
+    const reviewAt = getReviewAt();
+    if (!description.trim() || !reviewAt) return;
     onUpdateDirection({
-      question,
+      question: question.trim() || '이 방향으로 나는 어떻게 걸어가고 있을까?',
       description,
-      reviewAt: Date.now() + durationDays * 24 * 60 * 60 * 1000
+      categoryId: selectedCategory?.id,
+      categoryLabel: selectedCategory?.label,
+      reviewAt,
     });
     setIsEditing(false);
   };
 
+  const currentPathRecords = useMemo(() => {
+    if (!currentDirection) return [];
+    return records
+      .filter((record) => !record.isHidden && record.directionQuestion === currentDirection.question)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }, [currentDirection, records]);
+
+  const currentPathImages = currentPathRecords.filter((record) => record.imageUrl).slice(0, 4);
+
+  const topMood = useMemo(() => {
+    const moodCounts = currentPathRecords.reduce((acc, record) => {
+      if (record.moodCode) acc[record.moodCode] = (acc[record.moodCode] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  }, [currentPathRecords]);
+
+  const pathConsistency = useMemo(() => {
+    if (!currentDirection) return 0;
+    const startDate = new Date(currentDirection.createdAt);
+    const today = new Date();
+    const pathDays = Math.max(
+      1,
+      Math.floor(
+        (new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() -
+          new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1
+    );
+
+    return Math.round((currentPathRecords.length / pathDays) * 100);
+  }, [currentDirection, currentPathRecords.length]);
+
   if (isEditing) {
     return (
       <div className="animate-fade-in pb-24 pt-2">
-        <PageHeader title="New Direction" subtitle="이전의 방향은 종료되고 새로운 흐름이 시작됩니다." />
-        
+        <PageHeader title="새로운 방향 설정" subtitle="집중하고 싶은 방향을 차분히 정해볼까요?" />
+
         {showCategorySelect ? (
-            <div className="flex flex-col gap-3 px-1 mt-2">
-                 <p className="text-xs font-semibold text-mist-400 uppercase tracking-wider mb-1 ml-1">Choose Category</p>
-                 {CATEGORIES.map((cat) => (
-                    <Card 
-                        key={cat.id} 
-                        onClick={() => {
-                            setQuestion('');
-                            setDescription(cat.defaultTitle);
-                            setShowCategorySelect(false);
-                        }}
-                        className="!p-4 cursor-pointer bg-white/60 hover:bg-white active:scale-[0.99] border border-transparent hover:border-point-200 transition-all shadow-sm"
-                    >
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <h3 className="text-mist-600 font-medium text-sm mb-0.5">{cat.label}</h3>
-                                <p className="text-mist-400 text-[10px] font-light">{cat.desc}</p>
-                            </div>
-                            <div className="w-1.5 h-1.5 rounded-full bg-mist-200"></div>
-                        </div>
-                    </Card>
-                 ))}
-                 <SoftButton variant="secondary" onClick={handleCancel} className="mt-4">취소</SoftButton>
-            </div>
+          <div className="flex flex-col gap-3 px-1 mt-2">
+            <p className="text-[11px] font-bold text-mist-400 uppercase tracking-widest mb-2 ml-1">관심사 선택</p>
+            {CATEGORIES.map((cat) => (
+              <Card
+                key={cat.id}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setQuestion('');
+                  setDescription('');
+                  setShowCategorySelect(false);
+                }}
+                className="!p-5 cursor-pointer hover:bg-white active:scale-[0.98] border border-white transition-all shadow-sm hover:shadow-md"
+                style={{ background: `linear-gradient(135deg, ${cat.accentBg}CC, white)` } as React.CSSProperties}
+              >
+                <div className="flex items-center gap-4">
+                  <CategoryIcon categoryId={cat.id} size="md" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-base mb-0.5" style={{ color: cat.accent }}>{cat.label}</h3>
+                    <p className="text-mist-400 text-xs">{cat.desc}</p>
+                  </div>
+                  <ArrowRight size={16} className="text-mist-300 shrink-0" />
+                </div>
+              </Card>
+            ))}
+            <SoftButton variant="secondary" onClick={handleCancel} className="mt-6 bg-white/50">
+              돌아가기
+            </SoftButton>
+          </div>
         ) : (
-            <Card className="flex flex-col gap-6 !bg-white/80">
-          <div>
-            <label className="block text-xs font-semibold text-mist-400 uppercase tracking-wider mb-3 ml-1">Key Question</label>
-            <SoftInput 
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="예: “나는 더 단순해지고 있는가?”"
-              autoFocus
-            />
-          </div>
+          <Card className="flex flex-col gap-0 !bg-white/88 shadow-md border-white/80 !p-9 rounded-[2.25rem]">
+            {/* 선택된 카테고리 뱃지 */}
+            {selectedCategory && (
+              <div className="flex items-center gap-4 pb-8 border-b border-mist-100">
+                <CategoryIcon categoryId={selectedCategory.id} size="sm" />
+                <div className="min-w-0">
+                  <span className="text-[15px] font-bold leading-none block" style={{ color: selectedCategory.accent }}>{selectedCategory.label}</span>
+                  <span className="text-[13px] leading-6 text-mist-400 mt-3 block">이 카테고리 안에서 새로운 흐름을 시작해요.</span>
+                </div>
+              </div>
+            )}
 
-          <div>
-            <label className="block text-xs font-semibold text-mist-400 uppercase tracking-wider mb-3 ml-1">Description</label>
-            <SoftTextArea 
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="감정적 동요 없이 사실만 바라보기"
-              rows={3}
-              className="text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-mist-400 uppercase tracking-wider mb-3 ml-1">Journey Duration</label>
-            <div className="flex gap-2">
-              {[7, 30, 90].map(days => (
-                <button
-                  key={days}
-                  onClick={() => setDurationDays(days)}
-                  className={`px-4 py-2 rounded-xl text-xs transition-all ${durationDays === days ? 'bg-point-100 text-point-600 font-bold' : 'bg-mist-50 text-mist-400 hover:bg-mist-100'}`}
-                >
-                  {days} Days
-                </button>
-              ))}
-              <label className="relative flex items-center gap-2 px-4 py-2 rounded-xl bg-mist-50 text-mist-400 text-xs overflow-hidden cursor-pointer hover:bg-mist-100 transition-colors">
-                <Calendar size={12} className="shrink-0 pointer-events-none" />
-                <span className="pointer-events-none min-w-[80px]">
-                    {durationDays 
-                        ? new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toLocaleDateString()
-                        : "날짜 선택"
-                    }
-                </span>
-                <input 
-                    type="date"
-                    required
-                    min={(function() {
-                        const tomorrow = new Date();
-                        tomorrow.setDate(tomorrow.getDate() + 1);
-                        return tomorrow.toISOString().split('T')[0];
-                    })()} 
-                    value={(function() {
-                        if (!durationDays) return '';
-                        const targetDate = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
-                        return targetDate.toISOString().split('T')[0];
-                    })()}
-                    onChange={(e) => {
-                        if (!e.target.value) return;
-                        const selected = new Date(e.target.value);
-                        const now = new Date();
-                        
-                        // Reset hours to compare dates only
-                        selected.setHours(0,0,0,0);
-                        now.setHours(0,0,0,0);
-                        
-                        const diffTime = selected.getTime() - now.getTime();
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        
-                        if (diffDays > 0) setDurationDays(diffDays);
-                    }}
-                    onClick={(e) => {
-                        // Force picker on some browsers
-                        try {
-                            (e.target as HTMLInputElement).showPicker();
-                        } catch (err) {
-                            // fallback
-                        }
-                    }}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 appearance-none"
-                />
-              </label>
+            <div className="space-y-0 pt-8 pb-8">
+              <label className="block text-[14px] font-bold text-mist-500 mb-4 ml-1">여정 제목</label>
+              <SoftInput
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={selectedCategory ? `예: ${selectedCategory.defaultTitle}` : '예: 퇴근 후 30분 공부 루틴'}
+                autoFocus
+                className={`bg-white !text-[17px] !leading-none !py-5 !px-6 placeholder:!text-mist-300 placeholder:!font-semibold ${description ? '!font-semibold' : '!font-medium'} ${isTitleMissing ? '!border-rose-200 focus:!ring-rose-200' : ''}`}
+              />
+              {isTitleMissing ? (
+                <p className="text-[12px] text-rose-400 mt-4 ml-1">제목을 설정해주세요.</p>
+              ) : (
+                <p className="text-[12px] text-mist-300 mt-4 ml-1">예: {selectedCategory?.defaultTitle || '퇴근 후 30분 공부 루틴'}</p>
+              )}
             </div>
-          </div>
 
-          <div className="flex gap-3 mt-4 pt-2">
-            <SoftButton variant="secondary" onClick={handleCancel}>취소</SoftButton>
-            <SoftButton onClick={handleSubmit} disabled={!question.trim() || !durationDays}>설정 완료</SoftButton>
-          </div>
-        </Card>
+            <div className="space-y-0 pb-8">
+              <label className="block text-[14px] font-bold text-mist-500 mb-4 ml-1">나에게 던지는 질문 <span className="text-mist-300 font-normal">(선택)</span></label>
+              <SoftInput
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="예: 나는 이 방향으로 조금씩 나아가고 있을까?"
+                className="bg-white !text-[16px] !font-medium !leading-normal !py-5 !px-6 placeholder:!text-mist-300"
+              />
+              <p className="text-[12px] text-mist-300 mt-4 ml-1">비워두면 기본 질문으로 시작합니다.</p>
+            </div>
+
+            <div className="space-y-0">
+              <label className="block text-[14px] font-bold text-mist-500 mb-5 ml-1">언제 돌아볼까요?</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[7, 14, 30].map((days) => (
+                  <button
+                    key={days}
+                    onClick={() => { setDurationDays(days); setCustomReviewDate(''); setShowDateInput(false); }}
+                    className={`px-3 py-3 rounded-[1.15rem] text-[13px] font-semibold transition-all whitespace-nowrap ${
+                      durationDays === days && !customReviewDate
+                        ? 'bg-point-500 text-white shadow-md shadow-point-200/50 scale-105'
+                        : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
+                    }`}
+                  >
+                    {days}일
+                  </button>
+                ))}
+                <button
+                  onClick={() => { setShowDateInput(!showDateInput); setDurationDays(null); }}
+                  className={`px-2 py-3 rounded-[1.15rem] text-[13px] font-semibold transition-all flex items-center justify-center gap-1 whitespace-nowrap ${
+                    showDateInput || customReviewDate
+                      ? 'bg-point-500 text-white shadow-md shadow-point-200/50'
+                      : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
+                  }`}
+                >
+                  <Calendar size={12} />
+                  직접 선택
+                </button>
+              </div>
+              {showDateInput && (
+                <input
+                  type="date"
+                  min={todayStr}
+                  value={customReviewDate}
+                  onChange={(e) => { setCustomReviewDate(e.target.value); setDurationDays(null); }}
+                  className="mt-4 w-full bg-white border border-mist-100 rounded-2xl px-5 py-4 text-[15px] text-mist-600 outline-none focus:ring-1 focus:ring-point-300 transition-all"
+                />
+              )}
+              {reviewDateDisplay && (
+                <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl bg-point-50 border border-point-100 text-point-600 text-[14px]">
+                  <Calendar size={15} className="text-point-400 shrink-0" />
+                  <span className="font-semibold">{reviewDateDisplay}</span>
+                  <span className="text-point-400 text-xs ml-auto">에 돌아볼게요</span>
+                </div>
+              )}
+              {!getReviewAt() && (
+                <p className="text-[12px] text-mist-300 mt-4 ml-1">회고 시점을 정해야 여정을 시작할 수 있어요.</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 pt-2">
+              <SoftButton onClick={handleSubmit} disabled={!canSubmit} className="py-4 text-base font-bold shadow-point-200/50">
+                여정 시작하기
+              </SoftButton>
+              <SoftButton variant="secondary" onClick={handleCancel} className="bg-transparent border-none hover:bg-mist-50 shadow-none text-mist-400">
+                취소
+              </SoftButton>
+            </div>
+          </Card>
         )}
       </div>
     );
@@ -164,69 +236,137 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   return (
     <div className="animate-slide-up pb-28 pt-2">
       <div className="flex justify-between items-start">
-         <PageHeader 
-          title="Compass" 
-          subtitle="목표를 달성하는 것이 아니라, 방향을 잃지 않는 것이 중요합니다." 
-        />
+        <PageHeader title="Current Path" subtitle="지금 걷고 있는 방향과 흐름을 확인합니다." />
       </div>
 
       <div className="relative px-2">
-        {/* Decorative Line */}
-        <div className="absolute top-4 left-6 bottom-0 w-[2px] bg-gradient-to-b from-point-200 to-transparent z-0"></div>
-        
-        {/* Current Active Direction */}
-        <div className="relative z-10 mb-8">
-           <div className="flex items-center gap-3 mb-6">
-             <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-point-500 shadow-md shadow-point-100 ring-1 ring-point-50">
-                <Compass size={20} />
-             </div>
-             <div>
-               <span className="text-xs font-bold text-point-500 uppercase tracking-wider block">Currently Active</span>
-               <span className="text-sm text-mist-500 font-medium">진행 중인 방향</span>
-             </div>
-           </div>
+        <div className="absolute top-4 left-6 bottom-0 w-[2px] bg-gradient-to-b from-mist-200/50 to-transparent z-0"></div>
 
-           <Card className="ml-5 relative !bg-white shadow-lg shadow-mist-200/50">
-             {currentDirection ? (
-               <div className="py-2">
-                 <QuoteHeader text={currentDirection.question} className="mb-2" />
-                 <p className="text-mist-400 text-sm font-light mb-6 px-2 whitespace-pre-line">{currentDirection.description}</p>
-                 
-                 <div className="flex flex-col gap-2 mt-2">
-                    <div className="flex items-center gap-2 text-xs text-mist-300 bg-mist-50 inline-flex px-3 py-1.5 rounded-full w-fit">
-                        <CheckCircle2 size={12} />
-                        <span>{new Date(currentDirection.createdAt).toLocaleDateString()}부터 시작됨</span>
+        <div className="relative z-10 mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-12 h-12 rounded-[1.25rem] bg-white flex items-center justify-center text-point-500 shadow-sm border border-mist-100">
+              <Compass size={24} />
+            </div>
+            <div>
+              <span className="text-[10px] font-bold text-point-500 uppercase tracking-widest block mb-1">Current Path</span>
+              <span className="text-[15px] text-mist-600 font-bold tracking-wide">지금의 여정</span>
+            </div>
+          </div>
+
+          <Card className="ml-5 relative !bg-white/90 backdrop-blur-md shadow-md border border-white/50">
+            {currentDirection ? (
+              <div className="py-2">
+                <div className="space-y-3">
+                  {/* 카테고리 아이콘 + 라벨 */}
+                  {currentDirection.categoryId && (
+                    <div className="flex items-center gap-3">
+                      <CategoryIcon categoryId={currentDirection.categoryId} size="sm" />
+                      <span className="text-[11px] font-bold tracking-wide"
+                        style={{ color: CATEGORIES.find(c => c.id === currentDirection.categoryId)?.accent ?? '#9AA5B1' }}>
+                        {currentDirection.categoryLabel}
+                      </span>
                     </div>
-                    {currentDirection.reviewAt && (
-                        <div className="flex items-center gap-2 text-xs text-point-400 bg-point-50 inline-flex px-3 py-1.5 rounded-full w-fit">
-                            <Calendar size={12} />
-                            <span>{new Date(currentDirection.reviewAt).toLocaleDateString()}에 열어볼 예정</span>
+                  )}
+                  <h2 className="text-xl md:text-2xl text-mist-600 font-bold leading-relaxed tracking-wide">
+                    {currentDirection.description || '지금의 여정'}
+                  </h2>
+                  <p className="text-mist-500 text-[15px] font-medium whitespace-pre-line bg-mist-50/50 py-4 px-4 rounded-2xl">
+                    {currentDirection.question}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3 mt-6">
+                  <div className="rounded-2xl bg-white border border-mist-100 px-3 py-4 text-center shadow-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Consistency</p>
+                    <p className="text-xl font-bold text-point-500 mt-2">{pathConsistency}%</p>
+                  </div>
+                  <div className="rounded-2xl bg-white border border-mist-100 px-3 py-4 text-center shadow-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Record Days</p>
+                    <p className="text-xl font-bold text-mist-600 mt-2">{currentPathRecords.length}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white border border-mist-100 px-3 py-4 text-center shadow-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Top Mood</p>
+                    <div className="mt-2 flex justify-center">
+                      {topMood ? <MoodSticker code={topMood} className="opacity-100" /> : <span className="text-sm text-mist-300">-</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mt-5">
+                  <div className="flex items-center gap-3 text-sm text-mist-500 bg-white border border-mist-100 px-4 py-3 rounded-2xl shadow-sm">
+                    <CheckCircle2 size={16} className="text-point-400" />
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Start</p>
+                      <span className="font-medium">{new Date(currentDirection.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-mist-500 bg-white border border-mist-100 px-4 py-3 rounded-2xl shadow-sm">
+                    <Calendar size={16} className="text-point-400" />
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Review</p>
+                      <span className="font-medium">{currentDirection.reviewAt ? new Date(currentDirection.reviewAt).toLocaleDateString() : '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-[1.75rem] bg-white/75 border border-white shadow-sm p-5">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <ImageIcon size={16} className="text-mist-400" />
+                      <h3 className="text-xs font-bold text-mist-500 uppercase tracking-widest">Path Scene Board</h3>
+                    </div>
+                    <button onClick={onHistoryClick} className="text-[11px] font-semibold text-point-500 inline-flex items-center gap-1">
+                      지난 흐름 보기
+                      <ArrowRight size={12} />
+                    </button>
+                  </div>
+                  {currentPathImages.length > 0 ? (
+                    <div className="grid grid-cols-4 gap-3">
+                      {currentPathImages.map((record) => (
+                        <div key={`path-scene-${record.id}`} className="space-y-2">
+                          <div className="aspect-square rounded-2xl overflow-hidden border border-white shadow-sm bg-mist-50">
+                            <img src={record.imageUrl} alt="Path scene" className="w-full h-full object-cover" />
+                          </div>
+                          <p className="text-[10px] text-mist-400 text-center">{new Date(record.timestamp).getDate()}일</p>
                         </div>
-                    )}
-                 </div>
-               </div>
-             ) : (
-                <p className="text-mist-400 text-center py-4">설정된 방향이 없습니다.</p>
-             )}
-           </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl bg-mist-50/70 border border-dashed border-white p-5 text-center">
+                      <p className="text-sm font-medium text-mist-500">아직 장면 보드가 비어 있어요</p>
+                      <p className="text-[11px] text-mist-400 mt-2">사진이 포함된 기록을 남기면 여정의 장면이 모입니다.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-mist-400 font-medium tracking-wide">설정된 방향이 없습니다.</p>
+              </div>
+            )}
+          </Card>
         </div>
 
-        {/* Change Action & History Link */}
         <div className="relative z-10 ml-5 mt-12 flex flex-col gap-4">
-           <SoftButton variant="secondary" onClick={handleStartEdit} className="!bg-white/60 backdrop-blur-sm border-mist-100">
-             <Archive size={16} className="text-mist-400" />
-             <span className="text-mist-500">이 방향을 마무리하고 변경하기</span>
-           </SoftButton>
+          {currentDirection ? (
+            <SoftButton variant="secondary" onClick={handleStartEdit} className="!bg-white/70 backdrop-blur-sm border-white/50 shadow-sm py-4">
+              <span className="text-mist-500 font-bold">새로운 방향으로 수정하기</span>
+            </SoftButton>
+          ) : (
+            <SoftButton onClick={handleStartEdit} className="py-4 shadow-lg shadow-point-200/50 font-bold">
+              <span>새로운 방향 설정하기</span>
+            </SoftButton>
+          )}
 
-           <div className="flex justify-center mt-2">
-                <button 
-                    onClick={onHistoryClick} 
-                    className="flex items-center gap-1 text-[11px] text-mist-300 hover:text-mist-500 transition-colors"
-                >
-                    <History size={12} />
-                    <span>이전 방향들 (과정 다시 살펴보기)</span>
-                </button>
-           </div>
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={onHistoryClick}
+              className="flex items-center gap-2 text-xs font-bold text-mist-400 hover:text-mist-600 transition-colors bg-white/50 px-4 py-2 rounded-full border border-mist-100 shadow-sm"
+            >
+              <History size={14} />
+              <span>과거의 여정들 바로가기</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

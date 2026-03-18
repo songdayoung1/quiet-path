@@ -89,6 +89,23 @@ CREATE TABLE reactions (
     CONSTRAINT fk_reactions_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE notifications (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    recipient_user_id BIGINT NOT NULL,
+    type VARCHAR(30) NOT NULL,
+    actor_user_id BIGINT NOT NULL,
+    target_type VARCHAR(20) NOT NULL,
+    target_id BIGINT NOT NULL,
+    message VARCHAR(500) NOT NULL,
+    is_read TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    read_at DATETIME,
+    INDEX idx_notification_recipient_created (recipient_user_id, created_at),
+    INDEX idx_notification_recipient_read_created (recipient_user_id, is_read, created_at),
+    CONSTRAINT fk_notifications_recipient_user FOREIGN KEY (recipient_user_id) REFERENCES users(id),
+    CONSTRAINT fk_notifications_actor_user FOREIGN KEY (actor_user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE path_summaries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     path_id BIGINT NOT NULL,

@@ -1,26 +1,18 @@
-import { AppState, Direction, LogEntry, UserLevel, DailyTone, ToneType } from './types';
+import { AppState, Direction, Record, UserLevel, DailyTone, ToneType } from './types';
 
 const STORAGE_KEY = 'quiet_path_data_v1';
 
-const DEFAULT_DIRECTION: Direction = {
-  id: 'init-dir',
-  question: '이번 분기, 나는 나만의 속도를 찾고 있을까?',
-  description: '서두르지 않고 깊이있게 머무르는 연습',
-  createdAt: Date.now(),
-  isActive: true,
-};
-
 const INITIAL_STATE: AppState = {
-  currentDirection: DEFAULT_DIRECTION,
+  currentDirection: null,
   pastDirections: [],
-  logs: [],
+  records: [],
   hasLoggedToday: false,
   hasSeenOnboarding: false,
   userLevel: 'Beginning'
 };
 
 // TONE DATA DEFINITION
-const TONES: Record<ToneType, DailyTone> = {
+const TONES: { [key in ToneType]: DailyTone } = {
   Fact: {
     type: 'Fact',
     label: 'Fact Check',
@@ -63,33 +55,55 @@ export const getDailyTone = (): DailyTone => {
   return TONES[currentToneKey];
 };
 
-const calculateLevel = (logCount: number): UserLevel => {
-  if (logCount >= 50) return 'Reflector'; // 성찰자
-  if (logCount >= 30) return 'Maintainer'; // 유지자
-  if (logCount >= 10) return 'Observer'; // 관찰자
-  if (logCount >= 3) return 'Recorder'; // 기록자
+const calculateLevel = (recordCount: number): UserLevel => {
+  if (recordCount >= 50) return 'Reflector'; // 성찰자
+  if (recordCount >= 30) return 'Maintainer'; // 유지자
+  if (recordCount >= 10) return 'Observer'; // 관찰자
+  if (recordCount >= 3) return 'Recorder'; // 기록자
   return 'Beginning';
+};
+
+const isMockRecord = (record: Record): boolean => record.id.startsWith('dummy_');
+const isMockDirection = (direction: Direction | null | undefined): boolean => direction?.id === 'init-dir';
+
+const sanitizeState = (state: AppState): AppState => {
+  const sanitizedRecords = (state.records || []).filter((record) => !isMockRecord(record));
+  const sanitizedCurrentDirection = isMockDirection(state.currentDirection) ? null : state.currentDirection;
+  const sanitizedPastDirections = (state.pastDirections || []).filter((direction) => !isMockDirection(direction));
+
+  return {
+    ...state,
+    currentDirection: sanitizedCurrentDirection,
+    pastDirections: sanitizedPastDirections,
+    records: sanitizedRecords,
+  };
 };
 
 export const loadState = (): AppState => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return INITIAL_STATE;
-    
-    const parsed = JSON.parse(saved);
+    const parsed = saved ? JSON.parse(saved) : null;
+    const sanitized = sanitizeState({
+      ...INITIAL_STATE,
+      ...(parsed || {}),
+    });
+
+    if (parsed && JSON.stringify(parsed) !== JSON.stringify(sanitized)) {
+      saveState(sanitized);
+    }
     
     // Check if logged today
-    const lastLog = parsed.logs && parsed.logs.length > 0 ? parsed.logs[0] : null;
-    const isToday = lastLog 
-      ? new Date(lastLog.timestamp).toDateString() === new Date().toDateString()
+    const lastRecord = sanitized.records && sanitized.records.length > 0 ? sanitized.records[0] : null;
+    const isToday = lastRecord 
+      ? new Date(lastRecord.timestamp).toDateString() === new Date().toDateString()
       : false;
 
     // Recalculate level ensuring it exists
-    const level = calculateLevel(parsed.logs?.length || 0);
+    const level = calculateLevel(sanitized.records?.length || 0);
 
     return {
       ...INITIAL_STATE, // Ensure shape
-      ...parsed,
+      ...sanitized,
       hasLoggedToday: isToday,
       userLevel: level
     };
