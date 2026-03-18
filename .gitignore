@@ -38,3 +38,6 @@ backend/.gradle/
 # Root docs: keep only canonical ERD
 docs/*
 !docs/DATABASE_ERD.md
+
+# Local mascot image assets
+frontend/public/assets/mascot/

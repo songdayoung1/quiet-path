@@ -4,6 +4,7 @@ import { createLogId } from '../storage';
 import { SoftButton, AutoTextArea, MoodSticker, WaterDropOverlay } from '../components/UI';
 import { X, Check, Image as ImageIcon } from 'lucide-react';
 import { MOOD_STICKERS } from '../constants';
+import { CharacterTone } from '../components/WaterDropCharacter';
 
 interface LogEditorViewProps {
   state: AppState;
@@ -62,6 +63,7 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
   };
 
   const isSaving = saveState !== 'idle';
+  const mascotTone: CharacterTone = (MOOD_STICKERS.some((sticker) => sticker.code === moodCode) ? moodCode : 'default') as CharacterTone;
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col animate-fade-in bg-[#E8EDF2]/95 backdrop-blur-xl">
@@ -195,7 +197,7 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
 
       {/* Water Drop Micro-interaction */}
       {isSaving && (
-        <WaterDropOverlay leaving={saveState === 'leaving'} />
+        <WaterDropOverlay leaving={saveState === 'leaving'} tone={mascotTone} />
       )}
     </div>
   );

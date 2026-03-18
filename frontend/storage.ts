@@ -2,16 +2,8 @@ import { AppState, Direction, Record, UserLevel, DailyTone, ToneType } from './t
 
 const STORAGE_KEY = 'quiet_path_data_v1';
 
-const DEFAULT_DIRECTION: Direction = {
-  id: 'init-dir',
-  question: '이번 분기, 나는 나만의 속도를 찾고 있을까?',
-  description: '서두르지 않고 깊이있게 머무르는 연습',
-  createdAt: Date.now(),
-  isActive: true,
-};
-
 const INITIAL_STATE: AppState = {
-  currentDirection: DEFAULT_DIRECTION,
+  currentDirection: null,
   pastDirections: [],
   records: [],
   hasLoggedToday: false,
@@ -71,53 +63,47 @@ const calculateLevel = (recordCount: number): UserLevel => {
   return 'Beginning';
 };
 
+const isMockRecord = (record: Record): boolean => record.id.startsWith('dummy_');
+const isMockDirection = (direction: Direction | null | undefined): boolean => direction?.id === 'init-dir';
+
+const sanitizeState = (state: AppState): AppState => {
+  const sanitizedRecords = (state.records || []).filter((record) => !isMockRecord(record));
+  const sanitizedCurrentDirection = isMockDirection(state.currentDirection) ? null : state.currentDirection;
+  const sanitizedPastDirections = (state.pastDirections || []).filter((direction) => !isMockDirection(direction));
+
+  return {
+    ...state,
+    currentDirection: sanitizedCurrentDirection,
+    pastDirections: sanitizedPastDirections,
+    records: sanitizedRecords,
+  };
+};
+
 export const loadState = (): AppState => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    let parsed = saved ? JSON.parse(saved) : null;
+    const parsed = saved ? JSON.parse(saved) : null;
+    const sanitized = sanitizeState({
+      ...INITIAL_STATE,
+      ...(parsed || {}),
+    });
 
-    // Inject dummy data if no records exist so the user can see the UI filled
-    if (!parsed || !parsed.records || parsed.records.length === 0) {
-        parsed = {
-            ...(parsed || INITIAL_STATE),
-            records: [
-                {
-                    id: 'dummy_1',
-                    date: new Date().toISOString(),
-                    timestamp: Date.now(),
-                    directionQuestion: '조용한 일상을 찾아서',
-                    action: '따뜻한 커피 한 잔과 함께 온전히 나에게 집중했던 시간.',
-                    oneWordText: '평온',
-                    moodCode: '포근',
-                    imageUrl: 'https://images.unsplash.com/photo-1544716278-e513176f20b5?auto=format&fit=crop&q=80&w=600'
-                },
-                {
-                    id: 'dummy_2',
-                    date: new Date(Date.now() - 86400000).toISOString(),
-                    timestamp: Date.now() - 86400000,
-                    directionQuestion: '조용한 일상을 찾아서',
-                    action: '오랜만에 공원에 나가 바람을 쐬었다. 초록색이 주는 위안.',
-                    oneWordText: '초록빛 한숨',
-                    moodCode: '잔잔',
-                    imageUrl: 'https://images.unsplash.com/photo-1506744626753-1fa44df3133f?auto=format&fit=crop&q=80&w=600'
-                }
-            ]
-        };
-        saveState(parsed);
+    if (parsed && JSON.stringify(parsed) !== JSON.stringify(sanitized)) {
+      saveState(sanitized);
     }
     
     // Check if logged today
-    const lastRecord = parsed.records && parsed.records.length > 0 ? parsed.records[0] : null;
+    const lastRecord = sanitized.records && sanitized.records.length > 0 ? sanitized.records[0] : null;
     const isToday = lastRecord 
       ? new Date(lastRecord.timestamp).toDateString() === new Date().toDateString()
       : false;
 
     // Recalculate level ensuring it exists
-    const level = calculateLevel(parsed.records?.length || 0);
+    const level = calculateLevel(sanitized.records?.length || 0);
 
     return {
       ...INITIAL_STATE, // Ensure shape
-      ...parsed,
+      ...sanitized,
       hasLoggedToday: isToday,
       userLevel: level
     };

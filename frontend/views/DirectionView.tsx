@@ -31,6 +31,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
     const ts = getReviewAt();
     return ts ? new Date(ts).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : null;
   })();
+  const isTitleMissing = !description.trim();
+  const canSubmit = !isTitleMissing && !!getReviewAt();
 
   const handleStartEdit = () => {
     setIsEditing(true);
@@ -97,7 +99,7 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   if (isEditing) {
     return (
       <div className="animate-fade-in pb-24 pt-2">
-        <PageHeader title="새로운 방향 설정" subtitle="어떤 질문을 안고 걸어볼까요?" />
+        <PageHeader title="새로운 방향 설정" subtitle="집중하고 싶은 방향을 차분히 정해볼까요?" />
 
         {showCategorySelect ? (
           <div className="flex flex-col gap-3 px-1 mt-2">
@@ -108,7 +110,7 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                 onClick={() => {
                   setSelectedCategory(cat);
                   setQuestion('');
-                  setDescription(cat.defaultTitle);
+                  setDescription('');
                   setShowCategorySelect(false);
                 }}
                 className="!p-5 cursor-pointer hover:bg-white active:scale-[0.98] border border-white transition-all shadow-sm hover:shadow-md"
@@ -129,49 +131,53 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
             </SoftButton>
           </div>
         ) : (
-          <Card className="flex flex-col gap-6 !bg-white/80 shadow-md border-white/80">
+          <Card className="flex flex-col gap-0 !bg-white/88 shadow-md border-white/80 !p-9 rounded-[2.25rem]">
             {/* 선택된 카테고리 뱃지 */}
             {selectedCategory && (
-              <div className="flex items-center gap-3 pb-2 border-b border-mist-100">
+              <div className="flex items-center gap-4 pb-8 border-b border-mist-100">
                 <CategoryIcon categoryId={selectedCategory.id} size="sm" />
-                <span className="text-sm font-bold" style={{ color: selectedCategory.accent }}>{selectedCategory.label}</span>
+                <div className="min-w-0">
+                  <span className="text-[15px] font-bold leading-none block" style={{ color: selectedCategory.accent }}>{selectedCategory.label}</span>
+                  <span className="text-[13px] leading-6 text-mist-400 mt-3 block">이 카테고리 안에서 새로운 흐름을 시작해요.</span>
+                </div>
               </div>
             )}
 
-            {/* 1. 이름/제목 먼저 (카드에서 큰 제목으로 표시되는 것) */}
-            <div>
-              <label className="block text-xs font-bold text-mist-500 mb-2 ml-1">이 여정의 이름</label>
+            <div className="space-y-0 pt-8 pb-8">
+              <label className="block text-[14px] font-bold text-mist-500 mb-4 ml-1">여정 제목</label>
               <SoftInput
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="예: 하루 1시간, 나만의 공부 루틴"
+                placeholder={selectedCategory ? `예: ${selectedCategory.defaultTitle}` : '예: 퇴근 후 30분 공부 루틴'}
                 autoFocus
-                className="bg-white"
+                className={`bg-white !text-[17px] !leading-none !py-5 !px-6 placeholder:!text-mist-300 placeholder:!font-semibold ${description ? '!font-semibold' : '!font-medium'} ${isTitleMissing ? '!border-rose-200 focus:!ring-rose-200' : ''}`}
               />
-              <p className="text-[10px] text-mist-300 mt-1.5 ml-1">카드에 큰 제목으로 보입니다</p>
+              {isTitleMissing ? (
+                <p className="text-[12px] text-rose-400 mt-4 ml-1">제목을 설정해주세요.</p>
+              ) : (
+                <p className="text-[12px] text-mist-300 mt-4 ml-1">예: {selectedCategory?.defaultTitle || '퇴근 후 30분 공부 루틴'}</p>
+              )}
             </div>
 
-            {/* 2. 질문 (카드에서 본문으로 표시되는 것) */}
-            <div>
-              <label className="block text-xs font-bold text-mist-500 mb-2 ml-1">나에게 던지는 질문 <span className="text-mist-300 font-normal">(선택)</span></label>
+            <div className="space-y-0 pb-8">
+              <label className="block text-[14px] font-bold text-mist-500 mb-4 ml-1">나에게 던지는 질문 <span className="text-mist-300 font-normal">(선택)</span></label>
               <SoftInput
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
-                placeholder="예: 나는 꾸준히 배우고 있을까?"
-                className="bg-white"
+                placeholder="예: 나는 이 방향으로 조금씩 나아가고 있을까?"
+                className="bg-white !text-[16px] !font-medium !leading-normal !py-5 !px-6 placeholder:!text-mist-300"
               />
-              <p className="text-[10px] text-mist-300 mt-1.5 ml-1">이 기간이 끝날 때 스스로 돌아볼 질문이에요</p>
+              <p className="text-[12px] text-mist-300 mt-4 ml-1">비워두면 기본 질문으로 시작합니다.</p>
             </div>
 
-            {/* 3. 언제 돌아볼까요 */}
-            <div>
-              <label className="block text-xs font-bold text-mist-500 mb-3 ml-1">언제 돌아볼까요?</label>
-              <div className="flex gap-2 flex-wrap">
+            <div className="space-y-0">
+              <label className="block text-[14px] font-bold text-mist-500 mb-5 ml-1">언제 돌아볼까요?</label>
+              <div className="grid grid-cols-4 gap-2">
                 {[7, 14, 30].map((days) => (
                   <button
                     key={days}
                     onClick={() => { setDurationDays(days); setCustomReviewDate(''); setShowDateInput(false); }}
-                    className={`px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all ${
+                    className={`px-3 py-3 rounded-[1.15rem] text-[13px] font-semibold transition-all whitespace-nowrap ${
                       durationDays === days && !customReviewDate
                         ? 'bg-point-500 text-white shadow-md shadow-point-200/50 scale-105'
                         : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
@@ -182,13 +188,13 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                 ))}
                 <button
                   onClick={() => { setShowDateInput(!showDateInput); setDurationDays(null); }}
-                  className={`px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                  className={`px-2 py-3 rounded-[1.15rem] text-[13px] font-semibold transition-all flex items-center justify-center gap-1 whitespace-nowrap ${
                     showDateInput || customReviewDate
                       ? 'bg-point-500 text-white shadow-md shadow-point-200/50'
                       : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
                   }`}
                 >
-                  <Calendar size={14} />
+                  <Calendar size={12} />
                   직접 선택
                 </button>
               </div>
@@ -198,20 +204,23 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                   min={todayStr}
                   value={customReviewDate}
                   onChange={(e) => { setCustomReviewDate(e.target.value); setDurationDays(null); }}
-                  className="mt-3 w-full bg-white border border-mist-100 rounded-2xl px-4 py-3 text-sm text-mist-600 outline-none focus:ring-1 focus:ring-point-300 transition-all"
+                  className="mt-4 w-full bg-white border border-mist-100 rounded-2xl px-5 py-4 text-[15px] text-mist-600 outline-none focus:ring-1 focus:ring-point-300 transition-all"
                 />
               )}
               {reviewDateDisplay && (
-                <div className="mt-3 flex items-center gap-2 px-4 py-3 rounded-2xl bg-point-50 border border-point-100 text-point-600 text-sm">
+                <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl bg-point-50 border border-point-100 text-point-600 text-[14px]">
                   <Calendar size={15} className="text-point-400 shrink-0" />
                   <span className="font-semibold">{reviewDateDisplay}</span>
                   <span className="text-point-400 text-xs ml-auto">에 돌아볼게요</span>
                 </div>
               )}
+              {!getReviewAt() && (
+                <p className="text-[12px] text-mist-300 mt-4 ml-1">회고 시점을 정해야 여정을 시작할 수 있어요.</p>
+              )}
             </div>
 
             <div className="flex flex-col gap-3 pt-2">
-              <SoftButton onClick={handleSubmit} disabled={!description.trim() || !getReviewAt()} className="py-4 text-base font-bold shadow-point-200/50">
+              <SoftButton onClick={handleSubmit} disabled={!canSubmit} className="py-4 text-base font-bold shadow-point-200/50">
                 여정 시작하기
               </SoftButton>
               <SoftButton variant="secondary" onClick={handleCancel} className="bg-transparent border-none hover:bg-mist-50 shadow-none text-mist-400">

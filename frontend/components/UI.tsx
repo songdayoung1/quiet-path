@@ -16,9 +16,10 @@ export const Card: React.FC<{
       onClick={onClick}
       style={style}
       className={`
-        glass-panel rounded-[2rem] p-6 transition-all duration-700 ease-out 
+        glass-panel rounded-[2rem] p-6 transition-all duration-300 ease-out 
         relative overflow-hidden
-        hover:shadow-[0_12px_40px_rgba(139,92,246,0.1)] 
+        hover:shadow-[0_8px_30px_rgba(139,92,246,0.08)] 
+        hover:scale-[1.015] active:scale-[0.99]
         ${breathe ? 'animate-breathe' : ''}
         ${className}
       `}
@@ -538,7 +539,9 @@ export const VisualTrace: React.FC<{ index: number }> = ({ index }) => {
 // ── Water Drop Micro-interaction Overlay ──
 import { WaterDropCharacter } from './WaterDropCharacter';
 
-export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({ leaving = false }) => {
+export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({
+  leaving = false,
+}) => {
   const droplets = [
     { dx: '-28px', dy: '-36px', delay: '0.28s', size: 8 },
     { dx: '32px',  dy: '-30px', delay: '0.32s', size: 6 },
@@ -567,7 +570,7 @@ export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({ leaving = fa
 
         {/* Happy character instead of plain emoji */}
         <div className="drop-icon relative z-10">
-          <WaterDropCharacter size={72} mood="happy" animate={false} />
+          <WaterDropCharacter size={86} mood="happy" animate={false} />
         </div>
 
         {droplets.map((d, i) => (

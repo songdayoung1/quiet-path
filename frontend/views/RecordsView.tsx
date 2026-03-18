@@ -1,8 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { Record as RecordType, Direction } from '../types';
-import { Card, PageHeader, SoftButton, MoodSticker } from '../components/UI';
-import { TodaysCard } from '../components/TodaysCard';
-import { MoreHorizontal, EyeOff, Pin, Calendar, Lock, Share2, Globe2, Image as ImageIcon, ChevronLeft, ChevronRight, BookOpenText } from 'lucide-react';
+import { Card, MoodSticker } from '../components/UI';
+import { Globe2, Pin, Calendar, Image as ImageIcon, BookOpenText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CharacterTone } from '../components/WaterDropCharacter';
+
+import { AlbumTab } from '../components/records/AlbumTab';
+import { RecordsListTab } from '../components/records/RecordsListTab';
+import { CalendarTab } from '../components/records/CalendarTab';
 
 interface RecordsViewProps {
   records: RecordType[];
@@ -13,514 +17,279 @@ interface RecordsViewProps {
   onLogClick: () => void;
 }
 
-export const RecordsView: React.FC<RecordsViewProps> = ({ records, currentDirection, onUpdateRecord, hasLoggedToday, onLogClick }) => {
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+export const RecordsView: React.FC<RecordsViewProps> = ({
+  records,
+  currentDirection,
+  onUpdateRecord,
+}) => {
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<RecordType | null>(null);
   const [activeTab, setActiveTab] = useState<'album' | 'records' | 'calendar'>('album');
 
-  const activeRecords = useMemo(() => records.filter(r => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp), [records]);
-
-  // 오늘의 기록 카드
-  const todayDateStr = new Date().toLocaleDateString('ko-KR');
-  const todayRecord = useMemo(() =>
-    activeRecords.find(r => new Date(r.timestamp).toLocaleDateString('ko-KR') === todayDateStr) || null,
-    [activeRecords, todayDateStr]
+  const activeRecords = useMemo(
+    () => records.filter((r) => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp),
+    [records],
   );
 
   const [selectedMonthDate, setSelectedMonthDate] = useState<Date>(() => {
-    if (activeRecords.length > 0) {
-      const latestRecordDate = new Date(activeRecords[0].timestamp);
-      return new Date(latestRecordDate.getFullYear(), latestRecordDate.getMonth(), 1);
-    }
-    const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), 1);
+    const ref = activeRecords[0] ? new Date(activeRecords[0].timestamp) : new Date();
+    return new Date(ref.getFullYear(), ref.getMonth(), 1);
   });
 
   const targetMonth = selectedMonthDate.getMonth();
   const targetYear = selectedMonthDate.getFullYear();
 
-  const monthlyRecords = useMemo(() => activeRecords.filter(r => {
-      const d = new Date(r.timestamp);
-      return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
-  }), [activeRecords, targetMonth, targetYear]);
+  const monthlyRecords = useMemo(
+    () =>
+      activeRecords.filter((r) => {
+        const d = new Date(r.timestamp);
+        return d.getMonth() === targetMonth && d.getFullYear() === targetYear;
+      }),
+    [activeRecords, targetMonth, targetYear],
+  );
 
-  // Statistics
-  const moodCounts = monthlyRecords.reduce((acc, record) => {
-      if (record.moodCode) acc[record.moodCode] = (acc[record.moodCode] || 0) + 1;
+  /* ── Stats ── */
+  const moodCounts = monthlyRecords.reduce(
+    (acc, r) => {
+      if (r.moodCode) acc[r.moodCode] = (acc[r.moodCode] || 0) + 1;
       return acc;
-  }, {} as Record<string, number>);
+    },
+    {} as Record<string, number>,
+  );
   const topMoods = Object.entries(moodCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
   const photoRecords = useMemo(
-    () => monthlyRecords
-      .filter(r => r.imageUrl)
-      .sort((a, b) => a.timestamp - b.timestamp),
-    [monthlyRecords]
+    () =>
+      monthlyRecords
+        .filter((r) => r.imageUrl)
+        .sort((a, b) => a.timestamp - b.timestamp),
+    [monthlyRecords],
   );
-  const displayedPhotoRecords = useMemo(
-    () => (photoRecords.length > 12 ? photoRecords.slice(-12) : photoRecords),
-    [photoRecords]
-  );
+  const displayedPhotoRecords = photoRecords.length > 12 ? photoRecords.slice(-12) : photoRecords;
+
+  const photoCoverage =
+    monthlyRecords.length > 0
+      ? Math.round((photoRecords.length / monthlyRecords.length) * 100)
+      : 0;
+
+  /* ── Month navigation bounds ── */
   const firstRecordMonth = useMemo(() => {
-    if (activeRecords.length === 0) return null;
-    const lastRecordDate = new Date(activeRecords[activeRecords.length - 1].timestamp);
-    return new Date(lastRecordDate.getFullYear(), lastRecordDate.getMonth(), 1);
+    if (!activeRecords.length) return null;
+    const d = new Date(activeRecords[activeRecords.length - 1].timestamp);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
   }, [activeRecords]);
+
   const latestRecordMonth = useMemo(() => {
-    if (activeRecords.length === 0) return null;
-    const latestRecordDate = new Date(activeRecords[0].timestamp);
-    return new Date(latestRecordDate.getFullYear(), latestRecordDate.getMonth(), 1);
+    if (!activeRecords.length) return null;
+    const d = new Date(activeRecords[0].timestamp);
+    return new Date(d.getFullYear(), d.getMonth(), 1);
   }, [activeRecords]);
+
   const canGoPrevMonth = firstRecordMonth !== null && selectedMonthDate.getTime() > firstRecordMonth.getTime();
   const canGoNextMonth = latestRecordMonth !== null && selectedMonthDate.getTime() < latestRecordMonth.getTime();
-  const photoCoverage = monthlyRecords.length > 0
-    ? Math.round((photoRecords.length / monthlyRecords.length) * 100)
-    : 0;
-  const sceneTextLabel = (record: RecordType) => record.action;
-  const monthlyRecordMap = useMemo(() => {
-    const map = new Map<number, RecordType>();
-    monthlyRecords.forEach((record) => {
-      map.set(new Date(record.timestamp).getDate(), record);
-    });
-    return map;
-  }, [monthlyRecords]);
+
+  /* ── Calendar grid ── */
   const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(targetYear, targetMonth, 1).getDay();
+
+  const monthlyRecordMap = useMemo(() => {
+    const map = new Map<number, RecordType>();
+    monthlyRecords.forEach((r) => map.set(new Date(r.timestamp).getDate(), r));
+    return map;
+  }, [monthlyRecords]);
+
   const calendarCells = useMemo(() => {
     const cells: Array<{ type: 'empty' } | { type: 'day'; day: number; record?: RecordType }> = [];
-    for (let i = 0; i < firstDayOfMonth; i += 1) {
-      cells.push({ type: 'empty' });
-    }
-    for (let day = 1; day <= daysInMonth; day += 1) {
+    for (let i = 0; i < firstDayOfMonth; i++) cells.push({ type: 'empty' });
+    for (let day = 1; day <= daysInMonth; day++)
       cells.push({ type: 'day', day, record: monthlyRecordMap.get(day) });
-    }
     return cells;
   }, [daysInMonth, firstDayOfMonth, monthlyRecordMap]);
-  const weekdayLabels = ['일', '월', '화', '수', '목', '금', '토'];
 
-  // Handlers
-  const handleHide = (record: RecordType) => {
-    onUpdateRecord({ ...record, isHidden: true });
-    setActiveMenuId(null);
-  };
-  const handlePin = (record: RecordType) => {
-    onUpdateRecord({ ...record, isPinned: !record.isPinned });
-    setActiveMenuId(null);
-  };
-  const handleShare = (record: RecordType) => {
-    if (!record.isShared) {
-        onUpdateRecord({ ...record, isShared: true });
-        alert("커뮤니티에 조용히 공유되었습니다.");
-    }
-    setActiveMenuId(null);
-  };
-
-  // DETAIL VIEW
+  /* ─────────────────────────────────────────
+     DETAIL VIEW
+  ───────────────────────────────────────── */
   if (selectedRecordForDetail) {
-      const record = selectedRecordForDetail;
-      return (
-        <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen bg-[#F5F7FA]">
-           <div className="px-4 flex justify-between items-center mb-6">
-              <button onClick={() => setSelectedRecordForDetail(null)} className="text-mist-500 hover:text-mist-600 transition-colors p-2 text-sm font-bold">닫기</button>
-              <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest">{new Date(record.timestamp).toLocaleDateString()}</span>
-              <div className="w-10"></div>
-           </div>
-
-           <div className="px-5 flex flex-col gap-6 max-w-md mx-auto">
-               <div className="text-center">
-                   {record.moodCode && <MoodSticker code={record.moodCode} className="mb-4 scale-125 hover:scale-125 pointer-events-none" />}
-                   {record.oneWordText && (
-                       <h2 className="text-2xl font-bold text-mist-600 mt-2">"{record.oneWordText}"</h2>
-                   )}
-                   <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-mist-400">
-                       {record.isShared && (
-                           <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 shadow-sm border border-mist-100">
-                               <Globe2 size={12} className="text-point-400" />
-                               공유됨
-                           </span>
-                       )}
-                       {record.isPinned && (
-                           <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 shadow-sm border border-mist-100">
-                               <Pin size={12} className="text-mist-400" />
-                               기억할 장면
-                           </span>
-                       )}
-                   </div>
-               </div>
-
-               {record.imageUrl && (
-                   <div className="w-full rounded-3xl overflow-hidden shadow-sm border border-mist-100">
-                       <img src={record.imageUrl} alt="Scene" className="w-full object-cover aspect-[4/5] max-h-96" />
-                   </div>
-               )}
-
-               <div className="bg-white/80 p-6 rounded-3xl shadow-sm border border-white">
-                   <p className="text-xs text-point-500 font-bold mb-3 uppercase tracking-wide">오늘의 장면</p>
-                   <p className="text-mist-600 text-[15px] leading-relaxed whitespace-pre-line">{sceneTextLabel(record)}</p>
-               </div>
-
-               {record.tomorrowText && (
-                   <div className="bg-white/50 p-6 rounded-3xl shadow-sm border border-white">
-                       <p className="text-xs text-mist-400 font-bold mb-3 uppercase tracking-wide">내일의 한 걸음</p>
-                       <p className="text-mist-600 text-[14px] leading-relaxed">{record.tomorrowText}</p>
-                   </div>
-               )}
-               
-               <div className="text-center mt-6">
-                   <p className="text-[10px] text-mist-300 tracking-wide">이 기록은 당신의 궤적에 안전하게 보관되어 있습니다.</p>
-               </div>
-           </div>
+    const record = selectedRecordForDetail;
+    return (
+      <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen bg-[#F5F7FA]">
+        <div className="px-4 flex justify-between items-center mb-6">
+          <button
+            onClick={() => setSelectedRecordForDetail(null)}
+            className="text-mist-500 hover:text-mist-600 transition-colors p-2 text-sm font-bold"
+          >
+            닫기
+          </button>
+          <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest">
+            {new Date(record.timestamp).toLocaleDateString()}
+          </span>
+          <div className="w-10" />
         </div>
-      );
+
+        <div className="px-5 flex flex-col gap-6 max-w-md mx-auto">
+          <div className="text-center">
+            {record.moodCode && (
+              <MoodSticker code={record.moodCode} className="mb-4 scale-125 hover:scale-125 pointer-events-none" />
+            )}
+            {record.action && (
+              <h2 className="text-2xl font-bold text-mist-600 mt-2 break-keep">{record.action}</h2>
+            )}
+            <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-mist-400">
+              {record.isShared && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 shadow-sm border border-mist-100">
+                  <span className="text-point-400">●</span> 공유됨
+                </span>
+              )}
+              {record.isPinned && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 shadow-sm border border-mist-100">
+                  <Pin size={12} className="text-mist-400" /> 기억할 장면
+                </span>
+              )}
+            </div>
+          </div>
+
+          {record.imageUrl && (
+            <div className="w-full rounded-3xl overflow-hidden shadow-sm border border-mist-100">
+              <img src={record.imageUrl} alt="Scene" className="w-full object-cover aspect-[4/5] max-h-96" />
+            </div>
+          )}
+
+          {record.oneWordText && (
+            <div className="bg-white/80 p-6 rounded-3xl shadow-sm border border-white">
+              <p className="text-xs text-point-500 font-bold mb-3 uppercase tracking-wide">오늘을 한 단어로 표현한다면?</p>
+              <p className="text-mist-600 text-[15px] leading-relaxed whitespace-pre-line">{record.oneWordText}</p>
+            </div>
+          )}
+
+          {record.tomorrowText && (
+            <div className="bg-white/50 p-6 rounded-3xl shadow-sm border border-white">
+              <p className="text-xs text-mist-400 font-bold mb-3 uppercase tracking-wide">내일의 한 걸음</p>
+              <p className="text-mist-600 text-[14px] leading-relaxed">{record.tomorrowText}</p>
+            </div>
+          )}
+
+          <div className="text-center mt-6 mb-4">
+            <p className="text-[10px] text-mist-300 tracking-wide">
+              이 기록은 당신의 궤적에 안전하게 보관되어 있습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  // MONTHLY VIEW
+  /* ─────────────────────────────────────────
+     MONTHLY VIEW
+  ───────────────────────────────────────── */
   return (
-    <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen" onClick={() => setActiveMenuId(null)}>
+    <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen">
 
-      {/* 0. Today's Card — 오늘 기록 카드 */}
+      {/* ── Header: 월간 요약 타이틀 + 월 네비게이션 ── */}
       <div className="px-4 mb-6">
-        <TodaysCard
-          hasLoggedToday={hasLoggedToday}
-          todayRecord={todayRecord}
-          onLogClick={onLogClick}
-          onEditClick={onLogClick}
-        />
-      </div>
-
-      {/* 1. 상단: 월간 요약 */}
-      <div className="px-4 mb-6">
-         <div className="flex items-center justify-between gap-3">
-            <div>
-               <h1 className="text-2xl font-bold text-mist-600 tracking-tight">
-                  {targetYear}년 {targetMonth + 1}월의 궤적
-               </h1>
-               <p className="text-mist-400 text-sm mt-1">이번 달의 기록들을 돌아봅니다.</p>
-            </div>
-            <div className="flex items-center gap-2 rounded-full bg-white/70 px-2 py-2 shadow-sm border border-white/70">
-               <button
-                 onClick={() => canGoPrevMonth && setSelectedMonthDate(new Date(targetYear, targetMonth - 1, 1))}
-                 disabled={!canGoPrevMonth}
-                 className="w-8 h-8 rounded-full flex items-center justify-center text-mist-500 hover:bg-mist-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-               >
-                 <ChevronLeft size={16} />
-               </button>
-               <span className="text-[11px] font-bold text-mist-500 tracking-wide min-w-[64px] text-center">
-                 {targetMonth + 1}월
-               </span>
-               <button
-                 onClick={() => canGoNextMonth && setSelectedMonthDate(new Date(targetYear, targetMonth + 1, 1))}
-                 disabled={!canGoNextMonth}
-                 className="w-8 h-8 rounded-full flex items-center justify-center text-mist-500 hover:bg-mist-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-               >
-                 <ChevronRight size={16} />
-               </button>
-            </div>
-         </div>
-      </div>
-
-      <div className="px-4 mb-6">
-         <div className="grid grid-cols-3 gap-3">
-             <div className="bg-white/70 p-4 rounded-3xl border border-white shadow-sm flex flex-col justify-center items-center min-h-[104px]">
-                 <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest mb-1.5 text-center">Records</span>
-                 <span className="text-3xl font-bold text-point-500">{monthlyRecords.length}</span>
-             </div>
-             <div className="bg-white/70 p-4 rounded-3xl border border-white shadow-sm flex flex-col justify-center items-center min-h-[104px]">
-                 <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest mb-1.5 text-center">Photo Moments</span>
-                 <span className="text-3xl font-bold text-mist-600">{photoRecords.length}</span>
-                 <span className="text-[10px] text-mist-300 mt-1">{photoCoverage}% 남김</span>
-             </div>
-             <div className="bg-white/70 p-4 rounded-3xl border border-white shadow-sm flex flex-col justify-center items-center min-h-[104px]">
-                 <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest mb-2 text-center">Top Moods</span>
-                 <div className="flex justify-center flex-wrap gap-1">
-                     {topMoods.length > 0 ? topMoods.map(([code]) => (
-                          <MoodSticker key={code} code={code} className="scale-90 opacity-100 px-2 py-1" />
-                     )) : <span className="text-sm text-mist-300">-</span>}
-                 </div>
-             </div>
-         </div>
-      </div>
-
-      <div className="px-4 mb-6">
-         <div className="bg-white/70 rounded-[2rem] p-1.5 border border-white shadow-sm grid grid-cols-3 gap-1">
-            <button
-              onClick={() => setActiveTab('album')}
-              className={`rounded-full px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'album' ? 'bg-white text-point-500 shadow-sm' : 'text-mist-400 hover:text-mist-600'
-              }`}
-            >
-              <ImageIcon size={16} />
-              앨범
-            </button>
-            <button
-              onClick={() => setActiveTab('records')}
-              className={`rounded-full px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'records' ? 'bg-white text-point-500 shadow-sm' : 'text-mist-400 hover:text-mist-600'
-              }`}
-            >
-              <BookOpenText size={16} />
-              기록
-            </button>
-            <button
-              onClick={() => setActiveTab('calendar')}
-              className={`rounded-full px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'calendar' ? 'bg-white text-point-500 shadow-sm' : 'text-mist-400 hover:text-mist-600'
-              }`}
-            >
-              <Calendar size={16} />
-              캘린더
-            </button>
-         </div>
-      </div>
-
-      {monthlyRecords.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-12 text-center opacity-70">
-              <Calendar size={32} className="text-mist-300 mb-4" />
-              <p className="text-mist-500 font-medium tracking-wide">기록된 궤적이 없습니다.</p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-mist-600 tracking-tight">
+              {targetYear}년 {targetMonth + 1}월의 궤적
+            </h1>
+            <p className="text-mist-400 text-sm mt-1">이번 달의 기록들을 돌아봅니다.</p>
           </div>
-      ) : (
-          <div className="flex flex-col gap-8">
-              {activeTab === 'album' ? (
-                  <div className="px-3 pb-6">
-                      {displayedPhotoRecords.length > 0 ? (
-                          <div className="flex flex-col gap-3">
-                              {/* 첫 번째 사진: 전체 너비 히어로 */}
-                              {(() => {
-                                  const hero = displayedPhotoRecords[displayedPhotoRecords.length - 1];
-                                  const rest = displayedPhotoRecords.slice(0, -1).reverse();
-                                  const formatDate = (ts: number) => {
-                                      const d = new Date(ts);
-                                      return `${d.getMonth() + 1}월 ${d.getDate()}일 ${['일','월','화','수','목','금','토'][d.getDay()]}`;
-                                  };
-                                  return (
-                                      <>
-                                          <button
-                                              type="button"
-                                              className="relative w-full aspect-[4/3] rounded-3xl overflow-hidden shadow-md group"
-                                              onClick={() => setSelectedRecordForDetail(hero)}
-                                          >
-                                              <img src={hero.imageUrl} alt="hero scene" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                                              <div className="absolute bottom-0 left-0 right-0 p-4 flex items-end justify-between">
-                                                  <div>
-                                                      <p className="text-white/70 text-[10px] font-medium tracking-wide mb-0.5">{formatDate(hero.timestamp)}</p>
-                                                      {hero.oneWordText && <p className="text-white font-bold text-base leading-tight">"{hero.oneWordText}"</p>}
-                                                  </div>
-                                                  {hero.moodCode && <MoodSticker code={hero.moodCode} className="opacity-100 shadow-md" />}
-                                              </div>
-                                          </button>
-                                          {/* 나머지 사진: 2열 그리드 */}
-                                          {rest.length > 0 && (
-                                              <div className="grid grid-cols-2 gap-3">
-                                                  {rest.map(record => (
-                                                      <button
-                                                          key={`photo-${record.id}`}
-                                                          type="button"
-                                                          className="relative aspect-square rounded-2xl overflow-hidden shadow-sm group"
-                                                          onClick={() => setSelectedRecordForDetail(record)}
-                                                      >
-                                                          <img src={record.imageUrl} alt="scene" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                                                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                                                          <div className="absolute bottom-0 left-0 right-0 p-2.5 flex items-end justify-between">
-                                                              <p className="text-white/80 text-[10px] font-medium">{formatDate(record.timestamp)}</p>
-                                                              {record.moodCode && <MoodSticker code={record.moodCode} className="opacity-100 scale-75 origin-right shadow-none" />}
-                                                          </div>
-                                                      </button>
-                                                  ))}
-                                              </div>
-                                          )}
-                                      </>
-                                  );
-                              })()}
-                          </div>
-                      ) : (
-                          <div className="mb-8 bg-white/50 border-2 border-dashed border-white rounded-3xl p-8 flex flex-col items-center justify-center text-center shadow-sm">
-                              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm mb-3">
-                                  <ImageIcon size={20} className="text-mist-300" />
-                              </div>
-                              <p className="text-sm font-bold text-mist-500 mb-1.5">아직 이번 달 장면이 없어요</p>
-                              <p className="text-[11px] text-mist-400 leading-relaxed max-w-[220px]">
-                                  기록을 남길 때 사진을 첨부하면<br />이곳에 장면이 차곡차곡 쌓입니다.
-                              </p>
-                          </div>
-                      )}
-                  </div>
-              ) : activeTab === 'records' ? (
-                  <div className="px-4 flex flex-col gap-5">
-                      <div className="flex items-center justify-between gap-3 mb-1 px-1">
-                          <div className="flex items-center gap-2">
-                              <Calendar size={16} className="text-mist-400" />
-                              <h3 className="text-xs font-bold text-mist-500 uppercase tracking-widest">Record View</h3>
-                          </div>
-                          <span className="text-[11px] text-mist-300">{monthlyRecords.length}일의 기록</span>
-                      </div>
-                      <p className="px-1 text-sm text-mist-400 leading-relaxed">
-                        날짜와 장면 순서대로 이번 달의 흐름을 다시 볼 수 있어요.
-                      </p>
-                      {monthlyRecords.map((record) => {
-                      const isLocked = currentDirection?.isActive && record.timestamp >= currentDirection.createdAt && new Date(record.timestamp).toDateString() !== new Date().toDateString();
+          <div className="flex items-center gap-1 rounded-full bg-white/70 px-2 py-2 shadow-sm border border-white/70">
+            <button
+              onClick={() => canGoPrevMonth && setSelectedMonthDate(new Date(targetYear, targetMonth - 1, 1))}
+              disabled={!canGoPrevMonth}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-mist-500 hover:bg-mist-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-[11px] font-bold text-mist-500 tracking-wide min-w-[40px] text-center">
+              {targetMonth + 1}월
+            </span>
+            <button
+              onClick={() => canGoNextMonth && setSelectedMonthDate(new Date(targetYear, targetMonth + 1, 1))}
+              disabled={!canGoNextMonth}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-mist-500 hover:bg-mist-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
 
-                      return (
-                          <Card 
-                              key={record.id} 
-                              className={`!p-6 !rounded-[2rem] cursor-pointer hover:shadow-lg transition-all duration-300 relative overflow-hidden ${record.isPinned ? 'bg-white shadow-md border border-point-200' : 'bg-white/80 border border-white/60'}`}
-                              onClick={() => !isLocked && setSelectedRecordForDetail(record)}
-                          >
-                              {/* Header */}
-                              <div className="flex justify-between items-start mb-4">
-                                  <div className="flex flex-col">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="text-[11px] font-bold text-mist-400 tracking-wider">
-                                              {new Date(record.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', weekday: 'short' })}
-                                          </span>
-                                          {record.isShared && (
-                                              <span className="inline-flex items-center gap-1 rounded-full bg-point-50 px-2 py-1 text-[10px] font-semibold text-point-500">
-                                                  <Globe2 size={10} />
-                                                  공유됨
-                                              </span>
-                                          )}
-                                      </div>
-                                  </div>
-                                  <div className="flex items-center gap-1 -mr-2 -mt-2">
-                                      <button 
-                                          onClick={(e) => {
-                                              e.stopPropagation();
-                                              setActiveMenuId(activeMenuId === record.id ? null : record.id);
-                                          }}
-                                          className="text-mist-300 hover:text-mist-500 transition-colors p-2"
-                                      >
-                                          <MoreHorizontal size={16} />
-                                      </button>
-                                  </div>
-                              </div>
-
-                              {/* Context Menu */}
-                              {activeMenuId === record.id && (
-                                  <div className="absolute right-6 top-12 bg-white shadow-xl rounded-2xl p-1.5 z-20 border border-mist-100 animate-fade-in min-w-[140px]">
-                                      <button onClick={(e) => { e.stopPropagation(); handlePin(record); }} className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-mist-600 hover:bg-mist-50 rounded-xl w-full text-left transition-colors">
-                                      <Pin size={14} className="text-mist-400" /> {record.isPinned ? '고정 해제' : '고정하기'}
-                                      </button>
-                                      {!record.isShared && (
-                                          <button onClick={(e) => { e.stopPropagation(); handleShare(record); }} className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-point-500 hover:bg-point-50 rounded-xl w-full text-left transition-colors mt-1">
-                                              <Share2 size={14} /> 커뮤니티 공유
-                                          </button>
-                                      )}
-                                      <button onClick={(e) => { e.stopPropagation(); handleHide(record); }} className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 rounded-xl w-full text-left transition-colors mt-1">
-                                      <EyeOff size={14} /> 숨기기
-                                      </button>
-                                  </div>
-                              )}
-
-                              {/* Content */}
-                              <div className={`transition-all duration-500 ${isLocked ? 'blur-[6px] select-none opacity-40 grayscale-[0.5]' : ''}`}>
-                                  {/* Mood and OneWord Row */}
-                                  <div className="flex items-center gap-3 mb-4">
-                                      {record.moodCode && <MoodSticker code={record.moodCode} className="opacity-100" />}
-                                      {record.oneWordText && <span className="text-[15px] font-bold text-mist-600">"{record.oneWordText}"</span>}
-                                  </div>
-                                  
-                                  <p className="text-mist-600 text-sm leading-relaxed line-clamp-3 font-normal">
-                                      {sceneTextLabel(record)}
-                                  </p>
-
-                                  {/* Image Thumbnail Hint */}
-                                  {record.imageUrl && (
-                                      <div className="mt-4 inline-flex items-center gap-3 rounded-2xl bg-mist-50/80 p-2 pr-3">
-                                          <div className="w-14 h-14 rounded-xl overflow-hidden border border-mist-100 shadow-sm opacity-90">
-                                              <img src={record.imageUrl} alt="Thumbnail" className="w-full h-full object-cover" />
-                                          </div>
-                                          <div>
-                                              <p className="text-[10px] font-bold text-mist-400 uppercase tracking-widest">Photo Moment</p>
-                                              <p className="text-xs text-mist-500 mt-1">이 날의 장면이 함께 남아 있어요</p>
-                                          </div>
-                                      </div>
-                                  )}
-                              </div>
-
-                              {/* Locked Overlay */}
-                              {isLocked && (
-                                  <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-white/20">
-                                      <div className="bg-white/90 backdrop-blur-md p-4 rounded-full mb-3 border border-mist-100 shadow-sm">
-                                          <Lock size={16} className="text-mist-400" />
-                                      </div>
-                                      <span className="text-[10px] text-mist-500 font-bold tracking-widest uppercase bg-white/80 px-3 py-1 rounded-full shadow-sm">Time Capsule</span>
-                                  </div>
-                              )}
-                          </Card>
-                      );
-                  })}
-                  </div>
+      {/* ── Stats Cards ── */}
+      <div className="px-4 mb-6">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-white/70 p-4 rounded-3xl border border-white shadow-sm flex flex-col justify-center items-center min-h-[96px]">
+            <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest mb-1.5 text-center">Records</span>
+            <span className="text-3xl font-bold text-point-500">{monthlyRecords.length}</span>
+          </div>
+          <div className="bg-white/70 p-4 rounded-3xl border border-white shadow-sm flex flex-col justify-center items-center min-h-[96px]">
+            <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest mb-1.5 text-center">Photos</span>
+            <span className="text-3xl font-bold text-mist-600">{photoRecords.length}</span>
+            <span className="text-[10px] text-mist-300 mt-1">{photoCoverage}%</span>
+          </div>
+          <div className="bg-white/70 p-4 rounded-3xl border border-white shadow-sm flex flex-col justify-center items-center min-h-[96px]">
+            <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest mb-2 text-center">Top Moods</span>
+            <div className="flex justify-center flex-wrap gap-1">
+              {topMoods.length > 0 ? (
+                topMoods.map(([code]) => (
+                  <MoodSticker key={code} code={code} className="scale-90 opacity-100 px-2 py-1" />
+                ))
               ) : (
-                  <div className="px-4">
-                      <Card className="!p-5 !rounded-[2rem] bg-white/75 border border-white/60 shadow-sm">
-                          {/* 요일 헤더 */}
-                          <div className="grid grid-cols-7 gap-1.5 mb-2">
-                              {weekdayLabels.map((label, i) => (
-                                  <div key={label} className={`text-center text-[10px] font-bold py-1.5 rounded-lg ${i === 0 ? 'text-rose-400' : i === 6 ? 'text-point-400' : 'text-mist-300'}`}>
-                                      {label}
-                                  </div>
-                              ))}
-                          </div>
-                          {/* 날짜 셀 */}
-                          <div className="grid grid-cols-7 gap-1.5">
-                              {calendarCells.map((cell, index) => {
-                                  if (cell.type === 'empty') {
-                                      return <div key={`empty-${index}`} className="aspect-square" />;
-                                  }
-
-                                  const record = cell.record;
-                                  const isToday = cell.day === new Date().getDate() && targetMonth === new Date().getMonth() && targetYear === new Date().getFullYear();
-
-                                  // 무드별 배경색
-                                  const moodBg: Record<string, string> = {
-                                      '포근': 'bg-point-100',
-                                      '멍함': 'bg-mist-100',
-                                      '반짝': 'bg-lavender-100',
-                                      '잔잔': 'bg-blue-50',
-                                      '버팀': 'bg-green-50',
-                                      '두근': 'bg-rose-50',
-                                  };
-                                  const cellBg = record
-                                      ? (record.moodCode ? (moodBg[record.moodCode] ?? 'bg-point-50') : 'bg-point-50')
-                                      : 'bg-mist-50/40';
-
-                                  return (
-                                      <button
-                                        key={`day-${cell.day}`}
-                                        type="button"
-                                        onClick={() => record && setSelectedRecordForDetail(record)}
-                                        className={`aspect-square rounded-xl flex flex-col items-center justify-start pt-1.5 gap-0.5 transition-all relative
-                                          ${record ? `${cellBg} shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer` : 'bg-mist-50/40 cursor-default'}
-                                        `}
-                                      >
-                                        {/* 날짜 숫자 */}
-                                        <span className={`text-[11px] font-bold leading-none
-                                          ${isToday ? 'w-5 h-5 flex items-center justify-center rounded-full bg-point-500 text-white' : record ? 'text-mist-600' : 'text-mist-300'}
-                                        `}>{cell.day}</span>
-
-                                        {/* 무드 점 */}
-                                        {record?.moodCode && (
-                                            <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
-                                                record.moodCode === '포근' ? 'bg-point-400' :
-                                                record.moodCode === '멍함' ? 'bg-mist-400' :
-                                                record.moodCode === '반짝' ? 'bg-lavender-400' :
-                                                record.moodCode === '잔잔' ? 'bg-blue-400' :
-                                                record.moodCode === '버팀' ? 'bg-green-400' :
-                                                record.moodCode === '두근' ? 'bg-rose-400' : 'bg-point-300'
-                                            }`} />
-                                        )}
-
-                                        {/* 사진 있는 날 카메라 점 */}
-                                        {record?.imageUrl && (
-                                            <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-point-300" />
-                                        )}
-                                      </button>
-                                  );
-                              })}
-                          </div>
-                      </Card>
-                  </div>
+                <span className="text-sm text-mist-300">-</span>
               )}
+            </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── Tab Bar ── */}
+      <div className="px-4 mb-6">
+        <div className="bg-white/70 rounded-[2rem] p-1.5 border border-white shadow-sm grid grid-cols-3 gap-1">
+          {(
+            [
+              { id: 'album', icon: <ImageIcon size={15} />, label: '앨범' },
+              { id: 'records', icon: <BookOpenText size={15} />, label: '기록' },
+              { id: 'calendar', icon: <Calendar size={15} />, label: '캘린더' },
+            ] as const
+          ).map(({ id, icon, label }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`rounded-full px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
+                activeTab === id
+                  ? 'bg-white text-point-500 shadow-sm'
+                  : 'text-mist-400 hover:text-mist-600'
+              }`}
+            >
+              {icon}
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Tab Content ── */}
+      {activeTab === 'album' && (
+        <AlbumTab
+          photoRecords={displayedPhotoRecords}
+          mascotTone={(topMoods[0]?.[0] || 'default') as CharacterTone}
+          onSelectRecord={setSelectedRecordForDetail}
+        />
+      )}
+      {activeTab === 'records' && (
+        <RecordsListTab
+          records={monthlyRecords}
+          currentDirection={currentDirection}
+          onSelectRecord={setSelectedRecordForDetail}
+          onUpdateRecord={onUpdateRecord}
+        />
+      )}
+      {activeTab === 'calendar' && (
+        <CalendarTab
+          calendarCells={calendarCells}
+          targetMonth={targetMonth}
+          targetYear={targetYear}
+          onSelectRecord={setSelectedRecordForDetail}
+        />
       )}
     </div>
   );

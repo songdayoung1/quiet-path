@@ -8,7 +8,45 @@ import { LogEditorView } from './views/LogEditorView';
 import { OnboardingView } from './views/OnboardingView';
 import { CommunityView } from './views/CommunityView';
 import { PastDirectionsView } from './views/PastDirectionsView';
-import { Compass, Home, BookOpen, Settings, Users } from 'lucide-react';
+import { Settings } from 'lucide-react';
+
+/* ── Custom Nav Icons ───────────────────────────────────────────────────── */
+const NavIcon: React.FC<{ view: ViewState; active: boolean }> = ({ view, active }) => {
+  const stroke = active ? '#FFFFFF' : '#94A3B8';
+  const sp = { strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, strokeWidth: '2' };
+
+  if (view === 'NOW') return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+        <path d="M3 10l9-7 9 7v10a1 1 0 01-1 1H4a1 1 0 01-1-1V10z" stroke={stroke} {...sp} />
+        <path d="M9 21V12h6v9" stroke={stroke} {...sp} />
+    </svg>
+  );
+
+  if (view === 'RECORDS') return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+        <path d="M4 6h7c1 0 2 1 2 2v11c0-1-1-2-2-2H4V6z" stroke={stroke} {...sp} />
+        <path d="M20 6h-7c-1 0-2 1-2 2v11c0-1 1-2 2-2h7V6z" stroke={stroke} {...sp} />
+    </svg>
+  );
+
+  if (view === 'COMMUNITY') return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke={stroke} {...sp} />
+        <circle cx="9" cy="7" r="4" stroke={stroke} {...sp} />
+        <path d="M23 21v-2a4 4 0 00-3-3.87" stroke={stroke} {...sp} />
+        <path d="M16 3.13a4 4 0 010 7.75" stroke={stroke} {...sp} />
+    </svg>
+  );
+
+  if (view === 'DIRECTION') return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+        <circle cx="12" cy="12" r="10" stroke={stroke} {...sp} />
+        <path d="M16.24 7.76l-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z" stroke={stroke} {...sp} />
+    </svg>
+  );
+
+  return null;
+};
 import { SettingsView } from './views/SettingsView';
 
 const App: React.FC = () => {
@@ -120,20 +158,32 @@ const App: React.FC = () => {
     }
   };
 
-  // Modern Floating Nav Item - Updated to use Point Color
-  const NavItem = ({ view, icon: Icon, label }: { view: ViewState, icon: any, label: string }) => {
+  const NavItem = ({ view, label }: { view: ViewState; label: string }) => {
     const isActive = currentView === view;
     return (
-      <button 
+      <button
         onClick={() => setCurrentView(view)}
-        className={`relative flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-500 ${isActive ? 'bg-point-500 text-white shadow-lg shadow-point-400/40 translate-y-[-8px]' : 'text-mist-400 hover:bg-white hover:text-mist-600'}`}
+        className="flex flex-col items-center justify-center gap-1.5 transition-all duration-500 ease-out group flex-1"
       >
-        <Icon size={isActive ? 20 : 22} strokeWidth={isActive ? 2 : 1.5} />
-        {isActive && (
-           <span className="absolute -bottom-6 text-[10px] font-medium text-mist-500 tracking-wide animate-fade-in whitespace-nowrap">
-             {label}
-           </span>
-        )}
+        <div
+          className={[
+            'w-16 h-16 rounded-[22px] flex items-center justify-center transition-all duration-500 ease-out',
+            isActive
+              ? 'bg-gradient-to-br from-[#9F75FF] to-[#8B5CF6] shadow-[0_8px_20px_rgba(139,92,246,0.3)] -translate-y-2 scale-110'
+              : 'bg-transparent hover:bg-white/40',
+          ].join(' ')}
+        >
+          <div className={`transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-105 group-active:scale-95'}`}>
+            <NavIcon view={view} active={isActive} />
+          </div>
+        </div>
+        <span
+          className={`text-[10px] font-bold tracking-tight transition-all duration-500 ${
+            isActive ? 'text-[#8B5CF6] opacity-100' : 'text-slate-400 opacity-0 group-hover:opacity-40'
+          }`}
+        >
+          {label}
+        </span>
       </button>
     );
   };
@@ -206,8 +256,8 @@ const App: React.FC = () => {
             />
         )}
         {currentView === 'SETTINGS' && (
-           <SettingsView 
-              state={state} 
+           <SettingsView
+              state={state}
               onClose={() => setCurrentView('NOW')}
               onLogin={handleLogin}
               onLogout={handleLogout}
@@ -226,12 +276,12 @@ const App: React.FC = () => {
 
       {/* Floating Bottom Navigation */}
       {currentView !== 'WRITE_LOG' && (
-        <div className="fixed bottom-8 left-0 w-full flex justify-center z-20 px-4 pointer-events-none">
-           <nav className="h-16 px-6 bg-white/80 backdrop-blur-xl border border-white/60 rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.04)] flex items-center gap-6 md:gap-8 justify-between w-full max-w-[340px] pointer-events-auto">
-            <NavItem view="NOW" icon={Home} label="오늘" />
-            <NavItem view="RECORDS" icon={BookOpen} label="기록" />
-            <NavItem view="COMMUNITY" icon={Users} label="둘러보기" />
-            <NavItem view="DIRECTION" icon={Compass} label="여정" />
+        <div className="fixed bottom-10 left-0 w-full flex justify-center z-20 px-6 pointer-events-none">
+           <nav className="h-24 px-4 bg-white/90 backdrop-blur-2xl border border-white/80 rounded-[40px] shadow-[0_12px_40px_rgba(0,0,0,0.06)] flex items-center justify-between w-full max-w-[360px] pointer-events-auto">
+            <NavItem view="NOW" label="오늘" />
+            <NavItem view="RECORDS" label="기록" />
+            <NavItem view="COMMUNITY" label="둘러보기" />
+            <NavItem view="DIRECTION" label="여정" />
           </nav>
         </div>
       )}

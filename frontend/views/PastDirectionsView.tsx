@@ -140,11 +140,13 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({ pastDire
                                 </div>
                                 <div className="flex items-center gap-2.5 mb-3">
                                     {record.moodCode && <MoodSticker code={record.moodCode} />}
-                                    {record.oneWordText && <span className="text-sm font-bold text-mist-600">"{record.oneWordText}"</span>}
+                                    {record.action && <span className="text-sm font-bold text-mist-600 line-clamp-2">{record.action}</span>}
                                 </div>
-                                <p className="text-mist-600 text-[15px] leading-relaxed font-normal">
-                                    {record.action}
-                                </p>
+                                {record.oneWordText && (
+                                    <p className="text-mist-600 text-[15px] leading-relaxed font-normal">
+                                        {record.oneWordText}
+                                    </p>
+                                )}
                             </div>
                         </Card>
                     ))
