@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Direction, Record as RecordType } from '../types';
-import { Card, PageHeader, SoftButton, SoftInput, SoftTextArea, MoodSticker, CategoryIcon } from '../components/UI';
+import { Card, PageHeader, SoftButton, MoodSticker, CategoryIcon, WaterDropOverlay } from '../components/UI';
 import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight } from 'lucide-react';
 import { CATEGORIES } from '../constants';
+import { DirectionSetupForm } from '../components/DirectionSetupForm';
 
 interface DirectionViewProps {
   currentDirection: Direction | null;
@@ -20,6 +21,7 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   const [customReviewDate, setCustomReviewDate] = useState('');
   const [showDateInput, setShowDateInput] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[number] | null>(null);
+  const [saveState, setSaveState] = useState<'idle' | 'animating' | 'leaving'>('idle');
 
   const todayStr = new Date().toISOString().split('T')[0];
   const getReviewAt = () => {
@@ -51,15 +53,26 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
 
   const handleSubmit = () => {
     const reviewAt = getReviewAt();
-    if (!description.trim() || !reviewAt) return;
-    onUpdateDirection({
-      question: question.trim() || '이 방향으로 나는 어떻게 걸어가고 있을까?',
-      description,
-      categoryId: selectedCategory?.id,
-      categoryLabel: selectedCategory?.label,
-      reviewAt,
-    });
-    setIsEditing(false);
+    if (!description.trim() || !reviewAt || saveState !== 'idle') return;
+
+    // Trigger Success Animation
+    setSaveState('animating');
+
+    setTimeout(() => {
+      setSaveState('leaving');
+    }, 1400);
+
+    setTimeout(() => {
+      onUpdateDirection({
+        question: question.trim() || '이 방향으로 나는 어떻게 걸어가고 있을까?',
+        description,
+        categoryId: selectedCategory?.id,
+        categoryLabel: selectedCategory?.label,
+        reviewAt,
+      });
+      setIsEditing(false);
+      setSaveState('idle');
+    }, 1750);
   };
 
   const currentPathRecords = useMemo(() => {
@@ -131,103 +144,48 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
             </SoftButton>
           </div>
         ) : (
-          <Card className="flex flex-col gap-0 !bg-white/88 shadow-md border-white/80 !p-9 rounded-[2.25rem]">
-            {/* 선택된 카테고리 뱃지 */}
-            {selectedCategory && (
-              <div className="flex items-center gap-4 pb-8 border-b border-mist-100">
-                <CategoryIcon categoryId={selectedCategory.id} size="sm" />
-                <div className="min-w-0">
-                  <span className="text-[15px] font-bold leading-none block" style={{ color: selectedCategory.accent }}>{selectedCategory.label}</span>
-                  <span className="text-[13px] leading-6 text-mist-400 mt-3 block">이 카테고리 안에서 새로운 흐름을 시작해요.</span>
-                </div>
-              </div>
-            )}
+          selectedCategory && (
+            <DirectionSetupForm
+              selectedCategory={selectedCategory}
+              directionName={description}
+              directionText={question}
+              durationDays={durationDays}
+              customReviewDate={customReviewDate}
+              showDateInput={showDateInput}
+              todayStr={todayStr}
+              reviewDateDisplay={reviewDateDisplay}
+              isNameMissing={isTitleMissing}
+              hasReviewAt={!!getReviewAt()}
+              submitDisabled={!canSubmit}
+              onDirectionNameChange={setDescription}
+              onDirectionTextChange={setQuestion}
+              onSelectDuration={(days) => {
+                setDurationDays(days);
+                setCustomReviewDate('');
+                setShowDateInput(false);
+              }}
+              onToggleDateInput={() => {
+                setShowDateInput(!showDateInput);
+                setDurationDays(null);
+              }}
+              onReviewDateChange={(value) => {
+                setCustomReviewDate(value);
+                setDurationDays(null);
+              }}
+              onSubmit={handleSubmit}
+              onCancel={handleCancel}
+            />
+          )
+        )}
 
-            <div className="space-y-0 pt-8 pb-8">
-              <label className="block text-[14px] font-bold text-mist-500 mb-4 ml-1">여정 제목</label>
-              <SoftInput
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder={selectedCategory ? `예: ${selectedCategory.defaultTitle}` : '예: 퇴근 후 30분 공부 루틴'}
-                autoFocus
-                className={`bg-white !text-[17px] !leading-none !py-5 !px-6 placeholder:!text-mist-300 placeholder:!font-semibold ${description ? '!font-semibold' : '!font-medium'} ${isTitleMissing ? '!border-rose-200 focus:!ring-rose-200' : ''}`}
-              />
-              {isTitleMissing ? (
-                <p className="text-[12px] text-rose-400 mt-4 ml-1">제목을 설정해주세요.</p>
-              ) : (
-                <p className="text-[12px] text-mist-300 mt-4 ml-1">예: {selectedCategory?.defaultTitle || '퇴근 후 30분 공부 루틴'}</p>
-              )}
-            </div>
-
-            <div className="space-y-0 pb-8">
-              <label className="block text-[14px] font-bold text-mist-500 mb-4 ml-1">나에게 던지는 질문 <span className="text-mist-300 font-normal">(선택)</span></label>
-              <SoftInput
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="예: 나는 이 방향으로 조금씩 나아가고 있을까?"
-                className="bg-white !text-[16px] !font-medium !leading-normal !py-5 !px-6 placeholder:!text-mist-300"
-              />
-              <p className="text-[12px] text-mist-300 mt-4 ml-1">비워두면 기본 질문으로 시작합니다.</p>
-            </div>
-
-            <div className="space-y-0">
-              <label className="block text-[14px] font-bold text-mist-500 mb-5 ml-1">언제 돌아볼까요?</label>
-              <div className="grid grid-cols-4 gap-2">
-                {[7, 14, 30].map((days) => (
-                  <button
-                    key={days}
-                    onClick={() => { setDurationDays(days); setCustomReviewDate(''); setShowDateInput(false); }}
-                    className={`px-3 py-3 rounded-[1.15rem] text-[13px] font-semibold transition-all whitespace-nowrap ${
-                      durationDays === days && !customReviewDate
-                        ? 'bg-point-500 text-white shadow-md shadow-point-200/50 scale-105'
-                        : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
-                    }`}
-                  >
-                    {days}일
-                  </button>
-                ))}
-                <button
-                  onClick={() => { setShowDateInput(!showDateInput); setDurationDays(null); }}
-                  className={`px-2 py-3 rounded-[1.15rem] text-[13px] font-semibold transition-all flex items-center justify-center gap-1 whitespace-nowrap ${
-                    showDateInput || customReviewDate
-                      ? 'bg-point-500 text-white shadow-md shadow-point-200/50'
-                      : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
-                  }`}
-                >
-                  <Calendar size={12} />
-                  직접 선택
-                </button>
-              </div>
-              {showDateInput && (
-                <input
-                  type="date"
-                  min={todayStr}
-                  value={customReviewDate}
-                  onChange={(e) => { setCustomReviewDate(e.target.value); setDurationDays(null); }}
-                  className="mt-4 w-full bg-white border border-mist-100 rounded-2xl px-5 py-4 text-[15px] text-mist-600 outline-none focus:ring-1 focus:ring-point-300 transition-all"
-                />
-              )}
-              {reviewDateDisplay && (
-                <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl bg-point-50 border border-point-100 text-point-600 text-[14px]">
-                  <Calendar size={15} className="text-point-400 shrink-0" />
-                  <span className="font-semibold">{reviewDateDisplay}</span>
-                  <span className="text-point-400 text-xs ml-auto">에 돌아볼게요</span>
-                </div>
-              )}
-              {!getReviewAt() && (
-                <p className="text-[12px] text-mist-300 mt-4 ml-1">회고 시점을 정해야 여정을 시작할 수 있어요.</p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-3 pt-2">
-              <SoftButton onClick={handleSubmit} disabled={!canSubmit} className="py-4 text-base font-bold shadow-point-200/50">
-                여정 시작하기
-              </SoftButton>
-              <SoftButton variant="secondary" onClick={handleCancel} className="bg-transparent border-none hover:bg-mist-50 shadow-none text-mist-400">
-                취소
-              </SoftButton>
-            </div>
-          </Card>
+        {/* Water Drop Micro-interaction Overlay */}
+        {saveState !== 'idle' && (
+          <WaterDropOverlay 
+            leaving={saveState === 'leaving'} 
+            mood="반짝" 
+            title="새로운 방향이 시작되었어요"
+            subtitle="함께 차분히 걸어가봐요 ✨"
+          />
         )}
       </div>
     );
@@ -249,122 +207,109 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
             </div>
             <div>
               <span className="text-[10px] font-bold text-point-500 uppercase tracking-widest block mb-1">Current Path</span>
-              <span className="text-[15px] text-mist-600 font-bold tracking-wide">지금의 여정</span>
+              <span className="text-[15px] text-mist-600 font-bold tracking-wide">지금의 방향</span>
             </div>
           </div>
 
-          <Card className="ml-5 relative !bg-white/90 backdrop-blur-md shadow-md border border-white/50">
+          <Card className="ml-5 relative !bg-white/90 backdrop-blur-md shadow-md border border-white/50 !p-5">
             {currentDirection ? (
-              <div className="py-2">
-                <div className="space-y-3">
-                  {/* 카테고리 아이콘 + 라벨 */}
+              <div className="flex flex-col">
+                {/* 1. Header (Category + Title + Question) */}
+                <div className="flex items-start gap-4 mb-4">
                   {currentDirection.categoryId && (
-                    <div className="flex items-center gap-3">
-                      <CategoryIcon categoryId={currentDirection.categoryId} size="sm" />
-                      <span className="text-[11px] font-bold tracking-wide"
+                    <CategoryIcon categoryId={currentDirection.categoryId} size="md" className="shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    {currentDirection.categoryId && (
+                      <span className="text-[10px] font-bold tracking-widest uppercase mb-1 block"
                         style={{ color: CATEGORIES.find(c => c.id === currentDirection.categoryId)?.accent ?? '#9AA5B1' }}>
                         {currentDirection.categoryLabel}
                       </span>
-                    </div>
-                  )}
-                  <h2 className="text-xl md:text-2xl text-mist-600 font-bold leading-relaxed tracking-wide">
-                    {currentDirection.description || '지금의 여정'}
-                  </h2>
-                  <p className="text-mist-500 text-[15px] font-medium whitespace-pre-line bg-mist-50/50 py-4 px-4 rounded-2xl">
-                    {currentDirection.question}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 mt-6">
-                  <div className="rounded-2xl bg-white border border-mist-100 px-3 py-4 text-center shadow-sm">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Consistency</p>
-                    <p className="text-xl font-bold text-point-500 mt-2">{pathConsistency}%</p>
-                  </div>
-                  <div className="rounded-2xl bg-white border border-mist-100 px-3 py-4 text-center shadow-sm">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Record Days</p>
-                    <p className="text-xl font-bold text-mist-600 mt-2">{currentPathRecords.length}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white border border-mist-100 px-3 py-4 text-center shadow-sm">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Top Mood</p>
-                    <div className="mt-2 flex justify-center">
-                      {topMood ? <MoodSticker code={topMood} className="opacity-100" /> : <span className="text-sm text-mist-300">-</span>}
-                    </div>
+                    )}
+                    <h2 className="text-[19px] text-mist-600 font-bold leading-tight break-keep">
+                      {currentDirection.description || '지금의 방향'}
+                    </h2>
                   </div>
                 </div>
+                
+                <p className="text-mist-500 text-[13px] font-medium leading-relaxed whitespace-pre-line bg-mist-50/70 border border-mist-100/50 py-3 px-4 rounded-[1.25rem]">
+                  {currentDirection.question}
+                </p>
 
-                <div className="grid grid-cols-2 gap-3 mt-5">
-                  <div className="flex items-center gap-3 text-sm text-mist-500 bg-white border border-mist-100 px-4 py-3 rounded-2xl shadow-sm">
-                    <CheckCircle2 size={16} className="text-point-400" />
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Start</p>
-                      <span className="font-medium">{new Date(currentDirection.createdAt).toLocaleDateString()}</span>
+                {/* 2. Combined Stats & Dates Dashboard */}
+                <div className="bg-white border border-mist-100 rounded-[1.25rem] p-4 mt-5 shadow-sm">
+                  {/* Stats Row */}
+                  <div className="flex items-center justify-between mb-4 border-b border-mist-50 pb-4">
+                    <div className="flex flex-col items-center flex-1">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-mist-300">Consistency</p>
+                      <p className="text-[17px] font-bold text-point-500 mt-1 leading-none">{pathConsistency}%</p>
+                    </div>
+                    <div className="w-px h-6 bg-mist-100"></div>
+                    <div className="flex flex-col items-center flex-1">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-mist-300">Days</p>
+                      <p className="text-[17px] font-bold text-mist-600 mt-1 leading-none">{currentPathRecords.length}</p>
+                    </div>
+                    <div className="w-px h-6 bg-mist-100"></div>
+                    <div className="flex flex-col items-center flex-1">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-mist-300">Mood</p>
+                      <div className="mt-1 flex justify-center h-[17px] items-center">
+                        {topMood ? <MoodSticker code={topMood} className="scale-75 origin-center opacity-100" /> : <span className="text-sm text-mist-300">-</span>}
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-mist-500 bg-white border border-mist-100 px-4 py-3 rounded-2xl shadow-sm">
-                    <Calendar size={16} className="text-point-400" />
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-mist-300">Review</p>
-                      <span className="font-medium">{currentDirection.reviewAt ? new Date(currentDirection.reviewAt).toLocaleDateString() : '-'}</span>
-                    </div>
+                  
+                  {/* Dates Row */}
+                  <div className="flex items-center justify-center gap-2 text-[11px] font-medium text-mist-400">
+                    <CheckCircle2 size={12} className="text-point-300" />
+                    <span>{new Date(currentDirection.createdAt).toLocaleDateString()} 시작</span>
+                    <ArrowRight size={10} className="text-mist-200" />
+                    <Calendar size={12} className="text-point-300" />
+                    <span>{currentDirection.reviewAt ? new Date(currentDirection.reviewAt).toLocaleDateString() : '-'} 회고</span>
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-[1.75rem] bg-white/75 border border-white shadow-sm p-5">
-                  <div className="flex items-center justify-between gap-3 mb-4">
-                    <div className="flex items-center gap-2">
-                      <ImageIcon size={16} className="text-mist-400" />
-                      <h3 className="text-xs font-bold text-mist-500 uppercase tracking-widest">Path Scene Board</h3>
+                {/* 3. Compact Path Scene Board */}
+                {currentPathImages.length > 0 && (
+                  <div className="mt-5 flex items-center justify-between bg-mist-50/50 rounded-full py-2.5 px-4 border border-mist-100/50">
+                    <div className="flex items-center gap-1.5">
+                       <ImageIcon size={14} className="text-mist-400" />
+                       <span className="text-[11px] font-bold text-mist-500">장면들 ({currentPathRecords.filter(r => r.imageUrl).length})</span>
                     </div>
-                    <button onClick={onHistoryClick} className="text-[11px] font-semibold text-point-500 inline-flex items-center gap-1">
-                      지난 흐름 보기
-                      <ArrowRight size={12} />
-                    </button>
-                  </div>
-                  {currentPathImages.length > 0 ? (
-                    <div className="grid grid-cols-4 gap-3">
-                      {currentPathImages.map((record) => (
-                        <div key={`path-scene-${record.id}`} className="space-y-2">
-                          <div className="aspect-square rounded-2xl overflow-hidden border border-white shadow-sm bg-mist-50">
-                            <img src={record.imageUrl} alt="Path scene" className="w-full h-full object-cover" />
-                          </div>
-                          <p className="text-[10px] text-mist-400 text-center">{new Date(record.timestamp).getDate()}일</p>
-                        </div>
+                    <div className="flex items-center -space-x-1.5">
+                      {currentPathImages.map((record, idx) => (
+                        <img key={`thumb-${record.id}`} src={record.imageUrl} alt="Scene" className="w-[28px] h-[28px] rounded-full border-2 border-white object-cover shadow-sm bg-mist-100 relative" style={{ zIndex: 4 - idx }} />
                       ))}
                     </div>
-                  ) : (
-                    <div className="rounded-2xl bg-mist-50/70 border border-dashed border-white p-5 text-center">
-                      <p className="text-sm font-medium text-mist-500">아직 장면 보드가 비어 있어요</p>
-                      <p className="text-[11px] text-mist-400 mt-2">사진이 포함된 기록을 남기면 여정의 장면이 모입니다.</p>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="text-center py-12">
-                <p className="text-mist-400 font-medium tracking-wide">설정된 방향이 없습니다.</p>
+              <div className="text-center py-10 flex flex-col items-center justify-center gap-3">
+                <Compass size={32} className="text-mist-200" strokeWidth={1.5} />
+                <p className="text-mist-400 text-sm font-medium tracking-wide">설정된 궤적이 없습니다.</p>
               </div>
             )}
           </Card>
         </div>
 
-        <div className="relative z-10 ml-5 mt-12 flex flex-col gap-4">
+        <div className="relative z-10 ml-5 mt-10 flex flex-col gap-3">
           {currentDirection ? (
-            <SoftButton variant="secondary" onClick={handleStartEdit} className="!bg-white/70 backdrop-blur-sm border-white/50 shadow-sm py-4">
-              <span className="text-mist-500 font-bold">새로운 방향으로 수정하기</span>
+            <SoftButton variant="secondary" onClick={handleStartEdit} className="!bg-white/70 backdrop-blur-sm border border-mist-100 shadow-sm py-3.5">
+              <span className="text-mist-500 font-bold text-sm">새로운 방향으로 수정하기</span>
             </SoftButton>
           ) : (
-            <SoftButton onClick={handleStartEdit} className="py-4 shadow-lg shadow-point-200/50 font-bold">
+            <SoftButton onClick={handleStartEdit} className="py-3.5 shadow-lg shadow-point-200/50 font-bold text-sm">
               <span>새로운 방향 설정하기</span>
             </SoftButton>
           )}
 
-          <div className="flex justify-center mt-4">
+          <div className="flex justify-center mt-3">
             <button
               onClick={onHistoryClick}
               className="flex items-center gap-2 text-xs font-bold text-mist-400 hover:text-mist-600 transition-colors bg-white/50 px-4 py-2 rounded-full border border-mist-100 shadow-sm"
             >
               <History size={14} />
-              <span>과거의 여정들 바로가기</span>
+              <span>지나온 방향들 바로가기</span>
             </button>
           </div>
         </div>
