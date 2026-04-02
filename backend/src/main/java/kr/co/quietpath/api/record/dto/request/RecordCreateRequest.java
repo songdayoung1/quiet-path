@@ -13,6 +13,8 @@ public class RecordCreateRequest {
     @NotBlank
     private String content;
 
+    private String moodCode;
+
     @NotBlank
     private String visibility;
 }
