@@ -19,59 +19,59 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
     : null;
 
   const cat = CATEGORIES.find(c => c.id === currentDirection?.categoryId);
+  const accentColor = cat?.accent || '#8B5CF6';
 
   return (
     <Card
-      className="!rounded-[2.5rem] !p-7 border-white/60 shadow-md !transition-all !duration-300"
-      style={{
-        background: cat
-          ? `linear-gradient(135deg, ${cat.accentBg}66, rgba(255,255,255,0.8))`
-          : 'rgba(255,255,255,0.7)',
-      }}
+      className="!rounded-[2rem] !p-5 !bg-white/85 backdrop-blur-md border-white/50 shadow-sm !transition-all !duration-300"
     >
-      {/* Decorative glow */}
-      <div
-        className="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none opacity-40"
-        style={{ background: cat ? `${cat.accentBg}` : 'rgba(196,181,253,0.3)' }}
-      />
-
-      <div className="flex items-start gap-6 relative z-10">
-        {/* Category Section: Name above Icon */}
-        <div className="flex flex-col items-center gap-2.5 shrink-0">
-          <span className="text-[11px] font-bold tracking-wider" style={{ color: cat?.accent ?? '#8B5CF6' }}>
+      <div className="flex items-center gap-5 relative z-10">
+        {/* Category Section: Icon with subtle background circle */}
+        <div className="flex flex-col items-center gap-2 shrink-0">
+          <span className="text-[10px] font-bold tracking-wider mb-1" style={{ color: accentColor }}>
             {cat?.label || 'Path'}
           </span>
-          <CategoryIcon categoryId={currentDirection?.categoryId} size="lg" className="!rounded-[1.75rem] shadow-lg" />
+          <div className="relative">
+             <div 
+               className="absolute inset-0 rounded-full blur-md opacity-20"
+               style={{ backgroundColor: accentColor }}
+             />
+             <CategoryIcon 
+               categoryId={currentDirection?.categoryId} 
+               size="lg" 
+               className="!rounded-full shadow-sm relative z-10 border border-white" 
+             />
+          </div>
         </div>
 
-        {/* Content Section: Title and Question aligned */}
-        <div className="flex-1 min-w-0 flex flex-col justify-center pt-5">
-          <h3 className="text-[19px] font-bold text-mist-600 leading-snug break-keep mb-2">
+        {/* Content Section: Title and Question */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <h3 className="text-[17px] font-bold text-mist-600 leading-snug break-keep mb-1.5">
             {currentDirection?.description || '아직 설정된 여정이 없어요'}
           </h3>
           {currentDirection?.question && (
-            <p className="text-[13px] text-mist-400 font-medium leading-relaxed break-keep opacity-80 border-l-2 border-mist-100 pl-3">
+            <p className="text-[12px] text-mist-400 font-medium leading-relaxed break-keep line-clamp-1 opacity-80">
               {currentDirection.question}
             </p>
           )}
         </div>
 
         {/* Info Section: Consistency & Review Date */}
-        <div className="flex flex-col items-end shrink-0 gap-3 pt-1">
+        <div className="flex flex-col items-end shrink-0 gap-2.5">
           <div className="text-right">
-            <div className="flex items-baseline justify-end gap-1">
-              <span className="text-2xl font-black tracking-tighter" style={{ color: cat?.accent ?? '#8B5CF6' }}>
+            <div className="flex items-baseline justify-end gap-0.5">
+              <span className="text-2xl font-black tracking-tighter" style={{ color: accentColor }}>
                 {currentPathConsistency}
               </span>
               <span className="text-[10px] font-bold text-mist-300">%</span>
             </div>
-            <p className="text-[9px] font-bold text-mist-300 uppercase tracking-widest mt-0.5">Focus</p>
+            <p className="text-[8px] font-bold text-mist-300 uppercase tracking-widest mt-0.5">Focus</p>
           </div>
           
           {reviewDateText && (
-            <div className="flex items-center gap-1.5 bg-white/80 px-3 py-1.5 rounded-full border border-mist-100 shadow-sm">
+            <div className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-full border border-mist-100 shadow-sm">
               <Compass size={10} className="text-point-400" />
-              <span className="text-[10px] font-bold text-mist-500">
+              <span className="text-[9px] font-bold text-mist-500">
                 ~ {reviewDateText}
               </span>
             </div>

@@ -11,11 +11,11 @@ interface AlbumTabProps {
 }
 
 const EmptyAlbum: React.FC<{ mascotTone?: CharacterTone }> = ({ mascotTone = 'default' }) => (
-  <div className="mx-4 mb-8 flex flex-col items-center justify-center text-center py-10 px-6">
-    <WaterDropCharacter size={78} mood="neutral" tone={mascotTone} animate={false} className="mb-1" />
-    <p className="text-sm font-bold text-mist-600 mb-2 mt-2">아직 이번 달 장면이 없어요</p>
-    <p className="text-[12px] text-mist-400 leading-relaxed max-w-[200px]">
-      기록을 남길 때 사진을 첨부하면<br />이곳에 장면 타임라인이 쌓입니다.
+  <div className="mx-4 flex flex-col items-center justify-center text-center py-12 px-6">
+    <WaterDropCharacter size={80} mood="neutral" tone={mascotTone} animate={true} className="mb-4" />
+    <p className="text-sm font-bold text-mist-600 mb-1">아직 이번 달 장면이 없어요</p>
+    <p className="text-[11px] text-mist-400 leading-relaxed opacity-80">
+      오늘의 한 걸음을 사진으로 남겨보세요.<br />이곳에 소중한 장면들이 모입니다.
     </p>
   </div>
 );

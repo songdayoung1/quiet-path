@@ -10,6 +10,7 @@ public class RecordDetailResponse {
     private Long pathId;
     private String recordDate;
     private String content;
+    private String moodCode;
     private String visibility;
     private OwnerSummary owner;
     private long reactionCount;

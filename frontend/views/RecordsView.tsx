@@ -55,7 +55,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     },
     {} as Record<string, number>,
   );
-  const topMoods = Object.entries(moodCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const topMoods = Object.entries(moodCounts).sort((a, b) => b[1] - a[1]).slice(0, 1);
 
   const photoRecords = useMemo(
     () =>
@@ -214,24 +214,44 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         </div>
       </div>
 
-      {/* ── Stats Cards ── */}
       <div className="px-4 mb-6">
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white/70 p-4 rounded-3xl border border-white shadow-sm flex flex-col justify-center items-center min-h-[96px]">
-            <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest mb-1.5 text-center">Records</span>
-            <span className="text-3xl font-bold text-point-500">{monthlyRecords.length}</span>
+          {/* Records Card */}
+          <div className="bg-white/70 p-4 rounded-[2rem] border border-white shadow-sm flex flex-col items-center min-h-[105px]">
+            <div className="h-6 flex items-center mb-1">
+              <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest text-center">Records</span>
+            </div>
+            <div className="flex-1 flex items-center justify-center w-full">
+              <span className="text-3xl font-bold text-point-500 leading-none">{monthlyRecords.length}</span>
+            </div>
           </div>
-          <div className="bg-white/70 p-4 rounded-3xl border border-white shadow-sm flex flex-col justify-center items-center min-h-[96px]">
-            <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest mb-1.5 text-center">Photos</span>
-            <span className="text-3xl font-bold text-mist-600">{photoRecords.length}</span>
-            <span className="text-[10px] text-mist-300 mt-1">{photoCoverage}%</span>
+          
+          {/* Photos Card */}
+          <div className="bg-white/70 p-4 rounded-[2rem] border border-white shadow-sm flex flex-col items-center min-h-[105px]">
+            <div className="h-6 flex items-center mb-1">
+              <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest text-center">Photos</span>
+            </div>
+            <div className="flex-1 flex items-center justify-center w-full">
+              <div className="relative flex items-baseline">
+                <span className="text-3xl font-bold text-mist-600 leading-none">{photoRecords.length}</span>
+                {photoCoverage > 0 && (
+                  <span className="absolute left-full ml-1 bottom-0.5 text-[10px] text-mist-300 font-bold whitespace-nowrap">
+                    {photoCoverage}%
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="bg-white/70 p-4 rounded-3xl border border-white shadow-sm flex flex-col justify-center items-center min-h-[96px]">
-            <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest mb-2 text-center">Top Moods</span>
-            <div className="flex justify-center flex-wrap gap-1">
+
+          {/* Top Mood Card */}
+          <div className="bg-white/70 p-4 rounded-[2rem] border border-white shadow-sm flex flex-col items-center min-h-[105px]">
+            <div className="h-6 flex items-center mb-1">
+              <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest text-center">Top Mood</span>
+            </div>
+            <div className="flex-1 flex items-center justify-center w-full">
               {topMoods.length > 0 ? (
                 topMoods.map(([code]) => (
-                  <MoodSticker key={code} code={code} className="scale-90 opacity-100 px-2 py-1" />
+                  <MoodSticker key={code} code={code} className="scale-90 opacity-100" />
                 ))
               ) : (
                 <span className="text-sm text-mist-300">-</span>

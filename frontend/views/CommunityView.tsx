@@ -3,7 +3,7 @@ import { PageHeader, MoodSticker } from '../components/UI';
 import { Heart, MessageCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { Record as RecordType } from '../types';
 
-const EXPAND_THRESHOLD = 120; // chars before collapsing text
+const EXPAND_THRESHOLD = 60; // chars before collapsing text
 
 interface CommunityViewProps {
   records?: RecordType[];
@@ -26,6 +26,11 @@ interface Post {
   timeAgo: string;
   isUserPost?: boolean;
 }
+
+const MOCK_COMMENTS = [
+  { id: 1, user: '지나가던_구름', text: '정말 공감되네요. 저도 오늘은 조금 천천히 걸어보려 합니다.', time: '1시간 전' },
+  { id: 2, user: '작은_위로', text: '그럴 때가 있죠. 자신만의 속도를 찾는 게 가장 중요한 것 같아요.', time: '30분 전' }
+];
 
 const CATEGORIES: { id: Category; label: string }[] = [
   { id: 'all', label: '전체' },
@@ -115,6 +120,19 @@ const MOCK_POSTS: Post[] = [
     comments: 3,
     timeAgo: '2일 전',
   },
+  {
+    id: 7,
+    category: 'workout',
+    username: '땀흘리는_여유',
+    question: '나의 한계를 마주하고 있는가?',
+    action: '오늘 하루 종일 바쁘게 움직였지만, 저녁에는 온전히 나만의 시간을 가지며 러닝머신 위를 달렸다. 숨이 차오를 때마다 복잡했던 머릿속이 맑아지는 기분이었다. 역시 땀 흘리는 시간은 배신하지 않는다. 내일도 이 감각을 잊지 않기를.',
+    mood: '포근',
+    moodCode: '포근',
+    level: '누군가의 기록',
+    likes: 82,
+    comments: 12,
+    timeAgo: '방금',
+  }
 ];
 
 
@@ -200,28 +218,28 @@ export const CommunityView: React.FC<CommunityViewProps> = ({ records = [] }) =>
         </div>
       </div>
 
-      {/* ── Weekly 많은 공감 ── */}
+      {/* ── Weekly Top 3 (이번 주 가장 공감받은 기록) ── */}
       {selectedCategory === 'all' && (
-        <div className="px-4 mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Heart size={14} className="text-rose-400 fill-rose-300" />
-            <h3 className="text-xs font-bold text-mist-500 tracking-widest">이번 주 많이 울린 기록</h3>
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {weeklyTop3.map((post) => (
-              <div
-                key={`top-${post.id}`}
-                className="flex items-center gap-3 bg-white/60 rounded-2xl px-4 py-3 border border-white/80 shadow-sm"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-bold text-mist-400 mb-0.5">@{post.username}</p>
-                  <p className="text-xs text-mist-600 line-clamp-2 leading-snug">{post.action}</p>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Heart size={13} className="text-rose-400 fill-rose-400" />
-                  <span className="text-[11px] font-bold text-mist-500">{post.likes}</span>
-                </div>
+        <div className="mb-10 relative">
+          <div className="px-5 pt-4 pb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="bg-white p-1.5 rounded-xl shadow-sm border border-mist-100">
+                <Heart size={14} className="text-rose-400 fill-rose-300" />
               </div>
+              <h3 className="text-[13px] font-bold text-mist-600 tracking-wide">이번 주 가장 공감받은 기록</h3>
+            </div>
+          </div>
+          
+          {/* 부각되는 디자인: 랭킹 배지와 특별한 테두리, 그리고 일반 피드와 동일한 세로 정렬(Vertical Flow) */}
+          <div className="flex flex-col gap-5 px-4 mt-3">
+            {weeklyTop3.map((post, index) => (
+                <PostItem
+                  key={`top-${post.id}`}
+                  post={post}
+                  liked={likedIds.has(post.id)}
+                  onToggleLike={(e) => toggleLike(post.id, e)}
+                  isHighlighted={true}
+                />
             ))}
           </div>
         </div>
@@ -267,15 +285,18 @@ interface PostItemProps {
   post: Post;
   liked: boolean;
   onToggleLike: (e: React.MouseEvent) => void;
+  isHighlighted?: boolean; // Flag to show a warm highlight styling instead of a rank
 }
 
-const PostItem: React.FC<PostItemProps> = ({ post, liked, onToggleLike }) => {
+const PostItem: React.FC<PostItemProps> = ({ post, liked, onToggleLike, isHighlighted }) => {
   const displayLikes = post.likes + (liked ? 1 : 0);
   const needsExpand = post.action.length > EXPAND_THRESHOLD || !!post.imageUrl;
   const [expanded, setExpanded] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentInput, setCommentInput] = useState('');
 
   return (
-    <div className="bg-white/70 rounded-3xl border border-white/70 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md hover:bg-white">
+    <div className={`bg-white/70 rounded-3xl border shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md hover:bg-white relative ${isHighlighted ? 'border-rose-200/60 shadow-rose-100/50 shadow-lg ring-1 ring-rose-200/50' : 'border-white/70'}`}>
       {/* Header */}
       <div className="px-5 pt-5 pb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -335,10 +356,13 @@ const PostItem: React.FC<PostItemProps> = ({ post, liked, onToggleLike }) => {
       <div className="px-5 pb-4 flex items-center justify-between border-t border-mist-50/80 pt-3">
         <MoodSticker code={post.moodCode || post.mood} className="scale-90 origin-left" />
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 text-mist-400">
-            <MessageCircle size={15} />
+          <button 
+            onClick={() => setShowComments(!showComments)}
+            className={`flex items-center gap-1.5 transition-all duration-200 ${showComments ? 'text-point-500' : 'text-mist-400 hover:text-mist-500'}`}
+          >
+            <MessageCircle size={15} className={showComments ? 'fill-point-500' : ''} />
             <span className="text-[12px] font-semibold">{post.comments}</span>
-          </div>
+          </button>
           <button
             onClick={onToggleLike}
             className={`flex items-center gap-1.5 transition-all duration-200 active:scale-90 ${
@@ -350,6 +374,43 @@ const PostItem: React.FC<PostItemProps> = ({ post, liked, onToggleLike }) => {
           </button>
         </div>
       </div>
+
+      {/* Embedded Comments Section */}
+      {showComments && (
+        <div className="bg-mist-50/50 pt-3 pb-4 px-5 border-t border-mist-100/50 animate-fade-in">
+          <div className="flex flex-col gap-3 mb-4">
+            {MOCK_COMMENTS.map(c => (
+              <div key={c.id} className="flex gap-2.5">
+                <div className="w-6 h-6 shrink-0 rounded-full bg-mist-200 flex items-center justify-center">
+                  <span className="text-[9px] font-bold text-white">{c.user.charAt(0)}</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[11px] font-bold text-mist-600">@{c.user}</span>
+                    <span className="text-[9px] text-mist-400">{c.time}</span>
+                  </div>
+                  <p className="text-[12px] text-mist-600 mt-0.5 leading-relaxed">{c.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 items-center">
+            <input 
+              type="text" 
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              placeholder="따뜻한 공감을 남겨주세요." 
+              className="flex-1 bg-white border border-mist-100 rounded-xl px-3 py-2 text-xs text-mist-600 placeholder-mist-300 focus:outline-none focus:border-point-300 transition-colors"
+            />
+            <button 
+              className="bg-mist-600 text-white px-3 py-2 rounded-xl text-xs font-bold hover:bg-mist-700 transition-colors"
+              onClick={() => { if(commentInput) { alert('댓글이 등록되었습니다.'); setCommentInput(''); } }}
+            >
+              등록
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

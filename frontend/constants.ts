@@ -59,7 +59,7 @@ export const CATEGORIES = [
 export const MOOD_STICKERS = [
   { code: '포근', label: '포근', color: 'bg-point-100/50 text-point-600 border border-point-200' },
   { code: '멍함', label: '멍함', color: 'bg-mist-100 text-mist-500 border border-mist-200' },
-  { code: '반짝', label: '반짝', color: 'bg-lavender-100/50 text-lavender-600 border border-lavender-200' },
+  { code: '반짝', label: '반짝', color: 'bg-amber-100/50 text-amber-600 border border-amber-200' },
   { code: '잔잔', label: '잔잔', color: 'bg-blue-50 text-blue-500 border border-blue-100' },
   { code: '버팀', label: '버팀', color: 'bg-green-50 text-green-600 border border-green-200' },
   { code: '두근', label: '두근', color: 'bg-rose-50 text-rose-500 border border-rose-200' },

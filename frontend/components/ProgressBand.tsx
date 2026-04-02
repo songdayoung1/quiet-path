@@ -19,12 +19,12 @@ export const ProgressBand: React.FC<ProgressBandProps> = ({
   return (
     <div className="flex flex-col gap-3">
        {/* 1. Streak Heatmap Section */}
-      <Card className="!bg-white/70 border border-white/50 shadow-sm !p-5">
+      <Card className="!bg-white/85 backdrop-blur-md border border-white/50 shadow-sm !p-5">
         <StreakHeatmap records={records} />
       </Card>
 
       {/* 2. Monthly Summary Stats */}
-      <Card className="!bg-white/55 border border-white/50 shadow-sm backdrop-blur-sm !p-5">
+      <Card className="!bg-white/85 backdrop-blur-md border border-white/50 shadow-sm !p-5">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Flame size={16} className="text-point-400" />
