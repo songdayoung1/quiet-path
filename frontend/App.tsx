@@ -163,23 +163,25 @@ const App: React.FC = () => {
     return (
       <button
         onClick={() => setCurrentView(view)}
-        className="flex flex-col items-center justify-center gap-1.5 transition-all duration-500 ease-out group flex-1"
+        className="relative flex flex-col items-center justify-center flex-1 h-full group pointer-events-auto"
       >
         <div
           className={[
-            'w-16 h-16 rounded-[22px] flex items-center justify-center transition-all duration-500 ease-out',
+            'w-[44px] h-[44px] rounded-[15px] flex items-center justify-center transition-all duration-500 ease-out z-10',
             isActive
-              ? 'bg-gradient-to-br from-[#9F75FF] to-[#8B5CF6] shadow-[0_8px_20px_rgba(139,92,246,0.3)] -translate-y-2 scale-110'
-              : 'bg-transparent hover:bg-white/40',
+              ? 'bg-gradient-to-br from-[#9F75FF] to-[#8B5CF6] shadow-[0_4px_12px_rgba(139,92,246,0.25)] -translate-y-[10px] scale-110'
+              : 'bg-transparent hover:bg-white/40 group-hover:-translate-y-1',
           ].join(' ')}
         >
-          <div className={`transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-105 group-active:scale-95'}`}>
+          <div className={`transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
             <NavIcon view={view} active={isActive} />
           </div>
         </div>
         <span
-          className={`text-[10px] font-bold tracking-tight transition-all duration-500 ${
-            isActive ? 'text-[#8B5CF6] opacity-100' : 'text-slate-400 opacity-0 group-hover:opacity-40'
+          className={`absolute bottom-[3px] text-[9px] font-bold tracking-tight transition-all duration-500 ${
+            isActive 
+              ? 'text-[#8B5CF6] opacity-100 translate-y-0' 
+              : 'text-slate-400 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
           }`}
         >
           {label}
@@ -205,13 +207,25 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen max-w-md mx-auto dream-bg relative shadow-2xl shadow-mist-200/40 flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       
+      {/* Header Overlay (Gradient Blur) */}
+      <div 
+        className="sticky top-0 h-20 -mb-20 z-20 pointer-events-none transition-opacity duration-500"
+        style={{
+          backdropFilter: 'blur(10px)',
+          WebkitBackdropFilter: 'blur(10px)',
+          maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
+          backgroundColor: 'rgba(255, 255, 255, 0.4)'
+        }}
+      />
+
       {/* Top Bar */}
-      <div className="h-16 flex items-center justify-between px-8 z-10 sticky top-0 bg-transparent">
+      <div className="h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
         <div className="w-6" />
         <h1 className="text-mist-400 text-[10px] font-bold tracking-[0.3em] uppercase opacity-70">Quiet Path</h1>
         <button 
           onClick={() => setCurrentView('SETTINGS')} 
-          className="text-mist-300 hover:text-mist-500 transition-colors p-2 rounded-full hover:bg-white/40"
+          className="text-mist-400 hover:text-purple-500 transition-all p-2 rounded-full hover:bg-white/40 active:scale-95"
         >
           <Settings size={18} />
         </button>
@@ -276,8 +290,8 @@ const App: React.FC = () => {
 
       {/* Floating Bottom Navigation */}
       {currentView !== 'WRITE_LOG' && (
-        <div className="fixed bottom-10 left-0 w-full flex justify-center z-20 px-6 pointer-events-none">
-           <nav className="h-24 px-4 bg-white/90 backdrop-blur-2xl border border-white/80 rounded-[40px] shadow-[0_12px_40px_rgba(0,0,0,0.06)] flex items-center justify-between w-full max-w-[360px] pointer-events-auto">
+        <div className="fixed bottom-6 left-0 w-full flex justify-center z-20 px-6 pointer-events-none">
+           <nav className="h-[64px] px-2 bg-white/94 backdrop-blur-2xl border border-white/80 rounded-[28px] shadow-[0_12px_40px_rgba(0,0,0,0.06)] flex items-center justify-between w-full max-w-[340px] pointer-events-auto">
             <NavItem view="NOW" label="오늘" />
             <NavItem view="RECORDS" label="기록" />
             <NavItem view="COMMUNITY" label="둘러보기" />

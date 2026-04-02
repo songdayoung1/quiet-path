@@ -50,12 +50,20 @@ const MOOD_LEGEND = [
   { code: '멍함', dot: MOOD_DOT['멍함'] },
 ];
 
-const EmptyCalendar: React.FC = () => (
-  <div className="flex flex-col items-center justify-center py-10 px-6 text-center">
-    <WaterDropCharacter size={78} mood="neutral" tone="default" animate={false} className="mb-1" />
-    <p className="text-sm font-bold text-mist-600 mb-2 mt-2">이번 달 기록이 없어요</p>
-    <p className="text-[12px] text-mist-400 leading-relaxed">
-      기록을 시작하면 달력에서<br />무드와 흐름을 한눈에 볼 수 있어요.
+const NoRecordsGuide: React.FC = () => (
+  <div className="flex flex-col items-center justify-center py-6 px-6 text-center animate-fade-in">
+    <p className="text-sm font-bold text-mist-600 mb-1.5 mt-2 tracking-tight">이번 달 기록이 아직 없어요</p>
+    <p className="text-[11px] text-mist-400 leading-[1.6] opacity-80 font-medium">
+      기록을 시작하면 이곳에서 당신의 무드와 흐름을<br />한눈에 매일매일 확인할 수 있습니다.
+    </p>
+  </div>
+);
+
+const TapGuide: React.FC = () => (
+  <div className="flex flex-col items-center justify-center py-5 px-6 text-center animate-fade-in">
+    <p className="text-[11px] font-bold text-mist-500 mb-1.5 opacity-90 tracking-wide uppercase">Your Mood Journey</p>
+    <p className="text-[10px] text-mist-400 leading-relaxed tracking-wide font-medium">
+      날짜를 탭하면 해당 기록을 바로 열어볼 수 있어요.
     </p>
   </div>
 );
@@ -71,12 +79,12 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
     (c) => c.type === 'day' && c.record,
   );
 
-  if (!hasAnyRecord) return <EmptyCalendar />;
-
   return (
-    <div className="px-4 pb-6">
+    <div className="px-4 pb-12">
+      {hasAnyRecord ? <TapGuide /> : <NoRecordsGuide />}
+      
       {/* Calendar grid */}
-      <div className="bg-white/80 rounded-[2rem] border border-white/70 shadow-sm overflow-hidden">
+      <div className="bg-white/80 rounded-[2rem] border border-white/70 shadow-sm overflow-hidden mb-6">
         {/* Weekday header */}
         <div className="grid grid-cols-7 bg-mist-50/60 border-b border-mist-100/50">
           {WEEKDAY_LABELS.map((label) => (
@@ -163,7 +171,7 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
       </div>
 
       {/* Legend */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 px-1">
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 px-1 opacity-80">
         <span className="text-[10px] text-mist-400 font-bold uppercase tracking-widest mr-1">무드</span>
         {MOOD_LEGEND.map(({ code, dot }) => (
           <div key={code} className="flex items-center gap-1">
@@ -176,10 +184,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
           <span className="text-[10px] text-mist-500 font-medium">사진 있음</span>
         </div>
       </div>
-
-      <p className="text-[10px] text-mist-300 mt-3 px-1 tracking-wide">
-        날짜를 탭하면 해당 기록을 바로 열어볼 수 있어요.
-      </p>
     </div>
   );
 };

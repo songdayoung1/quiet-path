@@ -197,7 +197,7 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
 
       {/* Water Drop Micro-interaction */}
       {isSaving && (
-        <WaterDropOverlay leaving={saveState === 'leaving'} tone={mascotTone} />
+        <WaterDropOverlay leaving={saveState === 'leaving'} mood={mascotTone} />
       )}
     </div>
   );

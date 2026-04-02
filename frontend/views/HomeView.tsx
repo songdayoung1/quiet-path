@@ -80,7 +80,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onHistory
              {hasLoggedToday ? '기록이 안전하게 쌓이고 있어요.' : '하루를 돌아보며 방향을 만들어가요.'}
           </p>
         </div>
-        {lastRecord?.moodCode && (
+        {!hasLoggedToday && lastRecord?.moodCode && (
           <div className="shrink-0 flex flex-col items-center">
              <span className="text-[10px] text-mist-300 mb-1">최근 무드</span>
              <MoodSticker code={lastRecord.moodCode} className="opacity-100" />

@@ -1,39 +1,50 @@
 import React from 'react';
 
 // Transparent PNG Mascot Image Paths (Using dist/assets as requested)
-const mascotPurple = '/assets/mascot/mascot_3d_purple.png';
-const mascotCalm = '/assets/mascot/mascot_3d_calm.png';
-const mascotHappy = '/assets/mascot/mascot_3d_happy.png';
-const mascotGray = '/assets/mascot/mascot_3d_gray.png';
+const mascotPurple = '/dist/assets/mascot/mascot_3d_purple.png';
+const mascotCalm = '/dist/assets/mascot/mascot_3d_calm.png';
+const mascotHappy = '/dist/assets/mascot/mascot_3d_happy.png';
+const mascotGray = '/dist/assets/mascot/mascot_3d_gray.png';
+const mascotSparkle = '/dist/assets/mascot/mascot_3d_sparkle.png';
+const mascotMint = '/dist/assets/mascot/mascot_3d_mint.png';
+const mascotBlank = '/dist/assets/mascot/mascot_3d_gray.png';
 
-export type CharacterMood = 'waiting' | '포근' | '멍함' | '반짝' | '잔잔' | '버팀' | '두근' | 'happy' | 'neutral';
+export type CharacterMood = 'waiting' | '포근' | '멍함' | '망함' | '반짝' | '잔잔' | '버팀' | '두근' | 'happy' | 'neutral' | 'default';
+export type CharacterTone = CharacterMood;
 
 interface WaterDropCharacterProps {
   size?: number;
   mood?: CharacterMood;
+  tone?: CharacterTone; // Compatibility for legacy 'tone' prop
   className?: string;
   animate?: boolean;
 }
 
 export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
   size = 100,
-  mood = 'waiting',
+  mood,
+  tone,
   className = '',
   animate = true,
 }) => {
+  // Use mood if provided, otherwise fallback to tone
+  const activeMood = mood || tone || 'waiting';
   // Map moods to transparent PNG images in public folder
   const getMascotImage = (m: CharacterMood) => {
     switch (m) {
       case '잔잔':
         return mascotCalm;
       case '반짝':
+        return mascotSparkle;
       case '두근':
       case 'happy':
         return mascotHappy;
       case '멍함':
-        return mascotGray;
-      case '포근':
+      case '망함':
+        return mascotBlank;
       case '버팀':
+        return mascotMint;
+      case '포근':
       case 'waiting':
       case 'neutral':
       default:
@@ -41,11 +52,11 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
     }
   };
 
-  const mascotSrc = getMascotImage(mood);
+  const mascotSrc = getMascotImage(activeMood);
 
   // Animation Styles
   const animationStyle = animate ? {
-    animation: mood === 'waiting' 
+    animation: (activeMood === 'waiting' || activeMood === 'neutral' || activeMood === 'default')
       ? 'float 3s ease-in-out infinite' 
       : 'breathe 4s ease-in-out infinite'
   } : {};
