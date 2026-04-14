@@ -8,6 +8,6 @@ import lombok.Getter;
 public class PathCreateResponse {
     private Long pathId;
     private String status;
-    private String startDate;
-    private String endDate;
+    private String createdAt;
+    private String reviewAt;
 }

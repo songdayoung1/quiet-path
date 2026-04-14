@@ -14,7 +14,6 @@ CREATE TABLE users (
     email VARCHAR(255),
     nickname VARCHAR(30) NOT NULL UNIQUE,
     current_title_id BIGINT,
-    current_path_id BIGINT,
     level INT NOT NULL DEFAULT 1,
     steps_taken INT NOT NULL DEFAULT 0,
     data_sync_enabled TINYINT NOT NULL DEFAULT 1,
@@ -29,21 +28,26 @@ CREATE TABLE paths (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     category_code VARCHAR(20) NOT NULL,
-    key_question VARCHAR(255) NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    description VARCHAR(500),
-    start_at DATETIME NOT NULL,
-    anchor_at DATETIME NOT NULL,
+    direction_name VARCHAR(100) NOT NULL,
+    direction_text VARCHAR(255),
+    review_at DATETIME NOT NULL,
+    cover_record_id BIGINT,
     status VARCHAR(20) NOT NULL,
-    closed_at DATETIME,
+    active_user_id BIGINT GENERATED ALWAYS AS (
+        CASE
+            WHEN status = 'ACTIVE' THEN user_id
+            ELSE NULL
+        END
+    ) STORED,
+    completed_at DATETIME,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
-    INDEX idx_user_status_anchor (user_id, status, anchor_at),
-    INDEX idx_category_status_anchor (category_code, status, anchor_at),
+    UNIQUE KEY uk_paths_active_user (active_user_id),
+    INDEX idx_user_status_created (user_id, status, created_at),
+    INDEX idx_category_status_created (category_code, status, created_at),
+    INDEX idx_review_at (review_at),
     CONSTRAINT fk_paths_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-ALTER TABLE users ADD CONSTRAINT fk_users_current_path FOREIGN KEY (current_path_id) REFERENCES paths(id);
 
 CREATE TABLE user_titles (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -66,17 +70,25 @@ CREATE TABLE records (
     one_word_text VARCHAR(200),
     tomorrow_text VARCHAR(200),
     mood_code VARCHAR(30),
+    image_url VARCHAR(500),
+    is_hidden TINYINT NOT NULL DEFAULT 0,
+    pinned_at DATETIME,
     visibility VARCHAR(10) NOT NULL DEFAULT 'PRIVATE',
     shared_at DATETIME,
+    share_code VARCHAR(32),
     reaction_count INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uk_user_date (user_id, record_date),
+    UNIQUE KEY uk_records_share_code (share_code),
     INDEX idx_path_date (path_id, record_date),
     INDEX idx_visibility_category_shared (visibility, category_code, shared_at, id),
+    INDEX idx_mood_date (mood_code, record_date),
     CONSTRAINT fk_records_user FOREIGN KEY (user_id) REFERENCES users(id),
     CONSTRAINT fk_records_path FOREIGN KEY (path_id) REFERENCES paths(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE paths ADD CONSTRAINT fk_paths_cover_record FOREIGN KEY (cover_record_id) REFERENCES records(id);
 
 CREATE TABLE reactions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -89,11 +101,26 @@ CREATE TABLE reactions (
     CONSTRAINT fk_reactions_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE comments (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    record_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    content VARCHAR(500) NOT NULL,
+    deleted TINYINT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    deleted_at DATETIME,
+    INDEX idx_comments_record_created (record_id, created_at),
+    INDEX idx_comments_user_created (user_id, created_at),
+    CONSTRAINT fk_comments_record FOREIGN KEY (record_id) REFERENCES records(id),
+    CONSTRAINT fk_comments_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE notifications (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     recipient_user_id BIGINT NOT NULL,
     type VARCHAR(30) NOT NULL,
-    actor_user_id BIGINT NOT NULL,
+    actor_user_id BIGINT,
     target_type VARCHAR(20) NOT NULL,
     target_id BIGINT NOT NULL,
     message VARCHAR(500) NOT NULL,
@@ -109,6 +136,7 @@ CREATE TABLE notifications (
 CREATE TABLE path_summaries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     path_id BIGINT NOT NULL,
+    version_no INT NOT NULL,
     status VARCHAR(20) NOT NULL,
     format VARCHAR(20) NOT NULL DEFAULT 'MARKDOWN',
     content MEDIUMTEXT,
@@ -117,7 +145,7 @@ CREATE TABLE path_summaries (
     input_hash CHAR(64),
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
-    UNIQUE KEY uk_path_prompt (path_id, prompt_version),
+    UNIQUE KEY uk_path_version (path_id, version_no),
     INDEX idx_path_status_updated (path_id, status, updated_at),
     CONSTRAINT fk_path_summaries_path FOREIGN KEY (path_id) REFERENCES paths(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

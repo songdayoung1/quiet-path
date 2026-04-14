@@ -12,12 +12,14 @@ import { MemoryPreviewStrip } from '../components/MemoryPreviewStrip';
 interface HomeViewProps {
   state: AppState;
   onLogClick: () => void;
+  onStartDirectionClick: () => void;
   onHistoryClick: () => void;
   onRecordsClick: () => void;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onHistoryClick, onRecordsClick }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDirectionClick, onHistoryClick, onRecordsClick }) => {
   const { currentDirection, records, hasLoggedToday } = state;
+  const hasActiveDirection = !!currentDirection;
   const sortedRecords = [...records].filter(r => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp);
   
   // Find today's record accurately matching local date
@@ -63,6 +65,26 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onHistory
   }, {} as Record<string, number>);
   const topMood = Object.entries(monthlyMoodCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
 
+  const handleLogClick = () => {
+    if (!hasActiveDirection) {
+      onStartDirectionClick();
+      return;
+    }
+    onLogClick();
+  };
+
+  const heroTitle = !hasActiveDirection
+    ? '지금은 잠시 쉬고 있어요.'
+    : hasLoggedToday
+      ? '오늘도 방향을 찾았네요.'
+      : '오늘은 어디로 움직였나요?';
+
+  const heroSubtitle = !hasActiveDirection
+    ? '원할 때 새 방향을 시작해요.'
+    : hasLoggedToday
+      ? '기록이 안전하게 쌓이고 있어요.'
+      : '하루를 돌아보며 방향을 만들어가요.';
+
   return (
     <div className="flex flex-col gap-6 animate-slide-up pb-32 pt-2 relative z-10">
       
@@ -72,15 +94,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onHistory
           <span className="text-[10px] px-3 py-1 bg-white/40 rounded-full text-mist-500 backdrop-blur-sm border border-white/40 shadow-sm font-medium tracking-wide">
             {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
           </span>
-          {/* Header text changes based on logging state */}
-          <h1 className="text-xl font-semibold text-mist-600 mt-3 px-1">
-            {hasLoggedToday ? '오늘도 방향을 찾았네요.' : '오늘은 어디로 움직였나요?'}
-          </h1>
+          <h1 className="text-xl font-semibold text-mist-600 mt-3 px-1">{heroTitle}</h1>
           <p className="text-sm text-mist-400 mt-1 px-1">
-             {hasLoggedToday ? '기록이 안전하게 쌓이고 있어요.' : '하루를 돌아보며 방향을 만들어가요.'}
+             {heroSubtitle}
           </p>
         </div>
-        {!hasLoggedToday && lastRecord?.moodCode && (
+        {hasActiveDirection && !hasLoggedToday && lastRecord?.moodCode && (
           <div className="shrink-0 flex flex-col items-center">
              <span className="text-[10px] text-mist-300 mb-1">최근 무드</span>
              <MoodSticker code={lastRecord.moodCode} className="opacity-100" />
@@ -91,9 +110,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onHistory
       {/* Tier 1: Action (TodaysCard) */}
       <TodaysCard 
         hasLoggedToday={hasLoggedToday} 
+        hasActiveDirection={hasActiveDirection}
         todayRecord={todayRecord} 
-        onLogClick={onLogClick} 
-        onEditClick={onLogClick} // Simplify for now, editing uses the same form 
+        onLogClick={handleLogClick} 
+        onEditClick={handleLogClick} // Simplify for now, editing uses the same form 
       />
 
       {/* Tier 2: Path & Progress */}
@@ -104,6 +124,16 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onHistory
           currentPathConsistency={currentPathConsistency} 
           currentPathRecordCount={currentPathRecordCount} 
         />
+        {!hasActiveDirection && hasLoggedToday && (
+          <div className="px-1 -mt-1">
+            <button
+              onClick={onStartDirectionClick}
+              className="w-full rounded-[1.6rem] border border-point-100 bg-white/80 px-4 py-3 text-sm font-bold text-point-500 shadow-sm transition-colors hover:border-point-200 hover:bg-white"
+            >
+              새 방향 시작하기
+            </button>
+          </div>
+        )}
         
         {/* Cumulative Progress Section */}
         <ProgressBand 

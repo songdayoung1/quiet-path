@@ -8,5 +8,5 @@ import lombok.Getter;
 public class PathFinishResponse {
     private Long pathId;
     private String status;
-    private String finishedAt;
+    private String completedAt;
 }

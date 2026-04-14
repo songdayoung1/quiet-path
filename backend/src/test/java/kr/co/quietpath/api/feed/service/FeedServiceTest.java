@@ -54,7 +54,7 @@ class FeedServiceTest {
         Path path10 = buildPath(10L, 1L, LocalDateTime.of(2026, 2, 7, 10, 0));
         Path path11 = buildPath(11L, 2L, LocalDateTime.of(2026, 2, 7, 10, 0));
         Path path12 = buildPath(12L, 3L, LocalDateTime.of(2026, 2, 6, 9, 0));
-        when(pathRepository.findByIdIn(List.of(10L, 11L, 12L)))
+        when(pathRepository.findByIdIn(List.of(11L, 10L, 12L)))
             .thenReturn(List.of(path10, path11, path12));
 
         when(userRepository.findByIdIn(any()))
@@ -128,12 +128,6 @@ class FeedServiceTest {
         when(recordRepository.findPublicFeedRecords(eq("PUBLIC"), any(), any(), any()))
             .thenReturn(List.of());
 
-        when(reactionRepository.countByRecordIds(any()))
-            .thenReturn(List.of());
-
-        when(reactionRepository.findReactedRecordIds(any(), any()))
-            .thenReturn(List.of());
-
         var response = feedService.getFeed(99L, 20, null);
 
         verify(recordRepository).findPublicFeedRecords(eq("PUBLIC"), any(), any(), any());
@@ -164,10 +158,9 @@ class FeedServiceTest {
         Path path = Path.builder()
             .userId(ownerId)
             .categoryCode("DEFAULT")
-            .keyQuestion("질문")
-            .name("제목")
-            .description("설명")
-            .anchorAt(LocalDateTime.now().plusDays(7))
+            .directionName("질문")
+            .directionText("설명")
+            .reviewAt(LocalDateTime.now().plusDays(7))
             .build();
         setField(path, "id", pathId);
         setField(path, "createdAt", updatedAt.minusDays(1));

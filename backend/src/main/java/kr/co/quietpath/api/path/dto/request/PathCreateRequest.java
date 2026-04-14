@@ -14,12 +14,10 @@ import java.time.LocalDate;
 public class PathCreateRequest {
 
     @NotBlank
-    private String keyQuestion;
+    private String directionName;
 
-    private String description;
-
-    private DurationType durationType;
+    private String directionText;
 
     @JsonFormat(pattern = "yyyy-MM-dd")
-    private LocalDate endDate;
+    private LocalDate reviewAt;
 }

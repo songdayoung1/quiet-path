@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "path_summaries",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_path_prompt", columnNames = {"path_id", "prompt_version"})
+        @UniqueConstraint(name = "uk_path_version", columnNames = {"path_id", "version_no"})
     },
     indexes = {
         @Index(name = "idx_path_status_updated", columnList = "path_id, status, updated_at")
@@ -29,6 +29,9 @@ public class PathSummary {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "path_id", nullable = false)
     private Path path;
+
+    @Column(name = "version_no", nullable = false)
+    private Integer versionNo;
 
     @Column(nullable = false, length = 20)
     private String status;
@@ -57,11 +60,13 @@ public class PathSummary {
     @Builder
     public PathSummary(
         Path path,
+        Integer versionNo,
         String promptVersion,
         String model,
         String inputHash
     ) {
         this.path = path;
+        this.versionNo = versionNo != null ? versionNo : 1;
         this.status = "PENDING";
         this.format = "MARKDOWN";
         this.promptVersion = promptVersion;

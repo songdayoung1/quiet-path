@@ -2,7 +2,6 @@ package kr.co.quietpath.domain.user.entity;
 
 import jakarta.persistence.*;
 import kr.co.quietpath.domain.title.entity.Title;
-import kr.co.quietpath.domain.path.entity.Path;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -40,10 +39,6 @@ public class User {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_title_id")
     private Title currentTitle;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "current_path_id")
-    private Path currentPath;
 
     @Column(nullable = false)
     private Integer level;
@@ -118,16 +113,6 @@ public class User {
 
     public void unequipTitle() {
         this.currentTitle = null;
-        touch();
-    }
-
-    public void setActivePath(Path path) {
-        this.currentPath = path;
-        touch();
-    }
-
-    public void clearActivePath() {
-        this.currentPath = null;
         touch();
     }
 

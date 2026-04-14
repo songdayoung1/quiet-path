@@ -1,18 +1,19 @@
 import React, { useMemo, useState } from 'react';
 import { Direction, Record as RecordType } from '../types';
 import { Card, PageHeader, SoftButton, MoodSticker, CategoryIcon, WaterDropOverlay } from '../components/UI';
-import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight } from 'lucide-react';
+import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight, Wind } from 'lucide-react';
 import { CATEGORIES } from '../constants';
 import { DirectionSetupForm } from '../components/DirectionSetupForm';
 
 interface DirectionViewProps {
   currentDirection: Direction | null;
   records: RecordType[];
-  onUpdateDirection: (newDirection: Partial<Direction>) => void;
+  onStartDirection: (newDirection: Partial<Direction>) => void;
+  onFinishDirection: () => void;
   onHistoryClick: () => void;
 }
 
-export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, records, onUpdateDirection, onHistoryClick }) => {
+export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, records, onStartDirection, onFinishDirection, onHistoryClick }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showCategorySelect, setShowCategorySelect] = useState(false);
   const [question, setQuestion] = useState('');
@@ -63,7 +64,7 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
     }, 1400);
 
     setTimeout(() => {
-      onUpdateDirection({
+      onStartDirection({
         question: question.trim() || '이 방향으로 나는 어떻게 걸어가고 있을까?',
         description,
         categoryId: selectedCategory?.id,
@@ -73,6 +74,12 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
       setIsEditing(false);
       setSaveState('idle');
     }, 1750);
+  };
+
+  const handleFinishDirection = () => {
+    if (window.confirm("이 방향을 마무리할까요?\n마무리 후 새 방향은 원할 때 시작할 수 있어요.")) {
+      onFinishDirection();
+    }
   };
 
   const currentPathRecords = useMemo(() => {
@@ -284,9 +291,14 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                 )}
               </div>
             ) : (
-              <div className="text-center py-10 flex flex-col items-center justify-center gap-3">
-                <Compass size={32} className="text-mist-200" strokeWidth={1.5} />
-                <p className="text-mist-400 text-sm font-medium tracking-wide">설정된 궤적이 없습니다.</p>
+              <div className="text-center py-6 flex flex-col items-center justify-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-mist-50/80 flex items-center justify-center mb-2 border border-mist-100/50 shadow-inner">
+                  <Wind size={28} className="text-mist-300" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <p className="text-mist-600 text-base font-bold tracking-wide mb-1">지금은 잠시 쉬고 있어요</p>
+                  <p className="text-mist-400 text-xs font-medium tracking-wide">원할 때 새 방향을 천천히 시작해요.</p>
+                </div>
               </div>
             )}
           </Card>
@@ -294,12 +306,16 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
 
         <div className="relative z-10 ml-5 mt-10 flex flex-col gap-3">
           {currentDirection ? (
-            <SoftButton variant="secondary" onClick={handleStartEdit} className="!bg-white/70 backdrop-blur-sm border border-mist-100 shadow-sm py-3.5">
-              <span className="text-mist-500 font-bold text-sm">새로운 방향으로 수정하기</span>
+            <SoftButton 
+              variant="secondary" 
+              onClick={handleFinishDirection} 
+              className="!bg-white/90 backdrop-blur-sm border border-mist-200 shadow-sm py-3.5 hover:border-point-300 transition-colors"
+            >
+              <span className="text-mist-600 font-bold text-sm">현재 방향 마무리하기</span>
             </SoftButton>
           ) : (
             <SoftButton onClick={handleStartEdit} className="py-3.5 shadow-lg shadow-point-200/50 font-bold text-sm">
-              <span>새로운 방향 설정하기</span>
+              <span>새 방향 시작하기</span>
             </SoftButton>
           )}
 

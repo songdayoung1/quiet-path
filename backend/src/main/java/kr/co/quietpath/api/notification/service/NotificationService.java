@@ -23,6 +23,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -55,6 +56,7 @@ public class NotificationService {
         List<Notification> notifications = notificationPage.getContent();
         Set<Long> actorIds = notifications.stream()
             .map(Notification::getActorUserId)
+            .filter(Objects::nonNull)
             .collect(Collectors.toSet());
 
         Map<Long, User> userMap = actorIds.isEmpty()
@@ -67,7 +69,9 @@ public class NotificationService {
                 User actorUser = userMap.get(notification.getActorUserId());
                 ActorSummary actor = ActorSummary.builder()
                     .userId(notification.getActorUserId())
-                    .nickname(actorUser != null ? actorUser.getNickname() : null)
+                    .nickname(notification.isSystemNotification()
+                        ? "시스템"
+                        : actorUser != null ? actorUser.getNickname() : null)
                     .profileImageUrl(null)
                     .build();
 

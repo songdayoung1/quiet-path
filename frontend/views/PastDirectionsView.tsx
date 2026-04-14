@@ -80,20 +80,29 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({ pastDire
 
         <div className="px-6 mb-12 animate-slide-up" style={{ animationDelay: '0.1s' }}>
             {!showSummary ? (
-                <SoftButton 
-                    onClick={isLocked ? undefined : handleSummarize} 
-                    className={`w-full !rounded-2xl !py-5 shadow-sm bg-white/80 backdrop-blur-sm border border-white font-bold ${isLocked ? 'opacity-60 cursor-not-allowed grayscale' : 'hover:shadow-md hover:border-point-100 hover:bg-white'}`}
-                    variant="secondary"
-                    disabled={isLocked}
-                >
-                    {isSummarizing ? (
-                        <span className="text-point-500 flex gap-2 items-center"><Sparkles size={16} className="animate-spin"/> 지난 조각들을 엮는 중...</span>
-                    ) : isLocked ? (
-                        <span className="text-mist-500 flex gap-2 items-center text-sm"><Lock size={16} /> {unlockDate}까지 회고가 잠겨있습니다</span>
-                    ) : (
-                        <span className="text-point-500 flex gap-2 items-center"><Sparkles size={16} /> AI 회고 리포트 받아보기</span>
-                    )}
-                </SoftButton>
+                isLocked ? (
+                    <Card className="w-full !rounded-3xl !bg-mist-800/90 backdrop-blur-md border border-mist-700/50 !p-8 flex flex-col items-center text-center shadow-lg">
+                        <div className="w-12 h-12 rounded-full bg-mist-700/50 flex items-center justify-center mb-4 border border-mist-600/30">
+                            <Lock size={20} className="text-mist-300" />
+                        </div>
+                        <h3 className="text-white/90 font-bold text-[16px] mb-2 tracking-wide">AI 회고 캡슐</h3>
+                        <p className="text-mist-300/80 text-[12px] font-medium tracking-wide">
+                            {unlockDate} 이후에 열어볼 수 있는<br/>방향 종합 리포트입니다.
+                        </p>
+                    </Card>
+                ) : (
+                    <SoftButton 
+                        onClick={handleSummarize} 
+                        className="w-full !rounded-3xl !py-5 shadow-sm bg-white/80 backdrop-blur-sm border border-white font-bold hover:shadow-md hover:border-point-100 hover:bg-white transition-all"
+                        variant="secondary"
+                    >
+                        {isSummarizing ? (
+                            <span className="text-point-500 flex gap-2 items-center"><Sparkles size={16} className="animate-spin"/> 지난 조각들을 엮는 중...</span>
+                        ) : (
+                            <span className="text-point-500 flex gap-2 items-center"><Sparkles size={16} /> AI 회고 캡슐 열기</span>
+                        )}
+                    </SoftButton>
+                )
             ) : (
                 <div className="animate-fade-in bg-white/90 backdrop-blur-md rounded-3xl border border-white shadow-lg shadow-point-100/30 overflow-hidden">
                     <div className="flex justify-center py-4 bg-point-50/50 border-b border-white">
@@ -116,11 +125,6 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({ pastDire
                  <div className="flex items-center gap-2">
                     <span className="text-[11px] font-bold text-mist-500 uppercase tracking-widest">Recorded Flows</span>
                  </div>
-                 {isLocked && (
-                    <div className="flex items-center gap-1.5 bg-white/50 backdrop-blur-sm px-3 py-1.5 rounded-full text-mist-500 border border-white shadow-sm">
-                         <Lock size={12} /> <span className="text-[10px] font-bold tracking-wide">{unlockDate} 해제</span>
-                    </div>
-                 )}
              </div>
              
              <div className="flex flex-col gap-4">
@@ -131,7 +135,7 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({ pastDire
                  ) : (
                     flowRecords.map((record) => (
                         <Card key={record.id} className={`!p-5 border border-white shadow-sm transition-transform active:scale-[0.99] ${record.isPinned ? 'bg-white shadow-md border-point-100 ring-1 ring-point-50' : 'bg-white/70 backdrop-blur-md'}`}>
-                            <div className={`transition-all duration-700 ${isLocked ? 'blur-[6px] opacity-40 select-none grayscale-[0.5]' : ''}`}>
+                            <div className={`transition-all duration-700`}>
                                 <div className="flex justify-between items-start mb-4">
                                     <span className="text-xs font-bold text-mist-400 tracking-wider">
                                         {new Date(record.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
@@ -158,7 +162,7 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({ pastDire
             <div className="px-6 pb-12 animate-slide-up" style={{ animationDelay: '0.3s' }}>
                 <div className="relative h-48 w-full bg-gradient-to-b from-white/40 to-white/70 backdrop-blur-md rounded-3xl border border-white shadow-sm overflow-hidden">
                      {flowRecords.map((record, i) => (
-                         <ForestObject key={record.id} index={i} type={record.action} isLocked={isLocked} />
+                         <ForestObject key={record.id} index={i} type={record.action} isLocked={false} />
                      ))}
                      <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-white/80 via-white/40 to-transparent pointer-events-none"></div>
                 </div>

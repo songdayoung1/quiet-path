@@ -10,23 +10,23 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "comments", indexes = {
-    @Index(name = "idx_comment_target_created", columnList = "target_type, target_id, created_at")
+    @Index(name = "idx_comments_record_created", columnList = "record_id, created_at"),
+    @Index(name = "idx_comments_user_created", columnList = "user_id, created_at")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Comment {
 
+    private static final String TARGET_TYPE_RECORD = "RECORD";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, length = 20)
-    private String targetType;
+    @Column(name = "record_id", nullable = false)
+    private Long recordId;
 
-    @Column(nullable = false)
-    private Long targetId;
-
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
     @Column(nullable = false, length = 500)
@@ -45,9 +45,8 @@ public class Comment {
     private LocalDateTime deletedAt;
 
     @Builder
-    public Comment(String targetType, Long targetId, Long userId, String content) {
-        this.targetType = targetType;
-        this.targetId = targetId;
+    public Comment(Long recordId, Long userId, String content) {
+        this.recordId = recordId;
         this.userId = userId;
         this.content = content;
         this.deleted = false;
@@ -66,5 +65,13 @@ public class Comment {
             this.deletedAt = LocalDateTime.now();
             this.updatedAt = LocalDateTime.now();
         }
+    }
+
+    public String getTargetType() {
+        return TARGET_TYPE_RECORD;
+    }
+
+    public Long getTargetId() {
+        return recordId;
     }
 }

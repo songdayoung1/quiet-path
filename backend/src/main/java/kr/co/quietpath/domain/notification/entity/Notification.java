@@ -16,7 +16,8 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "notifications", indexes = {
-    @Index(name = "idx_notification_recipient_created", columnList = "recipient_user_id, created_at")
+    @Index(name = "idx_notification_recipient_created", columnList = "recipient_user_id, created_at"),
+    @Index(name = "idx_notification_recipient_read_created", columnList = "recipient_user_id, is_read, created_at")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -32,7 +33,7 @@ public class Notification {
     @Column(nullable = false, length = 30)
     private String type;
 
-    @Column(nullable = false)
+    @Column
     private Long actorUserId;
 
     @Column(nullable = false, length = 20)
@@ -77,5 +78,9 @@ public class Notification {
             this.read = true;
             this.readAt = readAt;
         }
+    }
+
+    public boolean isSystemNotification() {
+        return this.actorUserId == null;
     }
 }
