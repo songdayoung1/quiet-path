@@ -41,7 +41,6 @@ docs/*
 
 # Local planning docs
 frontend/docs/
-backend/docs/기능정의/앱-방향성-정의-v1.6.md
 
 # Local mascot image assets
 frontend/public/assets/mascot/
