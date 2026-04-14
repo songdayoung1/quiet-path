@@ -39,5 +39,8 @@ backend/.gradle/
 docs/*
 !docs/DATABASE_ERD.md
 
+# Local planning docs
+frontend/docs/
+
 # Local mascot image assets
 frontend/public/assets/mascot/

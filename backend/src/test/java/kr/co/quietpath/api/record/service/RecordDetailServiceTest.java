@@ -5,6 +5,7 @@ import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
+import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
@@ -34,6 +35,9 @@ class RecordDetailServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private PathRepository pathRepository;
+
+    @Mock
     private ReactionRepository reactionRepository;
 
     @Mock
@@ -58,7 +62,7 @@ class RecordDetailServiceTest {
 
         when(reactionRepository.countByTargetTypeAndTargetId("RECORD", 10L)).thenReturn(3L);
         when(reactionRepository.existsByUserIdAndTargetTypeAndTargetId(99L, "RECORD", 10L)).thenReturn(true);
-        when(commentRepository.countByTargetTypeAndTargetId("RECORD", 10L)).thenReturn(2L);
+        when(commentRepository.countByRecordId(10L)).thenReturn(2L);
 
         RecordDetailResponse response = recordService.getRecordDetail(99L, 10L);
 
@@ -75,10 +79,9 @@ class RecordDetailServiceTest {
         Path path = Path.builder()
             .userId(ownerId)
             .categoryCode("DEFAULT")
-            .keyQuestion("질문")
-            .name("제목")
-            .description("설명")
-            .anchorAt(LocalDateTime.now().plusDays(7))
+            .directionName("질문")
+            .directionText("설명")
+            .reviewAt(LocalDateTime.now().plusDays(7))
             .build();
 
         Record record = Record.builder()

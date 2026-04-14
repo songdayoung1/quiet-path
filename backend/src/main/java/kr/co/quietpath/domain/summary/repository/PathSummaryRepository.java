@@ -10,7 +10,7 @@ public interface PathSummaryRepository extends JpaRepository<PathSummary, Long> 
 
     Optional<PathSummary> findByPathIdAndPromptVersion(Long pathId, String promptVersion);
 
-    List<PathSummary> findByPathIdOrderByUpdatedAtDesc(Long pathId);
+    List<PathSummary> findByPathIdOrderByVersionNoDesc(Long pathId);
     
     List<PathSummary> findByPathIdAndStatus(Long pathId, String status);
 }

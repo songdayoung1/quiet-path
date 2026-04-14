@@ -1,6 +1,6 @@
 import React from 'react';
 import { Direction } from '../types';
-import { Compass } from 'lucide-react';
+import { Compass, Wind } from 'lucide-react';
 import { CategoryIcon, Card } from './UI';
 import { CATEGORIES } from '../constants';
 
@@ -20,6 +20,20 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
 
   const cat = CATEGORIES.find(c => c.id === currentDirection?.categoryId);
   const accentColor = cat?.accent || '#8B5CF6';
+
+  if (!currentDirection) {
+    return (
+      <Card className="!rounded-[2rem] !p-6 !bg-white/85 backdrop-blur-md border-white/50 shadow-sm !transition-all !duration-300 flex items-center justify-center gap-4 py-8">
+        <div className="w-12 h-12 rounded-full bg-mist-50/80 flex items-center justify-center mb-1 border border-mist-100/50 shadow-inner">
+          <Wind size={22} className="text-mist-300" strokeWidth={1.5} />
+        </div>
+        <div className="flex flex-col">
+          <p className="text-mist-600 text-[15px] font-bold tracking-wide">지금은 잠시 쉬고 있어요</p>
+          <p className="text-mist-400 text-[11px] font-medium tracking-wide mt-0.5">원할 때 새 방향을 천천히 시작해요.</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card

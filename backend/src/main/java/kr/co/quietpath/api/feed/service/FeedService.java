@@ -109,7 +109,7 @@ public class FeedService {
             items.add(FeedItem.builder()
                 .pathId(path != null ? path.getId() : null)
                 .recordId(record.getId())
-                .title(path != null ? path.getName() : null)
+                .title(path != null ? path.getDirectionName() : null)
                 .content(resolveContent(record))
                 .status(path != null ? mapStatus(path.getStatus()) : null)
                 .owner(ownerSummary)
@@ -197,7 +197,7 @@ public class FeedService {
             WeeklyTop3Item item = WeeklyTop3Item.builder()
                 .rank(rank)
                 .pathId(path.getId())
-                .title(path.getName())
+                .title(path.getDirectionName())
                 .status(mapStatus(path.getStatus()))
                 .owner(ownerSummary)
                 .reactionCount(projection.getReactionCount())
@@ -221,7 +221,7 @@ public class FeedService {
     }
 
     private String mapStatus(String status) {
-        if ("FINISHED".equals(status) || "CLOSED".equals(status)) {
+        if ("FINISHED".equals(status) || "CLOSED".equals(status) || "COMPLETED".equals(status)) {
             return "ENDED";
         }
         return status;

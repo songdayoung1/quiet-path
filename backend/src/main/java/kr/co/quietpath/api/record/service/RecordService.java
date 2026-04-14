@@ -12,6 +12,7 @@ import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.path.entity.Path;
+import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.user.entity.User;
@@ -39,18 +40,14 @@ public class RecordService {
 
     private final RecordRepository recordRepository;
     private final UserRepository userRepository;
+    private final PathRepository pathRepository;
     private final ReactionRepository reactionRepository;
     private final CommentRepository commentRepository;
 
     public RecordCreateResponse createRecord(Long userId, RecordCreateRequest request) {
         User user = getUser(userId);
-        Path activePath = user.getCurrentPath();
-        if (activePath == null) {
-            throw new ApiException(ErrorCode.ACTIVE_PATH_REQUIRED);
-        }
-        if (!STATUS_ACTIVE.equals(activePath.getStatus())) {
-            throw new ApiException(ErrorCode.PATH_NOT_ACTIVE);
-        }
+        Path activePath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
+            .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_PATH_REQUIRED));
 
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
         if (recordRepository.existsByUser_IdAndRecordDate(userId, today)) {
@@ -69,6 +66,7 @@ public class RecordService {
             .oneWordText(null)
             .tomorrowText(null)
             .moodCode(moodCode)
+            .imageUrl(null)
             .build();
 
         try {
@@ -123,7 +121,7 @@ public class RecordService {
 
         long reactionCount = reactionRepository.countByTargetTypeAndTargetId("RECORD", record.getId());
         boolean isReacted = reactionRepository.existsByUserIdAndTargetTypeAndTargetId(userId, "RECORD", record.getId());
-        long commentCount = commentRepository.countByTargetTypeAndTargetId("RECORD", record.getId());
+        long commentCount = commentRepository.countByRecordId(record.getId());
 
         User owner = record.getUser();
         RecordDetailResponse.OwnerSummary ownerSummary = RecordDetailResponse.OwnerSummary.builder()

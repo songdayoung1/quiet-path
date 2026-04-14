@@ -14,7 +14,7 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND", "Comment를 찾을 수 없습니다."),
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_NOT_FOUND", "Notification을 찾을 수 없습니다."),
     INVALID_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_PERIOD", "기간 설정이 올바르지 않습니다."),
-    KEY_QUESTION_REQUIRED(HttpStatus.BAD_REQUEST, "KEY_QUESTION_REQUIRED", "keyQuestion은 필수입니다."),
+    DIRECTION_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "DIRECTION_NAME_REQUIRED", "directionName은 필수입니다."),
     CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "CONTENT_REQUIRED", "content는 필수입니다."),
     INVALID_STATUS(HttpStatus.BAD_REQUEST, "INVALID_STATUS", "지원하지 않는 status입니다."),
     INVALID_CURSOR(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", "cursor 형식이 올바르지 않습니다."),

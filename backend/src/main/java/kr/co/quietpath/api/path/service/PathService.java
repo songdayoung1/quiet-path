@@ -2,7 +2,6 @@ package kr.co.quietpath.api.path.service;
 
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
-import kr.co.quietpath.api.path.dto.request.DurationType;
 import kr.co.quietpath.api.path.dto.request.PathCreateRequest;
 import kr.co.quietpath.api.path.dto.response.*;
 import kr.co.quietpath.domain.path.entity.Path;
@@ -14,6 +13,7 @@ import kr.co.quietpath.domain.summary.repository.PathSummaryRepository;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,7 +33,7 @@ import java.util.List;
 public class PathService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
-    private static final String STATUS_FINISHED = "FINISHED";
+    private static final String STATUS_COMPLETED = "COMPLETED";
     private static final String SUMMARY_STATUS_DONE = "DONE";
     private static final String SUMMARY_STATUS_LOCKED = "LOCKED";
     private static final String SUMMARY_STATUS_UNLOCKED = "UNLOCKED";
@@ -46,53 +46,56 @@ public class PathService {
 
     @Transactional(readOnly = true)
     public PathActiveResponse getActivePath(Long userId) {
-        User user = getUser(userId);
-        Path currentPath = user.getCurrentPath();
+        getUser(userId);
+        Path currentPath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
+            .orElse(null);
         if (currentPath == null) {
             return PathActiveResponse.empty();
         }
         return PathActiveResponse.builder()
             .pathId(currentPath.getId())
-            .keyQuestion(currentPath.getKeyQuestion())
-            .description(currentPath.getDescription())
+            .directionName(currentPath.getDirectionName())
+            .directionText(currentPath.getDirectionText())
             .status(currentPath.getStatus())
-            .startDate(formatDate(currentPath.getStartAt()))
-            .endDate(formatDate(resolveEndDate(currentPath)))
+            .createdAt(formatDate(currentPath.getCreatedAt()))
+            .reviewAt(formatDate(currentPath.getReviewAt()))
             .build();
     }
 
     public PathCreateResponse createPath(Long userId, PathCreateRequest request) {
-        User user = getUser(userId);
-        if (user.getCurrentPath() != null) {
+        getUser(userId);
+        if (pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE).isPresent()) {
             throw new ApiException(ErrorCode.PATH_ALREADY_ACTIVE);
         }
-        LocalDate startDate = LocalDate.now();
-        LocalDate endDate = resolveEndDate(request, startDate);
+        LocalDate createdAt = LocalDate.now();
+        LocalDate reviewAt = resolveReviewAt(request, createdAt);
 
         Path path = Path.builder()
             .userId(userId)
             .categoryCode(DEFAULT_CATEGORY_CODE)
-            .keyQuestion(request.getKeyQuestion())
-            .name(request.getKeyQuestion())
-            .description(request.getDescription())
-            .anchorAt(endDate.atStartOfDay())
+            .directionName(request.getDirectionName())
+            .directionText(request.getDirectionText())
+            .reviewAt(reviewAt.atStartOfDay())
             .build();
 
-        pathRepository.save(path);
-        user.setActivePath(path);
-        userRepository.save(user);
+        try {
+            pathRepository.save(path);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ApiException(ErrorCode.PATH_ALREADY_ACTIVE);
+        }
 
         return PathCreateResponse.builder()
             .pathId(path.getId())
             .status(path.getStatus())
-            .startDate(startDate.toString())
-            .endDate(endDate.toString())
+            .createdAt(createdAt.toString())
+            .reviewAt(reviewAt.toString())
             .build();
     }
 
     public PathFinishResponse finishPath(Long userId, Long pathId) {
-        User user = getUser(userId);
-        Path currentPath = user.getCurrentPath();
+        getUser(userId);
+        Path currentPath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
+            .orElseThrow(() -> new ApiException(ErrorCode.PATH_NOT_ACTIVE));
         if (currentPath == null) {
             throw new ApiException(ErrorCode.PATH_NOT_ACTIVE);
         }
@@ -102,15 +105,13 @@ public class PathService {
         if (!STATUS_ACTIVE.equals(currentPath.getStatus())) {
             throw new ApiException(ErrorCode.PATH_NOT_ACTIVE);
         }
-        currentPath.close();
-        user.clearActivePath();
+        currentPath.complete();
         pathRepository.save(currentPath);
-        userRepository.save(user);
 
         return PathFinishResponse.builder()
             .pathId(currentPath.getId())
             .status(currentPath.getStatus())
-            .finishedAt(formatInstant(currentPath.getClosedAt()))
+            .completedAt(formatInstant(currentPath.getCompletedAt()))
             .build();
     }
 
@@ -135,7 +136,7 @@ public class PathService {
         Pageable pageable = PageRequest.of(0, size);
         List<Path> paths = pathRepository.findFinishedPathsWithCursor(
             userId,
-            STATUS_FINISHED,
+            STATUS_COMPLETED,
             cursorTime,
             cursorId,
             pageable
@@ -145,17 +146,17 @@ public class PathService {
         for (Path path : paths) {
             items.add(PathListItem.builder()
                 .pathId(path.getId())
-                .startDate(formatDate(path.getStartAt()))
-                .endDate(formatDate(resolveEndDate(path)))
-                .keyQuestion(path.getKeyQuestion())
+                .createdAt(formatDate(path.getCreatedAt()))
+                .completedAt(formatNullableDate(path.getCompletedAt()))
+                .directionName(path.getDirectionName())
                 .build());
         }
 
         String nextCursor = null;
         if (!paths.isEmpty()) {
             Path last = paths.get(paths.size() - 1);
-            if (last.getClosedAt() != null) {
-                nextCursor = formatInstant(last.getClosedAt()) + "," + last.getId();
+            if (last.getCompletedAt() != null) {
+                nextCursor = formatInstant(last.getCompletedAt()) + "," + last.getId();
             }
         }
 
@@ -173,9 +174,7 @@ public class PathService {
             throw new ApiException(ErrorCode.NOT_OWNER);
         }
 
-        LocalDate startDate = path.getStartAt().toLocalDate();
-        LocalDate endDate = resolveEndDate(path);
-        LocalDate unlockAtDate = path.getAnchorAt().toLocalDate();
+        LocalDate unlockAtDate = path.getReviewAt().toLocalDate();
 
         String summary = null;
         String summaryStatus = resolveSummaryStatus(path.getId(), unlockAtDate);
@@ -196,16 +195,14 @@ public class PathService {
 
         return PathDetailResponse.builder()
             .pathId(path.getId())
-            .keyQuestion(path.getKeyQuestion())
-            .description(path.getDescription())
+            .directionName(path.getDirectionName())
+            .directionText(path.getDirectionText())
             .status(path.getStatus())
-            .period(PathDetailResponse.Period.builder()
-                .startDate(startDate.toString())
-                .endDate(endDate.toString())
-                .build())
+            .createdAt(formatDate(path.getCreatedAt()))
+            .reviewAt(path.getReviewAt().toLocalDate().toString())
+            .completedAt(formatNullableDate(path.getCompletedAt()))
             .summary(summary)
             .summaryStatus(summaryStatus)
-            .unlockAt(unlockAtDate.toString())
             .records(recordItems)
             .build();
     }
@@ -215,50 +212,32 @@ public class PathService {
             .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
     }
 
-    private LocalDate resolveEndDate(PathCreateRequest request, LocalDate startDate) {
-        if (request.getDurationType() == null) {
+    private LocalDate resolveReviewAt(PathCreateRequest request, LocalDate createdAt) {
+        if (request.getReviewAt() == null) {
             throw new ApiException(ErrorCode.INVALID_PERIOD);
         }
-        if (request.getDurationType() == DurationType.CUSTOM) {
-            if (request.getEndDate() == null) {
-                throw new ApiException(ErrorCode.INVALID_PERIOD);
-            }
-            if (!request.getEndDate().isAfter(startDate)) {
-                throw new ApiException(ErrorCode.INVALID_PERIOD);
-            }
-            return request.getEndDate();
+        if (!request.getReviewAt().isAfter(createdAt)) {
+            throw new ApiException(ErrorCode.INVALID_PERIOD);
         }
-        return switch (request.getDurationType()) {
-            case DAYS_7 -> startDate.plusDays(7);
-            case DAYS_30 -> startDate.plusDays(30);
-            case DAYS_90 -> startDate.plusDays(90);
-            case CUSTOM -> request.getEndDate();
-        };
-    }
-
-    private LocalDate resolveEndDate(Path path) {
-        if (path.getClosedAt() != null) {
-            return path.getClosedAt().toLocalDate();
-        }
-        return path.getAnchorAt().toLocalDate();
+        return request.getReviewAt();
     }
 
     private String resolveSummaryStatus(Long pathId, LocalDate unlockAtDate) {
-        List<PathSummary> summaries = pathSummaryRepository.findByPathIdOrderByUpdatedAtDesc(pathId);
+        if (LocalDate.now().isBefore(unlockAtDate)) {
+            return SUMMARY_STATUS_LOCKED;
+        }
+        List<PathSummary> summaries = pathSummaryRepository.findByPathIdOrderByVersionNoDesc(pathId);
         if (!summaries.isEmpty()) {
             PathSummary latest = summaries.get(0);
             if (SUMMARY_STATUS_DONE.equals(latest.getStatus())) {
                 return SUMMARY_STATUS_DONE;
             }
         }
-        if (LocalDate.now().isBefore(unlockAtDate)) {
-            return SUMMARY_STATUS_LOCKED;
-        }
         return SUMMARY_STATUS_UNLOCKED;
     }
 
     private String findLatestSummary(Long pathId) {
-        List<PathSummary> summaries = pathSummaryRepository.findByPathIdOrderByUpdatedAtDesc(pathId);
+        List<PathSummary> summaries = pathSummaryRepository.findByPathIdOrderByVersionNoDesc(pathId);
         if (summaries.isEmpty()) {
             return null;
         }
@@ -274,6 +253,13 @@ public class PathService {
 
     private String formatDate(LocalDateTime dateTime) {
         return dateTime.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE);
+    }
+
+    private String formatNullableDate(LocalDateTime dateTime) {
+        if (dateTime == null) {
+            return null;
+        }
+        return formatDate(dateTime);
     }
 
     private String formatDate(LocalDate date) {

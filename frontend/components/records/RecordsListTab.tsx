@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Record as RecordType, Direction } from '../../types';
+import { Record as RecordType } from '../../types';
 import { Card, MoodSticker } from '../UI';
-import { Globe2, Pin, EyeOff, Share2, MoreHorizontal, Lock } from 'lucide-react';
+import { Globe2, Pin, EyeOff, Share2, MoreHorizontal } from 'lucide-react';
 import { WaterDropCharacter } from '../WaterDropCharacter';
 
 interface RecordsListTabProps {
   records: RecordType[];
-  currentDirection: Direction | null;
   onSelectRecord: (record: RecordType) => void;
   onUpdateRecord: (record: RecordType) => void;
 }
@@ -23,7 +22,6 @@ const EmptyRecords: React.FC = () => (
 
 export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   records,
-  currentDirection,
   onSelectRecord,
   onUpdateRecord,
 }) => {
@@ -50,11 +48,6 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   return (
     <div className="px-4 flex flex-col gap-5" onClick={() => setActiveMenuId(null)}>
       {records.map((record) => {
-        const isLocked =
-          currentDirection?.isActive &&
-          record.timestamp >= currentDirection.createdAt &&
-          new Date(record.timestamp).toDateString() !== new Date().toDateString();
-
         return (
           <Card
             key={record.id}
@@ -65,7 +58,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                 ? 'bg-white shadow-md border border-point-200'
                 : 'bg-white/80 border border-white/60'
             }`}
-            onClick={() => !isLocked && onSelectRecord(record)}
+            onClick={() => onSelectRecord(record)}
           >
             {/* Header */}
             <div className="flex justify-between items-start mb-4">
@@ -167,7 +160,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
             </div>
 
             {/* Content */}
-            <div className={`transition-all duration-500 ${isLocked ? 'blur-[6px] select-none opacity-40 grayscale-[0.5]' : ''}`}>
+            <div className="transition-all duration-500">
               <div className="flex items-center gap-3 mb-4">
                 {record.moodCode && <MoodSticker code={record.moodCode} className="opacity-100" />}
                 {record.action && (
@@ -189,18 +182,6 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Locked Overlay */}
-            {isLocked && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-white/20 rounded-[2rem]">
-                <div className="bg-white/90 backdrop-blur-md p-4 rounded-full mb-3 border border-mist-100 shadow-sm">
-                  <Lock size={16} className="text-mist-400" />
-                </div>
-                <span className="text-[10px] text-mist-500 font-bold tracking-widest uppercase bg-white/80 px-3 py-1 rounded-full shadow-sm">
-                  Time Capsule
-                </span>
-              </div>
-            )}
           </Card>
         );
       })}

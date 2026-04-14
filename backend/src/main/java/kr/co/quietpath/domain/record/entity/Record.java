@@ -14,11 +14,13 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "records",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_user_date", columnNames = {"user_id", "record_date"})
+        @UniqueConstraint(name = "uk_user_date", columnNames = {"user_id", "record_date"}),
+        @UniqueConstraint(name = "uk_records_share_code", columnNames = {"share_code"})
     },
     indexes = {
         @Index(name = "idx_path_date", columnList = "path_id, record_date"),
-        @Index(name = "idx_visibility_category_shared", columnList = "visibility, category_code, shared_at, id")
+        @Index(name = "idx_visibility_category_shared", columnList = "visibility, category_code, shared_at, id"),
+        @Index(name = "idx_mood_date", columnList = "mood_code, record_date")
     }
 )
 @Getter
@@ -37,37 +39,49 @@ public class Record {
     @JoinColumn(name = "path_id", nullable = false)
     private Path path;
 
-    @Column(nullable = false, length = 20)
+    @Column(name = "category_code", nullable = false, length = 20)
     private String categoryCode;
 
-    @Column(nullable = false)
+    @Column(name = "record_date", nullable = false)
     private LocalDate recordDate;
 
     @Column(length = 500)
     private String sceneText;
 
-    @Column(length = 200)
+    @Column(name = "one_word_text", length = 200)
     private String oneWordText;
 
-    @Column(length = 200)
+    @Column(name = "tomorrow_text", length = 200)
     private String tomorrowText;
 
-    @Column(length = 30)
+    @Column(name = "mood_code", length = 30)
     private String moodCode;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
+    @Column(name = "is_hidden", nullable = false)
+    private Boolean isHidden;
+
+    @Column(name = "pinned_at")
+    private LocalDateTime pinnedAt;
 
     @Column(nullable = false, length = 10)
     private String visibility;
 
-    @Column
+    @Column(name = "shared_at")
     private LocalDateTime sharedAt;
 
-    @Column(nullable = false)
+    @Column(name = "share_code", length = 32)
+    private String shareCode;
+
+    @Column(name = "reaction_count", nullable = false)
     private Integer reactionCount;
 
-    @Column(nullable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     @Builder
@@ -79,7 +93,8 @@ public class Record {
         String sceneText,
         String oneWordText,
         String tomorrowText,
-        String moodCode
+        String moodCode,
+        String imageUrl
     ) {
         this.user = user;
         this.path = path;
@@ -89,6 +104,8 @@ public class Record {
         this.oneWordText = oneWordText;
         this.tomorrowText = tomorrowText;
         this.moodCode = moodCode;
+        this.imageUrl = imageUrl;
+        this.isHidden = false;
         this.visibility = "PRIVATE";
         this.reactionCount = 0;
         this.createdAt = LocalDateTime.now();
@@ -114,6 +131,21 @@ public class Record {
         this.oneWordText = oneWordText;
         this.tomorrowText = tomorrowText;
         this.moodCode = moodCode;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void hide() {
+        this.isHidden = true;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void pinMemory() {
+        this.pinnedAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void unpinMemory() {
+        this.pinnedAt = null;
         this.updatedAt = LocalDateTime.now();
     }
 

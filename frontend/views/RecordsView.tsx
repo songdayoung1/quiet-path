@@ -298,7 +298,6 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
       {activeTab === 'records' && (
         <RecordsListTab
           records={monthlyRecords}
-          currentDirection={currentDirection}
           onSelectRecord={setSelectedRecordForDetail}
           onUpdateRecord={onUpdateRecord}
         />

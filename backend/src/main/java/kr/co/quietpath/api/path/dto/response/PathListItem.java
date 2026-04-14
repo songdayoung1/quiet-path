@@ -7,7 +7,7 @@ import lombok.Getter;
 @Builder
 public class PathListItem {
     private Long pathId;
-    private String startDate;
-    private String endDate;
-    private String keyQuestion;
+    private String createdAt;
+    private String completedAt;
+    private String directionName;
 }

@@ -10,9 +10,10 @@ interface LogEditorViewProps {
   state: AppState;
   onSave: (record: RecordType, directionUpdate?: Partial<Direction>) => void;
   onCancel: () => void;
+  onStartDirection: () => void;
 }
 
-export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onCancel }) => {
+export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onCancel, onStartDirection }) => {
   const [action, setAction] = useState(''); // 오늘의 장면
   const [oneWordText, setOneWordText] = useState('');
   const [tomorrowText, setTomorrowText] = useState('');
@@ -25,13 +26,13 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
   const { currentDirection } = state;
 
   const handleSubmit = () => {
-    if (!action.trim() || saveState !== 'idle') return;
+    if (!currentDirection || !action.trim() || saveState !== 'idle') return;
 
     const newRecord: RecordType = {
       id: createLogId(),
       date: new Date().toISOString(),
       timestamp: Date.now(),
-      directionQuestion: currentDirection?.question || '방향 없음',
+      directionQuestion: currentDirection.question,
       action: action.trim(),
       oneWordText: oneWordText.trim() || undefined,
       tomorrowText: tomorrowText.trim() || undefined,
@@ -65,6 +66,40 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
   const isSaving = saveState !== 'idle';
   const mascotTone: CharacterTone = (MOOD_STICKERS.some((sticker) => sticker.code === moodCode) ? moodCode : 'default') as CharacterTone;
 
+  if (!currentDirection) {
+    return (
+      <div className="absolute inset-0 z-50 flex flex-col animate-fade-in bg-[#E8EDF2]/95 backdrop-blur-xl">
+        <div className="sticky top-0 bg-transparent p-4 flex justify-between items-center z-10 pt-6">
+          <button onClick={onCancel} className="p-3 rounded-full bg-white/50 hover:bg-white text-mist-400 transition-colors shadow-sm">
+            <X size={20} />
+          </button>
+          <div className="flex flex-col items-center">
+             <span className="text-point-500 text-[10px] font-bold tracking-[0.2em] uppercase">Direction Required</span>
+             <span className="text-mist-400 text-[10px]">먼저 방향이 필요해요</span>
+          </div>
+          <div className="w-10"></div>
+        </div>
+
+        <div className="flex-1 px-6 flex items-center justify-center">
+          <div className="w-full max-w-sm rounded-[2rem] border border-white/70 bg-white/85 p-7 text-center shadow-sm">
+            <h2 className="text-lg font-bold text-mist-600 leading-tight">기록하려면 먼저 방향을 시작해 주세요.</h2>
+            <p className="mt-3 text-sm leading-relaxed text-mist-400">
+              지금은 쉬는 상태예요. 원할 때 새 방향을 만들고 다시 기록을 이어갈 수 있어요.
+            </p>
+            <div className="mt-6 flex flex-col gap-3">
+              <SoftButton onClick={onStartDirection} className="shadow-lg shadow-point-200/40">
+                <span>새 방향 시작하기</span>
+              </SoftButton>
+              <SoftButton variant="secondary" onClick={onCancel} className="!bg-white/60">
+                <span>돌아가기</span>
+              </SoftButton>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="absolute inset-0 z-50 flex flex-col animate-fade-in bg-[#E8EDF2]/95 backdrop-blur-xl">
       {/* Header */}
@@ -84,7 +119,7 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
         {/* Context: Current Direction */}
         <div className="text-center pb-2">
            <h2 className="text-sm text-mist-500 font-medium">
-             {currentDirection?.question || "오늘의 방향"}
+             {currentDirection.question}
            </h2>
         </div>
 

@@ -116,12 +116,11 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleUpdateDirection = (updates: Partial<Direction>) => {
+  const handleStartDirection = (updates: Partial<Direction>) => {
     setState(prev => {
-      // Archive current direction if exists
-      const archivedDirections = prev.currentDirection 
-        ? [{ ...prev.currentDirection, endedAt: Date.now(), isActive: false }, ...prev.pastDirections]
-        : prev.pastDirections;
+      if (prev.currentDirection) {
+        return prev;
+      }
 
       const newDir: Direction = {
         id: createDirectionId(),
@@ -136,10 +135,33 @@ const App: React.FC = () => {
       
       return {
         ...prev,
-        pastDirections: archivedDirections,
         currentDirection: newDir
       };
     });
+  };
+
+  const handleFinishDirection = () => {
+    setState(prev => {
+      if (!prev.currentDirection) return prev;
+
+      const archivedDirection = { ...prev.currentDirection, endedAt: Date.now(), isActive: false };
+      
+      return {
+        ...prev,
+        pastDirections: [archivedDirection, ...prev.pastDirections],
+        currentDirection: null
+      };
+    });
+  };
+
+  const handleOpenLogEditor = () => {
+    if (!state.currentDirection) {
+      window.alert('기록하려면 먼저 방향을 시작해 주세요.');
+      setCurrentView('DIRECTION');
+      return;
+    }
+
+    setCurrentView('WRITE_LOG');
   };
 
   const handleLogin = () => {
@@ -236,7 +258,8 @@ const App: React.FC = () => {
         {currentView === 'NOW' && (
           <HomeView 
             state={state} 
-            onLogClick={() => setCurrentView('WRITE_LOG')}
+            onLogClick={handleOpenLogEditor}
+            onStartDirectionClick={() => setCurrentView('DIRECTION')}
             onHistoryClick={() => setCurrentView('PAST_DIRECTIONS')}
             onRecordsClick={() => setCurrentView('RECORDS')}
           />
@@ -248,14 +271,15 @@ const App: React.FC = () => {
             pastDirections={state.pastDirections}
             onUpdateRecord={handleUpdateLog}
             hasLoggedToday={state.hasLoggedToday}
-            onLogClick={() => setCurrentView('WRITE_LOG')}
+            onLogClick={handleOpenLogEditor}
           />
         )}
         {currentView === 'DIRECTION' && (
           <DirectionView 
             currentDirection={state.currentDirection} 
             records={state.records}
-            onUpdateDirection={handleUpdateDirection}
+            onStartDirection={handleStartDirection}
+            onFinishDirection={handleFinishDirection}
             onHistoryClick={() => setCurrentView('PAST_DIRECTIONS')}
           />
         )}
@@ -284,6 +308,7 @@ const App: React.FC = () => {
         <LogEditorView 
           state={state} 
           onSave={handleSaveLog} 
+          onStartDirection={() => setCurrentView('DIRECTION')}
           onCancel={() => setCurrentView('NOW')} 
         />
       )}

@@ -7,6 +7,7 @@ import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
 import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
+import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
@@ -38,6 +39,9 @@ class RecordServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private PathRepository pathRepository;
+
+    @Mock
     private ReactionRepository reactionRepository;
 
     @Mock
@@ -50,9 +54,9 @@ class RecordServiceTest {
     void createRecord_alreadyExists_returns409() {
         User user = User.createGoogle("provider", "user@example.com", "nick");
         Path activePath = buildPath(1L);
-        user.setActivePath(activePath);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(activePath));
         when(recordRepository.existsByUser_IdAndRecordDate(1L, LocalDate.now()))
             .thenReturn(true);
 
@@ -69,9 +73,9 @@ class RecordServiceTest {
         User user = User.createGoogle("provider", "user@example.com", "nick");
         setId(user, 1L);
         Path activePath = buildPath(1L);
-        user.setActivePath(activePath);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(activePath));
         when(recordRepository.existsByUser_IdAndRecordDate(1L, LocalDate.now()))
             .thenReturn(false);
         when(recordRepository.save(any(Record.class))).thenAnswer(invocation -> {
@@ -153,10 +157,9 @@ class RecordServiceTest {
         Path path = Path.builder()
             .userId(1L)
             .categoryCode("DEFAULT")
-            .keyQuestion("질문")
-            .name("질문")
-            .description("설명")
-            .anchorAt(LocalDateTime.now().plusDays(7))
+            .directionName("질문")
+            .directionText("설명")
+            .reviewAt(LocalDateTime.now().plusDays(7))
             .build();
         setId(path, id);
         return path;

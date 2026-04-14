@@ -64,16 +64,14 @@ class CommentServiceTest {
         when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
 
         Comment comment = Comment.builder()
-            .targetType("RECORD")
-            .targetId(10L)
+            .recordId(10L)
             .userId(1L)
             .content("원래 내용")
             .build();
         setField(comment, "id", 100L);
         comment.softDelete();
 
-        when(commentRepository.findByTargetTypeAndTargetIdOrderByCreatedAtAsc(
-            "RECORD",
+        when(commentRepository.findByRecordIdOrderByCreatedAtAsc(
             10L,
             PageRequest.of(0, 20))
         ).thenReturn(new PageImpl<>(List.of(comment), PageRequest.of(0, 20), 1));
@@ -99,10 +97,9 @@ class CommentServiceTest {
         Path path = Path.builder()
             .userId(1L)
             .categoryCode("DEFAULT")
-            .keyQuestion("질문")
-            .name("제목")
-            .description("설명")
-            .anchorAt(LocalDateTime.now().plusDays(7))
+            .directionName("질문")
+            .directionText("설명")
+            .reviewAt(LocalDateTime.now().plusDays(7))
             .build();
         Record record = Record.builder()
             .user(user)

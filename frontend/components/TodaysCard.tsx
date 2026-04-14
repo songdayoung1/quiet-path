@@ -6,6 +6,7 @@ import { WaterDropCharacter, CharacterMood } from './WaterDropCharacter';
 
 interface TodaysCardProps {
   hasLoggedToday: boolean;
+  hasActiveDirection: boolean;
   todayRecord: RecordType | null;
   onLogClick: () => void;
   onEditClick: () => void;
@@ -13,11 +14,13 @@ interface TodaysCardProps {
 
 export const TodaysCard: React.FC<TodaysCardProps> = ({ 
   hasLoggedToday, 
+  hasActiveDirection,
   todayRecord, 
   onLogClick, 
   onEditClick 
 }) => {
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const isRestingState = !hasActiveDirection;
 
   // 1. Before Record State — character waits for you
   if (!hasLoggedToday) {
@@ -28,14 +31,21 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
             <WaterDropCharacter size={90} mood="waiting" animate={true} />
           </div>
           <div className="flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-point-300 mb-2">Today&apos;s Record</p>
-            <h2 className="text-lg font-bold text-mist-600 leading-tight break-keep">오늘 남기고 싶은<br/>장면이 있나요?</h2>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-point-300 mb-2">
+              {isRestingState ? 'RESTING NOW' : "TODAY'S RECORD"}
+            </p>
+            <h2 className="text-lg font-bold text-mist-600 leading-tight break-keep whitespace-pre-line">
+              {isRestingState ? '지금은 잠시\n쉬고 있어요' : '오늘 남기고 싶은\n장면이 있나요?'}
+            </h2>
+            <p className="text-sm text-mist-400 mt-2 break-keep">
+              {isRestingState ? '원할 때 새 방향을 시작해요.' : '한 줄만 남겨도 충분해요.'}
+            </p>
           </div>
         </div>
         <div className="mt-4">
           <SoftButton onClick={onLogClick} className="!py-3 shadow-lg shadow-point-200/30">
             <PenLine size={16} />
-            <span className="text-sm font-semibold">기록 남기기</span>
+            <span className="text-sm font-semibold">{isRestingState ? '새 방향 시작하기' : '기록 남기기'}</span>
           </SoftButton>
         </div>
       </Card>
