@@ -1,51 +1,81 @@
 import React from 'react';
 
-// Transparent PNG Mascot Image Paths (Using dist/assets as requested)
-const mascotPurple = '/assets/mascot/mascot_3d_purple.png';
-const mascotCalm = '/assets/mascot/mascot_3d_calm.png';
-const mascotHappy = '/assets/mascot/mascot_3d_happy.png';
-const mascotGray = '/assets/mascot/mascot_3d_gray.png';
+const mascotCozy = '/assets/mascot/mascot_3d_COZY.png';
+const mascotCalm = '/assets/mascot/mascot_3d_CALM.png';
+const mascotExcited = '/assets/mascot/mascot_3d_EXCITED.png';
+const mascotBlank = '/assets/mascot/mascot_3d_BLANK.png';
+const mascotSparkle = '/assets/mascot/mascot_3d_SPARKLE.png';
+const mascotHolding = '/assets/mascot/mascot_3d_HOLDING.png';
 
-export type CharacterMood = 'waiting' | '포근' | '멍함' | '반짝' | '잔잔' | '버팀' | '두근' | 'happy' | 'neutral';
+export type CharacterMood =
+  | 'waiting'
+  | '포근'
+  | 'COZY'
+  | '멍함'
+  | '망함'
+  | 'BLANK'
+  | '반짝'
+  | 'SPARKLE'
+  | '잔잔'
+  | 'CALM'
+  | '버팀'
+  | 'HOLDING'
+  | '두근'
+  | 'happy'
+  | 'EXCITED'
+  | 'neutral'
+  | 'default';
+export type CharacterTone = CharacterMood;
 
 interface WaterDropCharacterProps {
   size?: number;
   mood?: CharacterMood;
+  tone?: CharacterTone; // Compatibility for legacy 'tone' prop
   className?: string;
   animate?: boolean;
 }
 
 export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
   size = 100,
-  mood = 'waiting',
+  mood,
+  tone,
   className = '',
   animate = true,
 }) => {
-  // Map moods to transparent PNG images in public folder
+  const activeMood = mood || tone || 'waiting';
+
   const getMascotImage = (m: CharacterMood) => {
     switch (m) {
       case '잔잔':
+      case 'CALM':
         return mascotCalm;
       case '반짝':
+      case 'SPARKLE':
+        return mascotSparkle;
       case '두근':
       case 'happy':
-        return mascotHappy;
+      case 'EXCITED':
+        return mascotExcited;
       case '멍함':
-        return mascotGray;
-      case '포근':
+      case '망함':
+      case 'BLANK':
+        return mascotBlank;
       case '버팀':
+      case 'HOLDING':
+        return mascotHolding;
+      case '포근':
+      case 'COZY':
       case 'waiting':
       case 'neutral':
       default:
-        return mascotPurple;
+        return mascotCozy;
     }
   };
 
-  const mascotSrc = getMascotImage(mood);
+  const mascotSrc = getMascotImage(activeMood);
 
-  // Animation Styles
   const animationStyle = animate ? {
-    animation: mood === 'waiting' 
+    animation: (activeMood === 'waiting' || activeMood === 'neutral' || activeMood === 'default')
       ? 'float 3s ease-in-out infinite' 
       : 'breathe 4s ease-in-out infinite'
   } : {};
@@ -68,7 +98,6 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
         `}
       </style>
       
-      {/* 3D Mascot Image (Transparent PNG from public/assets/mascot) */}
       <img
         src={mascotSrc}
         alt="Mascot"
@@ -84,14 +113,13 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
   );
 };
 
-/** Mood-tinted mini drop for decorative use */
 export const MiniDrop: React.FC<{ size?: number; className?: string }> = ({
   size = 24,
   className = '',
 }) => {
   return (
     <div style={{ width: size, height: size }} className={className}>
-      <img src={mascotPurple} className="w-full h-full object-contain opacity-80" alt="drop" />
+      <img src={mascotCozy} className="w-full h-full object-contain opacity-80" alt="drop" />
     </div>
   );
 };
