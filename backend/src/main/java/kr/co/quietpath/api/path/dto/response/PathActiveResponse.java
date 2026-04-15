@@ -9,11 +9,11 @@ import lombok.Getter;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class PathActiveResponse {
     private Long pathId;
-    private String keyQuestion;
-    private String description;
+    private String directionName;
+    private String directionText;
     private String status;
-    private String startDate;
-    private String endDate;
+    private String createdAt;
+    private String reviewAt;
 
     public static PathActiveResponse empty() {
         return PathActiveResponse.builder()

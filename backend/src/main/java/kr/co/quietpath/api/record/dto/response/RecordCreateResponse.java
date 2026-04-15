@@ -10,6 +10,7 @@ public class RecordCreateResponse {
     private Long pathId;
     private String recordDate;
     private String content;
+    private String moodCode;
     private String visibility;
     private String createdAt;
 }

@@ -12,9 +12,9 @@ import java.util.Optional;
 
 public interface PathRepository extends JpaRepository<Path, Long> {
 
-    List<Path> findByUserIdOrderByAnchorAtDesc(Long userId);
+    List<Path> findByUserIdOrderByReviewAtDesc(Long userId);
 
-    List<Path> findByUserIdAndStatusOrderByAnchorAtDesc(Long userId, String status);
+    List<Path> findByUserIdAndStatusOrderByReviewAtDesc(Long userId, String status);
     
     Optional<Path> findByUserIdAndStatus(Long userId, String status);
 
@@ -26,13 +26,13 @@ public interface PathRepository extends JpaRepository<Path, Long> {
         select p from Path p
         where p.userId = :userId
           and p.status = :status
-          and p.closedAt is not null
+          and p.completedAt is not null
           and (
             :cursorTime is null
-            or (p.closedAt < :cursorTime)
-            or (p.closedAt = :cursorTime and p.id < :cursorId)
+            or (p.completedAt < :cursorTime)
+            or (p.completedAt = :cursorTime and p.id < :cursorId)
           )
-        order by p.closedAt desc, p.id desc
+        order by p.completedAt desc, p.id desc
         """)
     List<Path> findFinishedPathsWithCursor(
         @Param("userId") Long userId,

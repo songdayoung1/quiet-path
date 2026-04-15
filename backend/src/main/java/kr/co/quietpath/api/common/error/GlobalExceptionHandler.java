@@ -20,10 +20,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex) {
         FieldError fieldError = ex.getBindingResult().getFieldError();
-        if (fieldError != null && "keyQuestion".equals(fieldError.getField())) {
+        if (fieldError != null && "directionName".equals(fieldError.getField())) {
             return ResponseEntity
-                .status(ErrorCode.KEY_QUESTION_REQUIRED.getHttpStatus())
-                .body(ErrorResponse.of(ErrorCode.KEY_QUESTION_REQUIRED));
+                .status(ErrorCode.DIRECTION_NAME_REQUIRED.getHttpStatus())
+                .body(ErrorResponse.of(ErrorCode.DIRECTION_NAME_REQUIRED));
         }
         if (fieldError != null && "content".equals(fieldError.getField())) {
             return ResponseEntity

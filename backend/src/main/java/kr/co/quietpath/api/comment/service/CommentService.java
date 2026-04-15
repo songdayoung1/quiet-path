@@ -52,8 +52,7 @@ public class CommentService {
         getUser(userId);
 
         Comment comment = Comment.builder()
-            .targetType(request.getTargetType())
-            .targetId(request.getTargetId())
+            .recordId(request.getTargetId())
             .userId(userId)
             .content(request.getContent())
             .build();
@@ -80,8 +79,7 @@ public class CommentService {
         int page = query.getPage() != null && query.getPage() >= 0 ? query.getPage() : 0;
         int size = normalizeSize(query.getSize());
 
-        Page<Comment> commentPage = commentRepository.findByTargetTypeAndTargetIdOrderByCreatedAtAsc(
-            query.getTargetType(),
+        Page<Comment> commentPage = commentRepository.findByRecordIdOrderByCreatedAtAsc(
             query.getTargetId(),
             PageRequest.of(page, size)
         );

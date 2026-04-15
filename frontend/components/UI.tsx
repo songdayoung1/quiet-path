@@ -537,10 +537,18 @@ export const VisualTrace: React.FC<{ index: number }> = ({ index }) => {
   );
 };
 // ── Water Drop Micro-interaction Overlay ──
-import { WaterDropCharacter } from './WaterDropCharacter';
+import { WaterDropCharacter, CharacterMood } from './WaterDropCharacter';
 
-export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({
+export const WaterDropOverlay: React.FC<{ 
+  leaving?: boolean;
+  mood?: CharacterMood;
+  title?: string;
+  subtitle?: string;
+}> = ({
   leaving = false,
+  mood = 'happy',
+  title = "오늘의 장면이 담겼어요",
+  subtitle = "하루를 잘 기록했어요 ✨"
 }) => {
   const droplets = [
     { dx: '-28px', dy: '-36px', delay: '0.28s', size: 8 },
@@ -568,9 +576,9 @@ export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({
           />
         ))}
 
-        {/* Happy character instead of plain emoji */}
+        {/* Mascot dynamic mood */}
         <div className="drop-icon relative z-10">
-          <WaterDropCharacter size={86} mood="happy" animate={false} />
+          <WaterDropCharacter size={86} mood={mood} animate={false} />
         </div>
 
         {droplets.map((d, i) => (
@@ -589,10 +597,10 @@ export const WaterDropOverlay: React.FC<{ leaving?: boolean }> = ({
       </div>
 
       <p className="success-text mt-8 text-base font-semibold text-point-600 tracking-wide">
-        오늘의 장면이 담겼어요
+        {title}
       </p>
       <p className="success-text mt-1 text-xs text-mist-400" style={{ animationDelay: '0.65s' }}>
-        하루를 잘 기록했어요 ✨
+        {subtitle}
       </p>
     </div>
   );

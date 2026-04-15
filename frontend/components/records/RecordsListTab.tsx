@@ -1,29 +1,27 @@
 import React, { useState } from 'react';
-import { Record as RecordType, Direction } from '../../types';
+import { Record as RecordType } from '../../types';
 import { Card, MoodSticker } from '../UI';
-import { Globe2, Pin, EyeOff, Share2, MoreHorizontal, Lock } from 'lucide-react';
+import { Globe2, Pin, EyeOff, Share2, MoreHorizontal } from 'lucide-react';
 import { WaterDropCharacter } from '../WaterDropCharacter';
 
 interface RecordsListTabProps {
   records: RecordType[];
-  currentDirection: Direction | null;
   onSelectRecord: (record: RecordType) => void;
   onUpdateRecord: (record: RecordType) => void;
 }
 
 const EmptyRecords: React.FC = () => (
-  <div className="mx-4 flex flex-col items-center justify-center text-center py-10 px-6">
-    <WaterDropCharacter size={84} mood="waiting" tone="default" animate={true} className="mb-3" />
-    <p className="text-sm font-bold text-mist-600 mb-2">아직 이번 달 기록이 없어요</p>
-    <p className="text-[12px] text-mist-400 leading-relaxed">
-      오늘의 장면을 남겨볼까요?
+  <div className="mx-4 flex flex-col items-center justify-center text-center py-12 px-6">
+    <WaterDropCharacter size={80} mood="waiting" tone="default" animate={true} className="mb-4" />
+    <p className="text-sm font-bold text-mist-600 mb-1">아직 이번 달 기록이 없어요</p>
+    <p className="text-[11px] text-mist-400 leading-relaxed opacity-80">
+      남겨주시는 오늘의 흔적들이<br />이곳에 차곡차곡 쌓일 예정입니다.
     </p>
   </div>
 );
 
 export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   records,
-  currentDirection,
   onSelectRecord,
   onUpdateRecord,
 }) => {
@@ -50,20 +48,17 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   return (
     <div className="px-4 flex flex-col gap-5" onClick={() => setActiveMenuId(null)}>
       {records.map((record) => {
-        const isLocked =
-          currentDirection?.isActive &&
-          record.timestamp >= currentDirection.createdAt &&
-          new Date(record.timestamp).toDateString() !== new Date().toDateString();
-
         return (
           <Card
             key={record.id}
-            className={`!p-6 !rounded-[2rem] cursor-pointer hover:shadow-lg transition-all duration-300 relative overflow-hidden ${
+            className={`!p-6 !rounded-[2rem] cursor-pointer hover:shadow-lg transition-all duration-300 relative !overflow-visible ${
+              activeMenuId === record.id ? 'z-50' : 'z-10'
+            } ${
               record.isPinned
                 ? 'bg-white shadow-md border border-point-200'
                 : 'bg-white/80 border border-white/60'
             }`}
-            onClick={() => !isLocked && onSelectRecord(record)}
+            onClick={() => onSelectRecord(record)}
           >
             {/* Header */}
             <div className="flex justify-between items-start mb-4">
@@ -88,48 +83,84 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                   </span>
                 )}
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveMenuId(activeMenuId === record.id ? null : record.id);
-                }}
-                className="text-mist-300 hover:text-mist-500 transition-colors p-2 -mr-2 -mt-2"
-              >
-                <MoreHorizontal size={16} />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveMenuId(activeMenuId === record.id ? null : record.id);
+                  }}
+                  className="text-mist-300 hover:text-mist-500 transition-colors p-2 -mr-2 -mt-2"
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+                
+                {/* Context Menu */}
+                {activeMenuId === record.id && (
+                  <div className="absolute right-0 top-full mt-1.5 bg-white/95 backdrop-blur-xl border border-mist-100 rounded-[1.25rem] shadow-xl p-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200 min-w-[160px]">
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handlePin(record); }}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-mist-600 hover:bg-mist-50 rounded-xl w-full text-left transition-colors"
+                      >
+                        <Pin size={14} className={record.isPinned ? 'text-amber-500 fill-amber-500' : 'text-mist-400'} />
+                        {record.isPinned ? '고정 해제' : '고정하기'}
+                      </button>
+                      
+                      {/* Categorized Share Options */}
+                      {!record.isShared && (
+                        <div className="my-1 border-t border-mist-50/80" />
+                      )}
+                      {!record.isShared && (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleShare(record); }}
+                            className="flex items-center gap-2.5 px-3 py-2 hover:bg-point-50 rounded-xl w-full text-left transition-colors group/btn"
+                          >
+                            <div className="bg-point-100/50 rounded-md p-1 group-hover/btn:bg-point-200/50 transition-colors">
+                              <span className="text-sm leading-none block">🏛️</span>
+                            </div>
+                            <span className="text-[11px] font-bold text-point-500">커뮤니티 공유</span>
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); alert('카카오톡으로 공유합니다.'); setActiveMenuId(null); }}
+                            className="flex items-center gap-2.5 px-3 py-2 hover:bg-mist-50 rounded-xl w-full text-left transition-colors group/btn"
+                          >
+                            <div className="bg-mist-100/50 rounded-md p-1 group-hover/btn:bg-mist-200/50 transition-colors">
+                              <span className="text-sm leading-none block">💬</span>
+                            </div>
+                            <span className="text-[11px] font-bold text-mist-600">카카오톡 공유</span>
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); alert('링크가 복사되었습니다.'); setActiveMenuId(null); }}
+                            className="flex items-center gap-2.5 px-3 py-2 hover:bg-mist-50 rounded-xl w-full text-left transition-colors group/btn"
+                          >
+                            <div className="bg-mist-100/50 rounded-md p-1 group-hover/btn:bg-mist-200/50 transition-colors">
+                              <span className="text-sm leading-none block">🔗</span>
+                            </div>
+                            <span className="text-[11px] font-bold text-mist-600">링크 복사</span>
+                          </button>
+                        </>
+                      )}
+    
+                      <div className="my-1 border-t border-mist-50/80" />
+                      
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleHide(record); }}
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-50 rounded-xl w-full text-left transition-colors"
+                      >
+                        <div className="bg-red-50 rounded-md p-1 group-hover/btn:bg-red-100 transition-colors">
+                          <EyeOff size={14} className="text-red-400" />
+                        </div>
+                        숨기기
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Context Menu */}
-            {activeMenuId === record.id && (
-              <div className="absolute right-6 top-12 bg-white shadow-xl rounded-2xl p-1.5 z-20 border border-mist-100 animate-fade-in min-w-[140px]">
-                <button
-                  onClick={(e) => { e.stopPropagation(); handlePin(record); }}
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-mist-600 hover:bg-mist-50 rounded-xl w-full text-left transition-colors"
-                >
-                  <Pin size={14} className="text-mist-400" />
-                  {record.isPinned ? '고정 해제' : '고정하기'}
-                </button>
-                {!record.isShared && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleShare(record); }}
-                    className="flex items-center gap-2 px-3 py-2 text-xs font-bold text-point-500 hover:bg-point-50 rounded-xl w-full text-left transition-colors mt-1"
-                  >
-                    <Share2 size={14} />
-                    커뮤니티 공유
-                  </button>
-                )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleHide(record); }}
-                  className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-50 rounded-xl w-full text-left transition-colors mt-1"
-                >
-                  <EyeOff size={14} />
-                  숨기기
-                </button>
-              </div>
-            )}
-
             {/* Content */}
-            <div className={`transition-all duration-500 ${isLocked ? 'blur-[6px] select-none opacity-40 grayscale-[0.5]' : ''}`}>
+            <div className="transition-all duration-500">
               <div className="flex items-center gap-3 mb-4">
                 {record.moodCode && <MoodSticker code={record.moodCode} className="opacity-100" />}
                 {record.action && (
@@ -151,18 +182,6 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                 </div>
               )}
             </div>
-
-            {/* Locked Overlay */}
-            {isLocked && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-10 bg-white/20">
-                <div className="bg-white/90 backdrop-blur-md p-4 rounded-full mb-3 border border-mist-100 shadow-sm">
-                  <Lock size={16} className="text-mist-400" />
-                </div>
-                <span className="text-[10px] text-mist-500 font-bold tracking-widest uppercase bg-white/80 px-3 py-1 rounded-full shadow-sm">
-                  Time Capsule
-                </span>
-              </div>
-            )}
           </Card>
         );
       })}

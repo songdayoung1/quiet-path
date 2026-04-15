@@ -12,11 +12,13 @@ import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.path.entity.Path;
+import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -33,21 +36,18 @@ public class RecordService {
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String VISIBILITY_PUBLIC = "PUBLIC";
     private static final String VISIBILITY_PRIVATE = "PRIVATE";
+    private static final Set<String> ALLOWED_MOOD_CODES = Set.of("포근", "멍함", "반짝", "잔잔", "버팀", "두근");
 
     private final RecordRepository recordRepository;
     private final UserRepository userRepository;
+    private final PathRepository pathRepository;
     private final ReactionRepository reactionRepository;
     private final CommentRepository commentRepository;
 
     public RecordCreateResponse createRecord(Long userId, RecordCreateRequest request) {
         User user = getUser(userId);
-        Path activePath = user.getCurrentPath();
-        if (activePath == null) {
-            throw new ApiException(ErrorCode.ACTIVE_PATH_REQUIRED);
-        }
-        if (!STATUS_ACTIVE.equals(activePath.getStatus())) {
-            throw new ApiException(ErrorCode.PATH_NOT_ACTIVE);
-        }
+        Path activePath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
+            .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_PATH_REQUIRED));
 
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
         if (recordRepository.existsByUser_IdAndRecordDate(userId, today)) {
@@ -55,6 +55,7 @@ public class RecordService {
         }
 
         String visibility = normalizeVisibility(request.getVisibility());
+        String moodCode = normalizeMoodCode(request.getMoodCode());
 
         Record record = Record.builder()
             .user(user)
@@ -64,10 +65,15 @@ public class RecordService {
             .sceneText(request.getContent())
             .oneWordText(null)
             .tomorrowText(null)
-            .moodCode(null)
+            .moodCode(moodCode)
+            .imageUrl(null)
             .build();
 
-        recordRepository.save(record);
+        try {
+            recordRepository.save(record);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ApiException(ErrorCode.RECORD_ALREADY_EXISTS);
+        }
 
         if (VISIBILITY_PUBLIC.equals(visibility)) {
             record.share();
@@ -78,6 +84,7 @@ public class RecordService {
             .pathId(activePath.getId())
             .recordDate(formatDate(today))
             .content(resolveContent(record))
+            .moodCode(record.getMoodCode())
             .visibility(record.getVisibility())
             .createdAt(formatDateTime(record.getCreatedAt()))
             .build();
@@ -92,6 +99,7 @@ public class RecordService {
                 .pathId(record.getPath().getId())
                 .recordDate(formatDate(record.getRecordDate()))
                 .content(resolveContent(record))
+                .moodCode(record.getMoodCode())
                 .visibility(record.getVisibility())
                 .createdAt(formatDateTime(record.getCreatedAt()))
                 .build())
@@ -113,7 +121,7 @@ public class RecordService {
 
         long reactionCount = reactionRepository.countByTargetTypeAndTargetId("RECORD", record.getId());
         boolean isReacted = reactionRepository.existsByUserIdAndTargetTypeAndTargetId(userId, "RECORD", record.getId());
-        long commentCount = commentRepository.countByTargetTypeAndTargetId("RECORD", record.getId());
+        long commentCount = commentRepository.countByRecordId(record.getId());
 
         User owner = record.getUser();
         RecordDetailResponse.OwnerSummary ownerSummary = RecordDetailResponse.OwnerSummary.builder()
@@ -127,6 +135,7 @@ public class RecordService {
             .pathId(record.getPath() != null ? record.getPath().getId() : null)
             .recordDate(formatDate(record.getRecordDate()))
             .content(resolveContent(record))
+            .moodCode(record.getMoodCode())
             .visibility(record.getVisibility())
             .owner(ownerSummary)
             .reactionCount(reactionCount)
@@ -141,12 +150,13 @@ public class RecordService {
         Record record = getRecord(recordId);
         validateOwner(userId, record);
         validateEditable(record);
+        String moodCode = normalizeMoodCode(request.getMoodCode());
 
         record.updateContent(
             request.getContent(),
             record.getOneWordText(),
             record.getTomorrowText(),
-            record.getMoodCode()
+            moodCode
         );
 
         String visibility = normalizeVisibility(request.getVisibility());
@@ -155,6 +165,7 @@ public class RecordService {
         return RecordUpdateResponse.builder()
             .id(record.getId())
             .content(resolveContent(record))
+            .moodCode(record.getMoodCode())
             .visibility(record.getVisibility())
             .updatedAt(formatDateTime(record.getUpdatedAt()))
             .build();
@@ -210,6 +221,16 @@ public class RecordService {
             return VISIBILITY_PRIVATE;
         }
         throw new ApiException(ErrorCode.INVALID_REQUEST);
+    }
+
+    private String normalizeMoodCode(String moodCode) {
+        if (moodCode == null || moodCode.isBlank()) {
+            return null;
+        }
+        if (!ALLOWED_MOOD_CODES.contains(moodCode)) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST);
+        }
+        return moodCode;
     }
 
     private void applyVisibility(Record record, String visibility) {

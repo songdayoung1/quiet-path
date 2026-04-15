@@ -59,6 +59,7 @@ public class RecordController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PutMapping("/{recordId}")
     @PatchMapping("/{recordId}")
     public RecordUpdateResponse updateRecord(
         @AuthenticationPrincipal UserPrincipal principal,

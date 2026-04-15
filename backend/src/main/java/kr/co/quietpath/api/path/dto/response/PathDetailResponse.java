@@ -9,19 +9,13 @@ import java.util.List;
 @Builder
 public class PathDetailResponse {
     private Long pathId;
-    private String keyQuestion;
-    private String description;
+    private String directionName;
+    private String directionText;
     private String status;
-    private Period period;
+    private String createdAt;
+    private String reviewAt;
+    private String completedAt;
     private String summary;
     private String summaryStatus;
-    private String unlockAt;
     private List<PathRecordItem> records;
-
-    @Getter
-    @Builder
-    public static class Period {
-        private String startDate;
-        private String endDate;
-    }
 }

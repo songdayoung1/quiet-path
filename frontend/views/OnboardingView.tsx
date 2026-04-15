@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { SoftButton, Card, SoftInput, CategoryIcon } from '../components/UI';
-import { Calendar, ArrowRight, Compass } from 'lucide-react';
-import { WaterDropCharacter } from '../components/WaterDropCharacter';
+import { SoftButton, Card, CategoryIcon } from '../components/UI';
+import { ArrowRight, Compass } from 'lucide-react';
+import { DirectionSetupForm } from '../components/DirectionSetupForm';
 import { Direction } from '../types';
 import { createDirectionId } from '../storage';
 import { CATEGORIES } from '../constants';
@@ -124,7 +124,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete, onLo
         </div>
         <div className="w-full max-w-xs mb-16">
           <SoftButton onClick={() => setStep(3)} className="shadow-lg shadow-lavender-200/40">
-            여정 만들기
+            새 방향 만들기
           </SoftButton>
         </div>
       </div>
@@ -153,106 +153,39 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({ onComplete, onLo
       <div className="flex flex-col h-screen px-5 pt-10 pb-8 animate-slide-up overflow-y-auto no-scrollbar z-10 relative">
         <div className="mb-5 shrink-0">
           <p className="text-[11px] font-bold text-point-500 uppercase tracking-[0.18em] mb-2">Step 2</p>
-          <h2 className="text-[30px] font-bold text-mist-600 leading-[1.2] tracking-[-0.02em]">나의 여정을 만들어요</h2>
+          <h2 className="text-[30px] font-bold text-mist-600 leading-[1.2] tracking-[-0.02em]">새 방향 만들기</h2>
         </div>
 
         <div className="flex-1">
-          <Card className="w-full !bg-white/90 flex flex-col gap-0 mb-6 !p-9 rounded-[2.25rem]">
-            {/* 선택된 카테고리 */}
-            <div className="flex items-center gap-4 pb-8 border-b border-mist-100">
-              <CategoryIcon categoryId={selectedCategory.id} size="sm" />
-              <div className="min-w-0">
-                <span className="font-bold text-[15px] leading-none block" style={{ color: selectedCategory.accent }}>{selectedCategory.label}</span>
-                <span className="text-[13px] leading-6 text-mist-400 mt-3 block">이 영역에서 나만의 흐름을 만들어가요.</span>
-              </div>
-            </div>
-
-            <div className="space-y-0 pt-8 pb-8">
-              <label className="block text-[14px] font-bold text-mist-500 mb-4 ml-1">여정 제목</label>
-              <SoftInput
-                value={customTitle}
-                onChange={(e) => setCustomTitle(e.target.value)}
-                placeholder={`예: ${selectedCategory.defaultTitle}`}
-                autoFocus
-                className={`bg-white !text-[17px] !leading-none !py-5 !px-6 placeholder:!text-mist-300 placeholder:!font-semibold ${customTitle ? '!font-semibold' : '!font-medium'} ${isTitleMissing ? '!border-rose-200 focus:!ring-rose-200' : ''}`}
-              />
-              {isTitleMissing ? (
-                <p className="text-[12px] text-rose-400 mt-4 ml-1">제목을 설정해주세요.</p>
-              ) : (
-                <p className="text-[12px] text-mist-300 mt-4 ml-1">예: {selectedCategory.defaultTitle}</p>
-              )}
-            </div>
-
-            <div className="space-y-0 pb-8">
-              <label className="block text-[14px] font-bold text-mist-500 mb-4 ml-1">나에게 던지는 질문 <span className="text-mist-300 font-normal">(선택)</span></label>
-              <SoftInput
-                value={customQuestion}
-                onChange={(e) => setCustomQuestion(e.target.value)}
-                placeholder="예: 나는 이 방향으로 조금씩 나아가고 있을까?"
-                className="bg-white !text-[16px] !font-medium !leading-normal !py-5 !px-6 placeholder:!text-mist-300"
-              />
-              <p className="text-[12px] text-mist-300 mt-4 ml-1">비워두면 기본 질문으로 시작합니다.</p>
-            </div>
-
-            <div className="space-y-0">
-              <label className="block text-[14px] font-bold text-mist-500 mb-5 ml-1">언제 돌아볼까요?</label>
-              <div className="grid grid-cols-4 gap-2">
-                {[7, 14, 30].map((days) => (
-                  <button
-                    key={days}
-                    onClick={() => { setDurationDays(days); setCustomReviewDate(''); setShowDateInput(false); }}
-                    className={`px-3 py-3 rounded-[1.15rem] text-[13px] font-semibold transition-all whitespace-nowrap ${
-                      durationDays === days && !customReviewDate
-                        ? 'bg-point-500 text-white shadow-md shadow-point-200/50 scale-105'
-                        : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
-                    }`}
-                  >
-                    {days}일
-                  </button>
-                ))}
-                <button
-                  onClick={() => { setShowDateInput(!showDateInput); setDurationDays(null); }}
-                  className={`px-2 py-3 rounded-[1.15rem] text-[13px] font-semibold transition-all flex items-center justify-center gap-1 whitespace-nowrap ${
-                    showDateInput || customReviewDate
-                      ? 'bg-point-500 text-white shadow-md shadow-point-200/50'
-                      : 'bg-mist-50 text-mist-500 hover:bg-mist-100'
-                  }`}
-                >
-                  <Calendar size={12} />
-                  직접 선택
-                </button>
-              </div>
-              {showDateInput && (
-                <input
-                  type="date"
-                  min={todayStr}
-                  value={customReviewDate}
-                  onChange={(e) => { setCustomReviewDate(e.target.value); setDurationDays(null); }}
-                  className="mt-4 w-full bg-white border border-mist-100 rounded-2xl px-5 py-4 text-[15px] text-mist-600 outline-none focus:ring-1 focus:ring-point-300 transition-all"
-                />
-              )}
-              {reviewDateDisplay && (
-                <div className="mt-4 flex items-center gap-2 px-4 py-3 rounded-2xl bg-point-50 border border-point-100 text-point-600 text-[14px]">
-                  <Calendar size={15} className="text-point-400 shrink-0" />
-                  <span className="font-semibold">{reviewDateDisplay}</span>
-                  <span className="text-point-400 text-xs ml-auto">에 돌아볼게요</span>
-                </div>
-              )}
-              {!getReviewAt() && (
-                <p className="text-[12px] text-mist-300 mt-4 ml-1">회고 시점을 정해야 여정을 시작할 수 있어요.</p>
-              )}
-            </div>
-          </Card>
-        </div>
-
-        <div className="shrink-0 pb-4">
-          <SoftButton
-            onClick={handleStart}
-            disabled={!canStart}
-            className="shadow-xl shadow-point-300/30"
-          >
-            여정 시작하기
-          </SoftButton>
+          <DirectionSetupForm
+            selectedCategory={selectedCategory}
+            directionName={customTitle}
+            directionText={customQuestion}
+            durationDays={durationDays}
+            customReviewDate={customReviewDate}
+            showDateInput={showDateInput}
+            todayStr={todayStr}
+            reviewDateDisplay={reviewDateDisplay}
+            isNameMissing={isTitleMissing}
+            hasReviewAt={!!getReviewAt()}
+            submitDisabled={!canStart}
+            onDirectionNameChange={setCustomTitle}
+            onDirectionTextChange={setCustomQuestion}
+            onSelectDuration={(days) => {
+              setDurationDays(days);
+              setCustomReviewDate('');
+              setShowDateInput(false);
+            }}
+            onToggleDateInput={() => {
+              setShowDateInput(!showDateInput);
+              setDurationDays(null);
+            }}
+            onReviewDateChange={(value) => {
+              setCustomReviewDate(value);
+              setDurationDays(null);
+            }}
+            onSubmit={handleStart}
+          />
         </div>
       </div>
     );
