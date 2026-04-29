@@ -1,4 +1,7 @@
 spring:
+  config:
+    import: optional:file:./backend/.env.local[.properties],optional:file:./.env.local[.properties]
+
   datasource:
     url: jdbc:mysql://localhost:3306/quietpath?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&useUnicode=true&characterEncoding=utf8&connectionCollation=utf8mb4_unicode_ci
     username: quietpath
@@ -18,3 +21,20 @@ spring:
     redis:
       host: localhost
       port: 6379
+
+kakao:
+  auth:
+    client-id: ${KAKAO_REST_API_KEY:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:5173}
+    authorize-uri: https://kauth.kakao.com/oauth/authorize
+    token-uri: https://kauth.kakao.com/oauth/token
+    user-info-uri: https://kapi.kakao.com/v2/user/me
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:change-this-jwt-secret-key-to-32-bytes-min}
+    access-token-ttl-seconds: ${APP_JWT_ACCESS_TOKEN_TTL_SECONDS:1209600}
+    issuer: ${APP_JWT_ISSUER:quiet-path}
+  cors:
+    allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}

@@ -3,6 +3,12 @@ package kr.co.quietpath.api.common.error;
 import org.springframework.http.HttpStatus;
 
 public enum ErrorCode {
+    AUTH_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_REQUIRED", "로그인이 필요합니다."),
+    KAKAO_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "KAKAO_AUTH_FAILED", "카카오 인증에 실패했습니다."),
+    AUTH_CONFIG_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "AUTH_CONFIG_MISSING", "인증 설정값이 누락되었습니다."),
+    NICKNAME_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "NICKNAME_GENERATION_FAILED", "닉네임 생성에 실패했습니다."),
+    NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "NICKNAME_ALREADY_EXISTS", "이미 사용 중인 닉네임입니다."),
+    INVALID_NICKNAME_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_NICKNAME_FORMAT", "닉네임 형식이 올바르지 않습니다."),
     PATH_ALREADY_ACTIVE(HttpStatus.CONFLICT, "PATH_ALREADY_ACTIVE", "이미 진행 중인 방향이 있습니다."),
     PATH_NOT_ACTIVE(HttpStatus.CONFLICT, "PATH_NOT_ACTIVE", "진행 중인 방향이 아닙니다."),
     NOT_OWNER(HttpStatus.FORBIDDEN, "NOT_OWNER", "본인 경로가 아닙니다."),
