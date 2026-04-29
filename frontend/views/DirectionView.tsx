@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Direction, Record as RecordType } from '../types';
 import { Card, PageHeader, SoftButton, MoodSticker, CategoryIcon, WaterDropOverlay } from '../components/UI';
-import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight, Wind } from 'lucide-react';
+import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight } from 'lucide-react';
 import { CATEGORIES } from '../constants';
 import { DirectionSetupForm } from '../components/DirectionSetupForm';
+import { WaterDropCharacter } from '../components/WaterDropCharacter';
 
 interface DirectionViewProps {
   currentDirection: Direction | null;
@@ -292,8 +293,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
               </div>
             ) : (
               <div className="text-center py-6 flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-mist-50/80 flex items-center justify-center mb-2 border border-mist-100/50 shadow-inner">
-                  <Wind size={28} className="text-mist-300" strokeWidth={1.5} />
+                <div className="mb-2">
+                  <WaterDropCharacter size={84} mood="SLEEPING" animate={true} />
                 </div>
                 <div>
                   <p className="text-mist-600 text-base font-bold tracking-wide mb-1">지금은 잠시 쉬고 있어요</p>

@@ -8,7 +8,8 @@ const INITIAL_STATE: AppState = {
   records: [],
   hasLoggedToday: false,
   hasSeenOnboarding: false,
-  userLevel: 'Beginning'
+  userLevel: 'Beginning',
+  auth: { isLoggedIn: false, token: null },
 };
 
 // TONE DATA DEFINITION
