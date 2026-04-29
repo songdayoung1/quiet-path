@@ -42,5 +42,11 @@ docs/*
 # Local planning docs
 frontend/docs/
 
+# Personal local docs/workspace
+AGENTS.md
+quiet-path.code-workspace
+backend/docs/블로그/
+backend/docs/백엔드-강점-컨텍스트.md
+
 # Local mascot image assets
 frontend/public/assets/mascot/
