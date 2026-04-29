@@ -239,14 +239,12 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    if (window.confirm("로그아웃 하시겠습니까? 로컬 데이터는 유지되지만, 동기화가 중지됩니다.")) {
-         const token = state.auth.token;
-         if (token) {
-           authApi.logout(token).catch(() => undefined);
-         }
-         setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null } }));
-         setCurrentView('ONBOARDING');
+    const token = state.auth.token;
+    if (token) {
+      authApi.logout(token).catch(() => undefined);
     }
+    setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null } }));
+    setCurrentView('NOW');
   };
 
   const NavItem = ({ view, label }: { view: ViewState | 'INITIALIZING'; label: string }) => {
@@ -386,31 +384,35 @@ const App: React.FC = () => {
     >
       
       {/* Header Overlay (Gradient Blur) */}
-      <div 
-        className="sticky top-0 h-20 -mb-20 z-20 pointer-events-none transition-opacity duration-500"
-        style={{
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
-          backgroundColor: 'rgba(255, 255, 255, 0.4)'
-        }}
-      />
+      {currentView !== 'SETTINGS' && (
+        <div 
+          className="sticky top-0 h-20 -mb-20 z-20 pointer-events-none transition-opacity duration-500"
+          style={{
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
+            backgroundColor: 'rgba(255, 255, 255, 0.4)'
+          }}
+        />
+      )}
 
       {/* Top Bar */}
-      <div className="h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
-        <div className="w-6" />
-        <h1 className="text-mist-400 text-[10px] font-bold tracking-[0.3em] uppercase opacity-70">Quiet Path</h1>
-        <button 
-          onClick={() => setCurrentView('SETTINGS')} 
-          className="text-mist-400 hover:text-purple-500 transition-all p-2 rounded-full hover:bg-white/40 active:scale-95"
-        >
-          <Settings size={18} />
-        </button>
-      </div>
+      {currentView !== 'SETTINGS' && (
+        <div className="h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
+          <div className="w-6" />
+          <h1 className="text-mist-400 text-[10px] font-bold tracking-[0.3em] uppercase opacity-70">Quiet Path</h1>
+          <button 
+            onClick={() => setCurrentView('SETTINGS')} 
+            className="text-mist-400 hover:text-purple-500 transition-all p-2 rounded-full hover:bg-white/40 active:scale-95"
+          >
+            <Settings size={18} />
+          </button>
+        </div>
+      )}
 
       {/* Main Content Area */}
-      <main className="flex-1 px-6 pt-2 pb-32">
+      <main className={currentView === 'SETTINGS' ? 'flex-1 px-0 pt-0 pb-0' : 'flex-1 px-6 pt-2 pb-32'}>
         {currentView === 'NOW' && (
           <HomeView 
             state={state} 
