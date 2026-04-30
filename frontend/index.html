@@ -103,12 +103,39 @@
       }
     </script>
     <style>
+      :root {
+        --qp-outside-bg:
+          radial-gradient(circle at -30% -25%, rgba(194,209,255,0.44) 0%, rgba(194,209,255,0) 62%),
+          radial-gradient(circle at 130% 120%, rgba(178,223,219,0.43) 0%, rgba(178,223,219,0) 62%),
+          linear-gradient(180deg, #ECEFFE 0%, #E2EEEC 100%);
+        --qp-blob-1: #c2d1ff;
+        --qp-blob-2: #b2dfdb;
+        --qp-blob-3: #ffffff;
+        --qp-blob-o1: 0.42;
+        --qp-blob-o2: 0.40;
+        --qp-blob-o3: 0.56;
+      }
+
+      html[data-qp-theme='dark'] {
+        --qp-outside-bg:
+          radial-gradient(circle at -30% -25%, rgba(51,65,85,0.65) 0%, rgba(51,65,85,0) 64%),
+          radial-gradient(circle at 130% 120%, rgba(30,41,59,0.62) 0%, rgba(30,41,59,0) 64%),
+          linear-gradient(180deg, #0B1220 0%, #090F1B 100%);
+        --qp-blob-1: #3730a3;
+        --qp-blob-2: #0f766e;
+        --qp-blob-3: #475569;
+        --qp-blob-o1: 0.34;
+        --qp-blob-o2: 0.28;
+        --qp-blob-o3: 0.20;
+      }
+
       html, body {
         min-height: 100%;
         width: 100%;
         background: transparent;
         -webkit-tap-highlight-color: transparent;
         -webkit-overflow-scrolling: touch;
+        transition: background 240ms ease;
       }
       #root {
         min-height: 100%;
@@ -137,7 +164,27 @@
         height: 100%;
         z-index: -1;
         overflow: hidden;
-        background: #F8FAFC;
+        background: var(--qp-outside-bg);
+        transition: background 280ms ease;
+      }
+
+      .living-bg > div {
+        transition: background-color 280ms ease, opacity 280ms ease;
+      }
+
+      .living-bg > div:nth-child(1) {
+        background-color: var(--qp-blob-1) !important;
+        opacity: var(--qp-blob-o1) !important;
+      }
+
+      .living-bg > div:nth-child(2) {
+        background-color: var(--qp-blob-2) !important;
+        opacity: var(--qp-blob-o2) !important;
+      }
+
+      .living-bg > div:nth-child(3) {
+        background-color: var(--qp-blob-3) !important;
+        opacity: var(--qp-blob-o3) !important;
       }
       
       .glass-panel {

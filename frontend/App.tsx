@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AppState, ViewState, Record, Direction } from './types';
 import { loadState, saveState, createDirectionId } from './storage';
 import { HomeView } from './views/HomeView';
@@ -17,6 +17,37 @@ import { Settings, Compass } from 'lucide-react';
 
 const OAUTH_PENDING_CODE_KEY = 'qp.oauth.pending.code';
 const OAUTH_PENDING_ERROR_KEY = 'qp.oauth.pending.error';
+const SETTINGS_STORAGE_KEY = 'qp.settings.v2';
+const THEME_CHANGE_EVENT = 'qp:theme-mode-changed';
+
+type ThemeMode = 'system' | 'light' | 'dark';
+type ResolvedTheme = 'light' | 'dark';
+
+const readThemeMode = (): ThemeMode => {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return 'system';
+    const parsed = JSON.parse(raw) as { theme?: ThemeMode };
+    if (parsed.theme === 'light' || parsed.theme === 'dark' || parsed.theme === 'system') {
+      return parsed.theme;
+    }
+    return 'system';
+  } catch {
+    return 'system';
+  }
+};
+
+const resolveTheme = (mode: ThemeMode): ResolvedTheme => {
+  if (mode === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return mode;
+};
+
+const applyDocumentTheme = (theme: ResolvedTheme) => {
+  document.documentElement.dataset.qpTheme = theme;
+  document.documentElement.style.colorScheme = theme;
+};
 
 /* ── Custom Nav Icons ───────────────────────────────────────────────────── */
 const NavIcon: React.FC<{ view: ViewState | 'INITIALIZING'; active: boolean }> = ({ view, active }) => {
@@ -56,10 +87,20 @@ const NavIcon: React.FC<{ view: ViewState | 'INITIALIZING'; active: boolean }> =
   return null;
 };
 
-const appFlowABgStyle: React.CSSProperties = {
-  backgroundColor: '#F8FAFC',
-  backgroundImage:
-    'radial-gradient(circle at -30% -25%, rgba(194,209,255,0.55) 0%, rgba(194,209,255,0) 62%), radial-gradient(circle at 130% 120%, rgba(178,223,219,0.55) 0%, rgba(178,223,219,0) 62%), linear-gradient(180deg, #ECEFFE 0%, #E2EEEC 100%)',
+const buildFlowBackground = (theme: ResolvedTheme): React.CSSProperties => {
+  if (theme === 'dark') {
+    return {
+      backgroundColor: '#0F172A',
+      backgroundImage:
+        'radial-gradient(circle at -30% -25%, rgba(51,65,85,0.62) 0%, rgba(51,65,85,0) 64%), radial-gradient(circle at 130% 120%, rgba(30,41,59,0.56) 0%, rgba(30,41,59,0) 64%), linear-gradient(180deg, #111827 0%, #0B1220 100%)',
+    };
+  }
+
+  return {
+    backgroundColor: '#F8FAFC',
+    backgroundImage:
+      'radial-gradient(circle at -30% -25%, rgba(194,209,255,0.55) 0%, rgba(194,209,255,0) 62%), radial-gradient(circle at 130% 120%, rgba(178,223,219,0.55) 0%, rgba(178,223,219,0) 62%), linear-gradient(180deg, #ECEFFE 0%, #E2EEEC 100%)',
+  };
 };
 
 const App: React.FC = () => {
@@ -76,6 +117,59 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState | 'INITIALIZING'>('INITIALIZING');
   const [isLoaded, setIsLoaded] = useState(false);
   const [authCodeParam, setAuthCodeParam] = useState<string | null>(null);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
+  const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
+  const shellFrameStyle = useMemo<React.CSSProperties>(
+    () => ({
+      ...appFlowABgStyle,
+      borderLeft: `1px solid ${resolvedTheme === 'dark' ? 'rgba(148,163,184,0.22)' : 'rgba(255,255,255,0.82)'}`,
+      borderRight: `1px solid ${resolvedTheme === 'dark' ? 'rgba(148,163,184,0.22)' : 'rgba(255,255,255,0.82)'}`,
+      boxShadow:
+        resolvedTheme === 'dark'
+          ? '0 24px 52px rgba(2,6,23,0.55)'
+          : '0 24px 52px rgba(148,163,184,0.24)',
+    }),
+    [appFlowABgStyle, resolvedTheme]
+  );
+
+  useEffect(() => {
+    const syncTheme = (mode?: ThemeMode) => {
+      const nextMode = mode ?? readThemeMode();
+      setThemeMode(nextMode);
+      setResolvedTheme(resolveTheme(nextMode));
+    };
+
+    const onThemeChange = (event: Event) => {
+      const custom = event as CustomEvent<{ mode?: ThemeMode }>;
+      syncTheme(custom.detail?.mode);
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== SETTINGS_STORAGE_KEY) return;
+      syncTheme();
+    };
+
+    syncTheme();
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    applyDocumentTheme(resolvedTheme);
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    if (themeMode !== 'system') return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setResolvedTheme(resolveTheme('system'));
+    media.addEventListener?.('change', onChange);
+    return () => media.removeEventListener?.('change', onChange);
+  }, [themeMode]);
 
   useEffect(() => {
     const initApp = async () => {
@@ -282,8 +376,8 @@ const App: React.FC = () => {
   /* ── 1. Fullscreen Loading ── */
   if (!isLoaded || currentView === 'INITIALIZING') {
     return (
-      <div className="flex h-screen w-full max-w-[430px] mx-auto items-center justify-center" style={appFlowABgStyle}>
-         <Compass size={32} className="text-point-500 animate-spin" style={{ animationDuration: '3s' }} />
+      <div className="flex h-screen w-full max-w-[430px] mx-auto items-center justify-center" style={shellFrameStyle}>
+         <Compass size={32} className="animate-spin" style={{ animationDuration: '3s', color: resolvedTheme === 'dark' ? '#A78BFA' : '#8B5CF6' }} />
       </div>
     );
   }
@@ -291,7 +385,7 @@ const App: React.FC = () => {
   /* ── 2. Fullscreen Auth Related Views ── */
   if (currentView === 'ACCOUNT_CONNECT') {
       return (
-          <div className="min-h-screen max-w-[430px] mx-auto relative" style={appFlowABgStyle}>
+          <div className="min-h-screen max-w-[430px] mx-auto relative" style={shellFrameStyle}>
              <AccountConnectView 
                 onBack={() => setCurrentView('ONBOARDING')}
                 onStartKakao={() => authApi.startKakaoLogin()}
@@ -307,7 +401,7 @@ const App: React.FC = () => {
 
   if (currentView === 'OAUTH_CALLBACK') {
       return (
-        <div className="min-h-screen max-w-[430px] mx-auto relative overflow-hidden" style={appFlowABgStyle}>
+        <div className="min-h-screen max-w-[430px] mx-auto relative overflow-hidden" style={shellFrameStyle}>
            <OAuthCallbackView
              authCode={authCodeParam || ''}
              onSuccess={handleLoginSuccess}
@@ -323,7 +417,7 @@ const App: React.FC = () => {
 
   if (currentView === 'NICKNAME_SETUP') {
       return (
-          <div className="min-h-screen max-w-[430px] mx-auto relative overflow-hidden" style={appFlowABgStyle}>
+          <div className="min-h-screen max-w-[430px] mx-auto relative overflow-hidden" style={shellFrameStyle}>
              <NicknameSetupView 
                 onComplete={async (nickname) => {
                    const token = state.auth.token;
@@ -362,7 +456,7 @@ const App: React.FC = () => {
       // 만약 이미 auth.isLoggedIn이면 무조건 Step 1(카테고리 선택)을 보여주는 로직을 OnboardingView 내에 구현해야 하지만
       // OnboardingView를 살짝 편법으로 우회/조작 가능합니다.
       return (
-        <div className="min-h-screen max-w-[430px] mx-auto relative overflow-hidden" style={appFlowABgStyle}>
+        <div className="min-h-screen max-w-[430px] mx-auto relative overflow-hidden" style={shellFrameStyle}>
             <OnboardingView 
                 onComplete={handleOnboardingComplete} 
                 onStartAuth={() => setCurrentView('ACCOUNT_CONNECT')}
@@ -379,8 +473,8 @@ const App: React.FC = () => {
   /* ── 3. Main App Layout (Header + Bottom Nav) ── */
   return (
     <div
-      className="min-h-screen max-w-[430px] mx-auto relative shadow-2xl shadow-mist-200/40 flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-      style={appFlowABgStyle}
+      className="min-h-screen max-w-[430px] mx-auto relative flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+      style={shellFrameStyle}
     >
       
       {/* Header Overlay (Gradient Blur) */}
@@ -392,7 +486,7 @@ const App: React.FC = () => {
             WebkitBackdropFilter: 'blur(10px)',
             maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
             WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
-            backgroundColor: 'rgba(255, 255, 255, 0.4)'
+            backgroundColor: resolvedTheme === 'dark' ? 'rgba(15,23,42,0.5)' : 'rgba(255, 255, 255, 0.4)',
           }}
         />
       )}
@@ -401,10 +495,19 @@ const App: React.FC = () => {
       {currentView !== 'SETTINGS' && (
         <div className="h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
           <div className="w-6" />
-          <h1 className="text-mist-400 text-[10px] font-bold tracking-[0.3em] uppercase opacity-70">Quiet Path</h1>
+          <h1
+            className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-80"
+            style={{ color: resolvedTheme === 'dark' ? '#CBD5E1' : '#7B8794' }}
+          >
+            Quiet Path
+          </h1>
           <button 
             onClick={() => setCurrentView('SETTINGS')} 
-            className="text-mist-400 hover:text-purple-500 transition-all p-2 rounded-full hover:bg-white/40 active:scale-95"
+            className="transition-all p-2 rounded-full active:scale-95"
+            style={{
+              color: resolvedTheme === 'dark' ? '#94A3B8' : '#7B8794',
+              backgroundColor: resolvedTheme === 'dark' ? 'rgba(15,23,42,0.16)' : 'transparent',
+            }}
           >
             <Settings size={18} />
           </button>
@@ -478,7 +581,16 @@ const App: React.FC = () => {
       {/* Floating Bottom Navigation */}
       {currentView !== 'WRITE_LOG' && currentView !== 'SETTINGS' && (
         <div className="fixed bottom-6 left-0 w-full flex justify-center z-40 px-6 pointer-events-none">
-           <nav className="h-[64px] px-2 bg-white/94 backdrop-blur-2xl border border-white/80 rounded-[28px] shadow-[0_12px_40px_rgba(0,0,0,0.06)] flex items-center justify-between w-full max-w-[340px] pointer-events-auto">
+           <nav
+             className="h-[64px] px-2 backdrop-blur-2xl rounded-[28px] flex items-center justify-between w-full max-w-[340px] pointer-events-auto"
+             style={{
+               background: resolvedTheme === 'dark' ? 'rgba(15,23,42,0.86)' : 'rgba(255,255,255,0.94)',
+               border: `1px solid ${resolvedTheme === 'dark' ? 'rgba(148,163,184,0.3)' : 'rgba(255,255,255,0.8)'}`,
+               boxShadow: resolvedTheme === 'dark'
+                 ? '0 12px 40px rgba(2,6,23,0.52)'
+                 : '0 12px 40px rgba(0,0,0,0.06)',
+             }}
+           >
              <NavItem view="NOW" label="오늘" />
              <NavItem view="RECORDS" label="기록" />
              <NavItem view="COMMUNITY" label="둘러보기" />
