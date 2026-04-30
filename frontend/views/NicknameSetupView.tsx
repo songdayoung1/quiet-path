@@ -6,7 +6,7 @@ interface NicknameSetupViewProps {
   onComplete: (nickname: string) => void | Promise<void>;
 }
 
-const NICKNAME_STEMS = [
+export const NICKNAME_STEMS = [
   '조용한물결빛',
   '새벽숲길산책',
   '고요한하늘빛',
@@ -19,7 +19,7 @@ const NICKNAME_REGEX = /^[가-힣]{6}[0-9]{4}$/;
 
 const pad4 = (num: number) => String(num).padStart(4, '0');
 
-const generateNickname = () => {
+export const generateNickname = () => {
   const stem = NICKNAME_STEMS[Math.floor(Math.random() * NICKNAME_STEMS.length)];
   const suffix = Math.floor(Math.random() * 10000);
   return `${stem}${pad4(suffix)}`;

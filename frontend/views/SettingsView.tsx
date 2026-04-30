@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Bell,
@@ -9,12 +9,14 @@ import {
   Moon,
   Palette,
   Pencil,
+  RefreshCcw,
   Sun,
   User,
   X,
 } from 'lucide-react';
 import { AppState } from '../types';
 import { authApi } from '../api/authApi';
+import { generateNickname } from './NicknameSetupView';
 
 interface SettingsViewProps {
   state: AppState;
@@ -25,7 +27,15 @@ interface SettingsViewProps {
 
 type ThemeMode = 'system' | 'light' | 'dark';
 type PermissionState = 'default' | 'granted' | 'denied';
-type BusyKey = 'likes' | 'comments' | 'pathEnd' | 'time' | 'theme' | 'nickname' | 'permission' | 'logout';
+type BusyKey =
+  | 'likes'
+  | 'comments'
+  | 'pathEnd'
+  | 'time'
+  | 'theme'
+  | 'nickname'
+  | 'permission'
+  | 'logout';
 
 interface LocalSettings {
   notifications: {
@@ -47,6 +57,7 @@ interface ToastItem {
 
 const SETTINGS_KEY = 'qp.settings.v2';
 const NICKNAME_KEY = 'qp.profile.nickname';
+const THEME_CHANGE_EVENT = 'qp:theme-mode-changed';
 
 const DEFAULT_SETTINGS: LocalSettings = {
   notifications: {
@@ -60,10 +71,22 @@ const DEFAULT_SETTINGS: LocalSettings = {
   theme: 'system',
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const detectNotificationPermission = (): PermissionState => {
+  if (typeof window === 'undefined' || !('Notification' in window)) return 'denied';
+  const permission = Notification.permission;
+  if (permission === 'granted' || permission === 'denied') return permission;
+  return 'default';
+};
+
 const readLocalSettings = (): LocalSettings => {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
+    if (!raw) {
+      return { ...DEFAULT_SETTINGS, permission: detectNotificationPermission() };
+    }
+
     const parsed = JSON.parse(raw) as Partial<LocalSettings>;
     return {
       notifications: {
@@ -73,11 +96,11 @@ const readLocalSettings = (): LocalSettings => {
         hour: parsed.notifications?.hour ?? DEFAULT_SETTINGS.notifications.hour,
         minute: parsed.notifications?.minute ?? DEFAULT_SETTINGS.notifications.minute,
       },
-      permission: parsed.permission ?? DEFAULT_SETTINGS.permission,
-      theme: parsed.theme ?? DEFAULT_SETTINGS.theme,
+      permission: detectNotificationPermission(),
+      theme: parsed.theme ?? 'system',
     };
   } catch {
-    return DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, permission: detectNotificationPermission() };
   }
 };
 
@@ -98,12 +121,16 @@ const applyTheme = (mode: ThemeMode) => {
   document.documentElement.style.colorScheme = resolved;
 };
 
-const isNicknameFormatValid = (nickname: string) => /^[가-힣]{6}[0-9]{4}$/.test(nickname);
+const validateNickname = (nickname: string) => {
+  const trimmed = nickname.trim();
+  if (!trimmed) return '닉네임을 입력해주세요';
+  if (trimmed.length < 2 || trimmed.length > 12) return '2~12자, 한글·영문·숫자 사용 가능';
+  if (!/^[A-Za-z0-9가-힣]+$/.test(trimmed)) return '2~12자, 한글·영문·숫자 사용 가능';
+  return '';
+};
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const SectionTitle: React.FC<{ icon: React.ReactNode; title: string }> = ({ icon, title }) => (
-  <div className="flex items-center gap-2 mb-2 px-1">
+const SectionLabel: React.FC<{ icon: React.ReactNode; title: string }> = ({ icon, title }) => (
+  <div className="flex items-center gap-2 px-1 mb-2.5">
     <span style={{ color: 'var(--qp-accent)' }}>{icon}</span>
     <h2 className="text-[11px] font-bold tracking-[0.16em]" style={{ color: 'var(--qp-text-muted)' }}>
       {title}
@@ -112,31 +139,30 @@ const SectionTitle: React.FC<{ icon: React.ReactNode; title: string }> = ({ icon
 );
 
 const Toggle: React.FC<{
-  on: boolean;
-  disabled?: boolean;
+  value: boolean;
   busy?: boolean;
   onClick: () => void;
-}> = ({ on, disabled, busy, onClick }) => (
+}> = ({ value, busy, onClick }) => (
   <button
     type="button"
     role="switch"
-    aria-checked={on}
-    disabled={disabled || busy}
+    aria-checked={value}
     onClick={onClick}
+    disabled={busy}
     className="relative w-[42px] h-[24px] rounded-full"
     style={{
-      background: on ? 'var(--qp-accent)' : 'var(--qp-border-line)',
-      opacity: disabled || busy ? 0.45 : 1,
+      background: value ? 'var(--qp-accent)' : 'var(--qp-toggle-off)',
+      opacity: busy ? 0.62 : 1,
       transition: 'background-color 180ms ease',
-      cursor: disabled || busy ? 'not-allowed' : 'pointer',
+      cursor: busy ? 'wait' : 'pointer',
     }}
   >
     <span
       className="absolute top-[2px] left-[2px] w-[20px] h-[20px] rounded-full bg-white"
       style={{
-        boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
-        transform: on ? 'translateX(18px)' : 'translateX(0)',
+        transform: value ? 'translateX(18px)' : 'translateX(0)',
         transition: 'transform 180ms ease',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
       }}
     />
   </button>
@@ -147,70 +173,84 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
   const token = state.auth?.token ?? null;
 
   const [settings, setSettings] = useState<LocalSettings>(readLocalSettings);
-  const [nickname, setNickname] = useState<string>(() => localStorage.getItem(NICKNAME_KEY) || '고요한물결0421');
+  const [nickname, setNickname] = useState(() => localStorage.getItem(NICKNAME_KEY) || '고요한물결0421');
   const [busy, setBusy] = useState<Partial<Record<BusyKey, boolean>>>({});
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
+  const [nicknameEditing, setNicknameEditing] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState('');
+  const [nicknameError, setNicknameError] = useState('');
+  const nicknameInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+
   const resolvedTheme = useMemo(() => resolveTheme(settings.theme), [settings.theme]);
 
-  const themeVars =
+  const syncPermissionFromBrowser = useCallback(() => {
+    const nextPermission = detectNotificationPermission();
+    setSettings((prev) => {
+      if (prev.permission === nextPermission) return prev;
+      return { ...prev, permission: nextPermission };
+    });
+  }, []);
+
+  const themeVars: React.CSSProperties =
     resolvedTheme === 'dark'
       ? ({
           ['--qp-bg-grad-from' as string]: '#121826',
           ['--qp-bg-grad-to' as string]: '#132028',
-          ['--qp-surface' as string]: 'rgba(30,41,59,0.68)',
+          ['--qp-surface' as string]: 'rgba(30,41,59,0.72)',
           ['--qp-surface-solid' as string]: '#1E293B',
           ['--qp-text-strong' as string]: '#E2E8F0',
           ['--qp-text-muted' as string]: '#94A3B8',
           ['--qp-text-faint' as string]: '#64748B',
-          ['--qp-border' as string]: 'rgba(148,163,184,0.24)',
-          ['--qp-divider' as string]: 'rgba(148,163,184,0.16)',
+          ['--qp-border' as string]: 'rgba(148,163,184,0.18)',
+          ['--qp-divider' as string]: 'rgba(148,163,184,0.08)',
           ['--qp-accent' as string]: '#8B5CF6',
           ['--qp-accent-soft' as string]: 'rgba(139,92,246,0.16)',
           ['--qp-accent-tint' as string]: 'rgba(139,92,246,0.12)',
           ['--qp-accent-text' as string]: '#C4B5FD',
-          ['--qp-danger' as string]: '#FB7185',
-          ['--qp-danger-soft' as string]: 'rgba(244,63,94,0.14)',
-          ['--qp-danger-text' as string]: '#FDA4AF',
           ['--qp-warn-soft' as string]: 'rgba(245,158,11,0.16)',
           ['--qp-warn-border' as string]: '#F59E0B',
           ['--qp-warn-accent' as string]: '#F59E0B',
           ['--qp-warn-text' as string]: '#FCD34D',
-          ['--qp-border-line' as string]: 'rgba(148,163,184,0.45)',
-          ['--qp-overlay' as string]: 'rgba(15,23,42,0.92)',
+          ['--qp-danger-soft' as string]: 'rgba(244,63,94,0.14)',
+          ['--qp-danger-border' as string]: '#FB7185',
+          ['--qp-danger-text' as string]: '#FB7185',
+          ['--qp-toggle-off' as string]: 'rgba(148,163,184,0.38)',
+          ['--qp-overlay' as string]: 'rgba(15,23,42,0.9)',
         } as React.CSSProperties)
       : ({
           ['--qp-bg-grad-from' as string]: '#ECEFFE',
           ['--qp-bg-grad-to' as string]: '#E2EEEC',
-          ['--qp-surface' as string]: 'rgba(255,255,255,0.72)',
+          ['--qp-surface' as string]: 'rgba(255,255,255,0.70)',
           ['--qp-surface-solid' as string]: '#F8FAFC',
           ['--qp-text-strong' as string]: '#334155',
           ['--qp-text-muted' as string]: '#64748B',
           ['--qp-text-faint' as string]: '#94A3B8',
-          ['--qp-border' as string]: 'rgba(255,255,255,0.75)',
-          ['--qp-divider' as string]: 'rgba(203,213,225,0.7)',
+          ['--qp-border' as string]: 'rgba(255,255,255,0.72)',
+          ['--qp-divider' as string]: 'rgba(148,163,184,0.12)',
           ['--qp-accent' as string]: '#8B5CF6',
           ['--qp-accent-soft' as string]: '#EDE9FE',
           ['--qp-accent-tint' as string]: '#F1EEF9',
           ['--qp-accent-text' as string]: '#7C3AED',
-          ['--qp-danger' as string]: '#F43F5E',
-          ['--qp-danger-soft' as string]: '#FFE4E6',
-          ['--qp-danger-text' as string]: '#E11D48',
           ['--qp-warn-soft' as string]: '#FFF7E8',
           ['--qp-warn-border' as string]: '#F4C562',
           ['--qp-warn-accent' as string]: '#F59E0B',
           ['--qp-warn-text' as string]: '#B45309',
-          ['--qp-border-line' as string]: '#CBD5E1',
+          ['--qp-danger-soft' as string]: '#FFE4E6',
+          ['--qp-danger-border' as string]: '#FDA4AF',
+          ['--qp-danger-text' as string]: '#E11D48',
+          ['--qp-toggle-off' as string]: '#CBD5E1',
           ['--qp-overlay' as string]: 'rgba(241,245,249,0.95)',
         } as React.CSSProperties);
 
   const panelStyle: React.CSSProperties = {
     background: 'var(--qp-surface)',
     border: '1px solid var(--qp-border)',
-    borderRadius: 20,
+    borderRadius: 22,
     overflow: 'hidden',
-    boxShadow: '0 2px 10px rgba(20,22,40,0.04)',
-    backdropFilter: 'blur(8px)',
+    boxShadow: '0 2px 10px rgba(20,22,40,0.035)',
   };
 
   const pushToast = (type: ToastItem['type'], message: string) => {
@@ -218,12 +258,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
     setToasts((prev) => [...prev, { id, type, message }]);
     window.setTimeout(() => {
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, 2200);
+    }, 2000);
   };
 
   useEffect(() => {
     writeLocalSettings(settings);
     applyTheme(settings.theme);
+    window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: { mode: settings.theme } }));
   }, [settings]);
 
   useEffect(() => {
@@ -233,6 +274,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
     media.addEventListener?.('change', onChange);
     return () => media.removeEventListener?.('change', onChange);
   }, [settings.theme]);
+
+  useEffect(() => {
+    syncPermissionFromBrowser();
+
+    const onFocus = () => syncPermissionFromBrowser();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') syncPermissionFromBrowser();
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [syncPermissionFromBrowser]);
 
   useEffect(() => {
     let cancelled = false;
@@ -250,20 +308,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
     };
   }, [isLoggedIn, token]);
 
-  const canUseNotification = isLoggedIn && settings.permission === 'granted';
+  useEffect(() => {
+    if (!nicknameEditing) return;
+    const timer = window.setTimeout(() => {
+      nicknameInputRef.current?.focus();
+      nicknameInputRef.current?.select();
+    }, 40);
+    return () => window.clearTimeout(timer);
+  }, [nicknameEditing]);
 
   const persist = async (key: BusyKey, next: LocalSettings, okMessage: string) => {
     if (busy[key]) return;
     setBusy((prev) => ({ ...prev, [key]: true }));
     setSettings(next);
-    await sleep(260);
+    await sleep(240);
     setBusy((prev) => ({ ...prev, [key]: false }));
     pushToast('ok', okMessage);
   };
 
   const handleRequestPermission = async () => {
     if (!isLoggedIn) {
-      pushToast('info', '로그인하면 사용할 수 있어요');
+      pushToast('info', '로그인 화면으로 이동해요');
       onLogin();
       return;
     }
@@ -276,29 +341,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
         pushToast('error', '이 브라우저는 알림을 지원하지 않아요');
         return;
       }
+
+      if (Notification.permission === 'denied') {
+        setSettings((prev) => ({ ...prev, permission: 'denied' }));
+        pushToast('info', '브라우저 설정에서 이 사이트 알림 허용 후 다시 시도해주세요');
+        return;
+      }
+
       const permission = (await Notification.requestPermission()) as PermissionState;
       setSettings((prev) => ({ ...prev, permission }));
       if (permission === 'granted') pushToast('ok', '알림이 켜졌어요');
+      else if (permission === 'denied') pushToast('info', '브라우저 설정에서 권한을 다시 켜주세요');
       else pushToast('info', '알림 권한이 허용되지 않았어요');
     } finally {
       setBusy((prev) => ({ ...prev, permission: false }));
     }
   };
 
-  const handleToggleNotification = async (
-    key: 'likes' | 'comments' | 'pathEnd',
-    label: string
-  ) => {
+  const handleToggle = async (key: 'likes' | 'comments' | 'pathEnd', label: string) => {
     if (!isLoggedIn) {
-      pushToast('info', '로그인 화면으로 이동해요');
       onLogin();
       return;
     }
-    if (settings.permission !== 'granted') {
-      pushToast('info', 'OS 알림 권한을 먼저 허용해주세요');
-      return;
-    }
-
     const next = {
       ...settings,
       notifications: {
@@ -306,16 +370,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
         [key]: !settings.notifications[key],
       },
     };
-
-    await persist(
-      key,
-      next,
-      `${label} 알림이 ${next.notifications[key] ? '켜졌어요' : '꺼졌어요'}`
-    );
+    await persist(key, next, `${label} 알림이 ${next.notifications[key] ? '켜졌어요' : '꺼졌어요'}`);
   };
 
-  const handleChangeTime = async (hour: number, minute: number) => {
-    if (!canUseNotification) return;
+  const handleTimeChange = async (hour: number, minute: number) => {
+    if (!isLoggedIn || busy.time) return;
     const next = {
       ...settings,
       notifications: {
@@ -331,25 +390,50 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
     );
   };
 
-  const handleTheme = async (nextTheme: ThemeMode) => {
-    if (busy.theme || settings.theme === nextTheme) return;
-    const next = { ...settings, theme: nextTheme };
-    await persist('theme', next, '테마가 저장되었어요');
+  const handleTheme = async (theme: ThemeMode) => {
+    if (settings.theme === theme || busy.theme) return;
+    await persist('theme', { ...settings, theme }, '테마가 저장되었어요');
   };
 
-  const handleChangeNickname = async () => {
-    if (!isLoggedIn || !token) {
-      pushToast('info', '로그인 후 변경할 수 있어요');
+  const openNicknameEdit = () => {
+    if (!isLoggedIn) {
       onLogin();
       return;
     }
+    setNicknameDraft(nickname);
+    setNicknameError('');
+    setNicknameEditing(true);
+  };
 
-    const next = window.prompt('새 닉네임 (한글 6글자 + 숫자 4자리)', nickname);
-    if (!next) return;
-    const value = next.trim();
-    if (value === nickname) return;
-    if (!isNicknameFormatValid(value)) {
-      pushToast('error', '한글 6글자 + 숫자 4자리 형식이어야 해요');
+  const clearNicknameDraft = () => {
+    setNicknameDraft('');
+    if (nicknameError) setNicknameError('');
+    nicknameInputRef.current?.focus();
+  };
+
+  const applyRecommendedNickname = () => {
+    const next = generateNickname();
+    setNicknameDraft(next);
+    setNicknameError('');
+  };
+
+  const cancelNicknameEdit = () => {
+    setNicknameDraft(nickname);
+    setNicknameError('');
+    setNicknameEditing(false);
+  };
+
+  const submitNicknameChange = async () => {
+    if (!isLoggedIn || !token || busy.nickname) return;
+
+    const value = nicknameDraft.trim();
+    const validationMessage = validateNickname(value);
+    if (validationMessage) {
+      setNicknameError(validationMessage);
+      return;
+    }
+    if (value === nickname) {
+      setNicknameEditing(false);
       return;
     }
 
@@ -359,81 +443,205 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
       setNickname(me.name);
       localStorage.setItem(NICKNAME_KEY, me.name);
       pushToast('ok', '닉네임이 변경되었어요');
+      setNicknameEditing(false);
     } catch (error: any) {
-      pushToast('error', error?.message || '닉네임 변경에 실패했어요');
+      setNicknameError(error?.message || '닉네임 변경에 실패했어요');
     } finally {
       setBusy((prev) => ({ ...prev, nickname: false }));
     }
   };
 
-  const handleLogout = async () => {
-    if (!isLoggedIn) return;
-    if (!window.confirm('로그아웃하시겠어요? 게스트 모드로 전환됩니다.')) return;
+  const confirmLogout = async () => {
+    if (!isLoggedIn || busy.logout) return;
     setBusy((prev) => ({ ...prev, logout: true }));
     onLogout();
     setBusy((prev) => ({ ...prev, logout: false }));
+    setLogoutModalOpen(false);
     pushToast('ok', '로그아웃되었어요');
   };
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+  const showPermissionCard = isLoggedIn && settings.permission !== 'granted';
+  const showGuestNotice = !isLoggedIn;
+  const hasNotificationTopBlock = showPermissionCard || showGuestNotice;
+
   return (
     <div
-      className="relative min-h-[calc(100dvh-56px)] w-full max-w-[430px] mx-auto px-5 pb-10 pt-4 animate-fade-in"
+      className="relative min-h-[calc(100dvh-56px)] w-full px-6 pb-10 pt-5 animate-fade-in overflow-y-auto"
       style={{
         ...themeVars,
         background: 'linear-gradient(180deg, var(--qp-bg-grad-from) 0%, var(--qp-bg-grad-to) 100%)',
       }}
     >
-      <button
-        onClick={onClose}
-        className="absolute top-3 right-3 w-8 h-8 rounded-full grid place-items-center"
-        style={{ color: 'var(--qp-text-muted)' }}
-        aria-label="설정 닫기"
-      >
-        <X size={18} />
-      </button>
+      <header className="relative h-11 mb-8">
+        <h1 className="text-center text-[16px] font-bold tracking-tight" style={{ color: 'var(--qp-text-strong)' }}>
+          설정
+        </h1>
+        <button
+          onClick={onClose}
+          className="absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full grid place-items-center"
+          style={{ color: 'var(--qp-text-muted)' }}
+          aria-label="설정 닫기"
+        >
+          <X size={21} />
+        </button>
+      </header>
 
-      <section className="mb-5">
-        <SectionTitle icon={<User size={13} />} title="계정" />
+      <section className="mb-6">
+        <SectionLabel icon={<User size={13} />} title="계정" />
         <div style={panelStyle}>
           {isLoggedIn ? (
             <>
-              <div className="px-4 py-4 flex items-center gap-3.5" style={{ borderBottom: '1px solid var(--qp-divider)' }}>
+              {nicknameEditing ? (
                 <div
-                  className="w-12 h-12 rounded-full grid place-items-center text-white text-[15px] font-bold shrink-0"
+                  className="px-4 py-3"
                   style={{
-                    background: 'linear-gradient(135deg, var(--qp-accent), #7C3AED)',
-                    boxShadow: '0 4px 10px -2px rgba(139,92,246,0.35)',
+                    background: 'var(--qp-accent-tint)',
+                    borderBottom: '1px solid var(--qp-divider)',
                   }}
                 >
-                  {nickname.slice(0, 1)}
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <p className="text-[10px] font-bold tracking-[0.18em]" style={{ color: 'var(--qp-accent-text)' }}>
+                      NICKNAME
+                    </p>
+                    <span className="text-[10px] font-semibold tabular-nums" style={{ color: 'var(--qp-text-faint)' }}>
+                      {nicknameDraft.trim().length}/12
+                    </span>
+                  </div>
+
+                  <div
+                    className="w-full min-h-[52px] rounded-[16px] px-3 py-2 flex items-center gap-2"
+                    style={{
+                      background: 'rgba(255,255,255,0.92)',
+                      border: `1.5px solid ${nicknameError ? 'var(--qp-danger-border)' : 'var(--qp-accent)'}`,
+                      boxShadow: '0 0 0 2px rgba(139,92,246,0.05)',
+                    }}
+                  >
+                    <input
+                      ref={nicknameInputRef}
+                      value={nicknameDraft}
+                      onChange={(event) => {
+                        setNicknameDraft(event.target.value);
+                        if (nicknameError) setNicknameError('');
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          void submitNicknameChange();
+                        }
+                        if (event.key === 'Escape') {
+                          event.preventDefault();
+                          cancelNicknameEdit();
+                        }
+                      }}
+                      placeholder="닉네임을 입력해주세요"
+                      className="flex-1 bg-transparent text-[15px] font-bold leading-tight focus:outline-none"
+                      style={{ color: 'var(--qp-text-strong)' }}
+                      disabled={!!busy.nickname}
+                      maxLength={12}
+                    />
+                    <button
+                      type="button"
+                      onClick={clearNicknameDraft}
+                      disabled={!nicknameDraft || !!busy.nickname}
+                      className="w-8 h-8 rounded-full grid place-items-center shrink-0"
+                      style={{
+                        background: 'var(--qp-accent-soft)',
+                        color: 'var(--qp-text-faint)',
+                        opacity: !nicknameDraft || busy.nickname ? 0.5 : 1,
+                      }}
+                      aria-label="닉네임 입력 지우기"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+
+                  <div className="mt-2 px-1 flex items-center justify-between gap-3">
+                    <p className="text-[10.5px] min-h-[16px]" style={{ color: nicknameError ? 'var(--qp-danger-text)' : 'var(--qp-text-muted)' }}>
+                      {nicknameError || '2~12자, 한글·영문·숫자 사용 가능'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={applyRecommendedNickname}
+                      disabled={!!busy.nickname}
+                      className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-bold"
+                      style={{
+                        background: 'rgba(255,255,255,0.82)',
+                        color: 'var(--qp-accent-text)',
+                        border: '1px solid rgba(139,92,246,0.14)',
+                        opacity: busy.nickname ? 0.55 : 1,
+                      }}
+                    >
+                      <RefreshCcw size={11} />
+                      추천 조합
+                    </button>
+                  </div>
+
+                  <div className="mt-3.5 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelNicknameEdit}
+                      disabled={!!busy.nickname}
+                      className="flex-1 min-h-[40px] rounded-[14px] text-[12.5px] font-semibold"
+                      style={{
+                        background: 'rgba(255,255,255,0.9)',
+                        color: 'var(--qp-text-muted)',
+                        border: '1px solid var(--qp-border)',
+                      }}
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void submitNicknameChange()}
+                      disabled={!!busy.nickname}
+                      className="flex-1 min-h-[40px] rounded-[14px] text-[12.5px] font-bold text-white"
+                      style={{
+                        background: 'linear-gradient(135deg, #BFA7FA 0%, #A78BFA 100%)',
+                        opacity: busy.nickname ? 0.7 : 1,
+                      }}
+                    >
+                      {busy.nickname ? '저장 중…' : '저장'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-bold tracking-[0.16em] mb-0.5" style={{ color: 'var(--qp-accent-text)' }}>
-                    NICKNAME
-                  </p>
-                  <p className="text-[15px] font-bold truncate leading-tight" style={{ color: 'var(--qp-text-strong)' }}>
-                    {nickname}
-                  </p>
+              ) : (
+                <div className="px-4 py-4 flex items-center gap-3.5" style={{ borderBottom: '1px solid var(--qp-divider)' }}>
+                  <div
+                    className="w-12 h-12 rounded-full grid place-items-center text-white text-[15px] font-bold shrink-0"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--qp-accent), #7C3AED)',
+                      boxShadow: '0 4px 10px -2px rgba(139,92,246,0.35)',
+                    }}
+                  >
+                    {nickname.slice(0, 1)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-bold tracking-[0.18em] mb-0.5" style={{ color: 'var(--qp-accent-text)' }}>
+                      NICKNAME
+                    </p>
+                    <p className="text-[15px] font-bold truncate leading-tight" style={{ color: 'var(--qp-text-strong)' }}>
+                      {nickname}
+                    </p>
+                  </div>
+                  <button
+                    onClick={openNicknameEdit}
+                    disabled={!!busy.nickname}
+                    className="w-9 h-9 rounded-full grid place-items-center"
+                    style={{
+                      color: 'var(--qp-text-faint)',
+                      background: 'transparent',
+                      opacity: busy.nickname ? 0.6 : 1,
+                    }}
+                    aria-label="닉네임 편집"
+                  >
+                    <Pencil size={16} />
+                  </button>
                 </div>
-                <button
-                  onClick={handleChangeNickname}
-                  disabled={!!busy.nickname}
-                  className="px-3 py-2 rounded-lg text-[12px] font-bold flex items-center gap-1.5"
-                  style={{
-                    background: 'var(--qp-accent-soft)',
-                    color: 'var(--qp-accent-text)',
-                    border: '1px solid var(--qp-accent-tint)',
-                    opacity: busy.nickname ? 0.6 : 1,
-                  }}
-                >
-                  <Pencil size={12} />
-                  변경
-                </button>
-              </div>
+              )}
               <button
-                onClick={handleLogout}
+                onClick={() => setLogoutModalOpen(true)}
                 disabled={!!busy.logout}
                 className="w-full px-4 py-3.5 text-left flex items-center justify-between"
                 style={{ color: 'var(--qp-danger-text)' }}
@@ -456,7 +664,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                     아직 로그인하지 않았어요
                   </p>
                   <p className="text-[12px] leading-[1.6]" style={{ color: 'var(--qp-text-muted)' }}>
-                    게스트는 둘러보기만 가능해요. <span className="font-semibold" style={{ color: 'var(--qp-text-strong)' }}>기록 동기화·커뮤니티 상호작용</span>
+                    게스트는 둘러보기만 가능해요.{' '}
+                    <span className="font-semibold" style={{ color: 'var(--qp-text-strong)' }}>
+                      기록 동기화·커뮤니티 상호작용
+                    </span>
                     은 로그인 후 사용할 수 있어요.
                   </p>
                 </div>
@@ -476,10 +687,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
         </div>
       </section>
 
-      <section className="mb-5">
-        <SectionTitle icon={<Bell size={13} />} title="알림" />
+      <section className="mb-6">
+        <SectionLabel icon={<Bell size={13} />} title="알림" />
         <div style={panelStyle}>
-          {isLoggedIn && settings.permission !== 'granted' && (
+          {showPermissionCard && (
             <div
               className="mx-3 mt-3 mb-1 p-3 rounded-xl flex items-start gap-2.5"
               style={{
@@ -487,27 +698,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                 border: '1px solid var(--qp-warn-border)',
               }}
             >
-              <AlertTriangle size={14} style={{ color: 'var(--qp-warn-accent)', marginTop: 2 }} />
+              <AlertTriangle
+                size={14}
+                style={{ color: 'var(--qp-warn-accent)', marginTop: 2 }}
+              />
               <div className="flex-1">
-                <p className="text-[12px] font-bold" style={{ color: 'var(--qp-warn-text)' }}>
+                <p
+                  className="text-[12px] font-bold"
+                  style={{ color: 'var(--qp-warn-text)' }}
+                >
                   알림 권한이 꺼져 있어요
                 </p>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--qp-warn-text)', opacity: 0.85 }}>
+                <p
+                  className="text-[11px] mt-0.5"
+                  style={{ color: 'var(--qp-warn-text)', opacity: 0.86 }}
+                >
                   설정한 알림을 받으려면 권한을 허용해주세요.
                 </p>
               </div>
               <button
                 onClick={handleRequestPermission}
                 disabled={!!busy.permission}
-                className="px-2.5 py-1.5 rounded-md text-[11px] font-bold text-white"
-                style={{ background: 'var(--qp-warn-accent)', opacity: busy.permission ? 0.6 : 1 }}
+                className="px-3 py-2 rounded-xl text-[11px] font-bold text-white"
+                style={{
+                  background: 'var(--qp-warn-accent)',
+                  opacity: busy.permission ? 0.6 : 1,
+                }}
               >
                 허용
               </button>
             </div>
           )}
 
-          {!isLoggedIn && (
+          {showGuestNotice && (
             <p className="px-4 pt-3 pb-1 text-[11.5px]" style={{ color: 'var(--qp-text-muted)' }}>
               알림은 로그인 후 사용할 수 있어요. 토글을 누르면 로그인 화면으로 이동해요.
             </p>
@@ -521,33 +744,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
             <div
               key={item.key}
               className="px-4 py-3.5 flex items-center gap-3"
-              style={{
-                borderTop: '1px solid var(--qp-divider)',
-                borderBottom:
-                  item.key === 'pathEnd' && settings.notifications.pathEnd && canUseNotification
-                    ? '1px solid var(--qp-divider)'
-                    : 'none',
-              }}
+              style={{ borderTop: index === 0 && !hasNotificationTopBlock ? 'none' : '1px solid var(--qp-divider)' }}
             >
               <div className="flex-1 min-w-0">
-                <p className="text-[16px] font-bold leading-tight" style={{ color: 'var(--qp-text-strong)' }}>
+                <p className="text-[14px] font-bold leading-tight" style={{ color: 'var(--qp-text-strong)' }}>
                   {item.label}
                 </p>
-                <p className="text-[12px] mt-1 leading-snug" style={{ color: 'var(--qp-text-muted)' }}>
+                <p className="text-[11.5px] mt-1 leading-snug" style={{ color: 'var(--qp-text-muted)' }}>
                   {item.hint}
                 </p>
               </div>
               {isLoggedIn ? (
                 <Toggle
-                  on={settings.notifications[item.key as 'likes' | 'comments' | 'pathEnd']}
-                  onClick={() =>
-                    handleToggleNotification(
-                      item.key as 'likes' | 'comments' | 'pathEnd',
-                      item.label
-                    )
-                  }
-                  disabled={settings.permission !== 'granted'}
-                  busy={busy[item.key as BusyKey]}
+                  value={settings.notifications[item.key as 'likes' | 'comments' | 'pathEnd']}
+                  busy={!!busy[item.key as BusyKey]}
+                  onClick={() => handleToggle(item.key as 'likes' | 'comments' | 'pathEnd', item.label)}
                 />
               ) : (
                 <button
@@ -561,29 +772,30 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
             </div>
           ))}
 
-          {settings.notifications.pathEnd && canUseNotification && (
+          {settings.notifications.pathEnd && isLoggedIn && (
             <div
               className="px-4 py-3.5"
               style={{
                 background: 'var(--qp-accent-tint)',
+                borderTop: '1px solid var(--qp-divider)',
               }}
             >
               <div className="flex items-center gap-2 mb-2.5">
                 <Clock3 size={14} style={{ color: 'var(--qp-accent)' }} />
-                <p className="text-[14px] font-bold" style={{ color: 'var(--qp-text-strong)' }}>
+                <p className="text-[12px] font-bold" style={{ color: 'var(--qp-text-strong)' }}>
                   알림 시간
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <select
                   value={settings.notifications.hour}
-                  onChange={(e) => handleChangeTime(parseInt(e.target.value, 10), settings.notifications.minute)}
+                  onChange={(e) => handleTimeChange(parseInt(e.target.value, 10), settings.notifications.minute)}
                   disabled={!!busy.time}
                   className="flex-1 min-h-[40px] px-3 rounded-lg text-[14px] font-semibold"
                   style={{
                     background: 'var(--qp-surface-solid)',
                     color: 'var(--qp-text-strong)',
-                    border: '1px solid var(--qp-border-line)',
+                    border: '1px solid var(--qp-divider)',
                   }}
                 >
                   {Array.from({ length: 24 }, (_, h) => h).map((h) => (
@@ -594,13 +806,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                 </select>
                 <select
                   value={settings.notifications.minute}
-                  onChange={(e) => handleChangeTime(settings.notifications.hour, parseInt(e.target.value, 10))}
+                  onChange={(e) => handleTimeChange(settings.notifications.hour, parseInt(e.target.value, 10))}
                   disabled={!!busy.time}
                   className="flex-1 min-h-[40px] px-3 rounded-lg text-[14px] font-semibold"
                   style={{
                     background: 'var(--qp-surface-solid)',
                     color: 'var(--qp-text-strong)',
-                    border: '1px solid var(--qp-border-line)',
+                    border: '1px solid var(--qp-divider)',
                   }}
                 >
                   {[0, 15, 30, 45].map((minute) => (
@@ -611,21 +823,22 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                 </select>
               </div>
               <p className="text-[11px] mt-2" style={{ color: 'var(--qp-text-muted)' }}>
-                매일 <b style={{ color: 'var(--qp-text-strong)' }}>{String(settings.notifications.hour).padStart(2, '0')}:{String(settings.notifications.minute).padStart(2, '0')}</b>에 부드럽게 알려드릴게요. · {timezone}
+                매일{' '}
+                <b style={{ color: 'var(--qp-text-strong)' }}>
+                  {String(settings.notifications.hour).padStart(2, '0')}:{String(settings.notifications.minute).padStart(2, '0')}
+                </b>
+                에 부드럽게 알려드릴게요. · {timezone}
               </p>
             </div>
           )}
         </div>
       </section>
 
-      <section className="mb-5">
-        <SectionTitle icon={<Palette size={13} />} title="테마" />
+      <section className="mb-6">
+        <SectionLabel icon={<Palette size={13} />} title="테마" />
         <div style={panelStyle}>
           <div className="p-4">
-            <div
-              className="flex gap-1 p-1 rounded-xl"
-              style={{ background: 'var(--qp-accent-tint)' }}
-            >
+            <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--qp-accent-tint)' }}>
               {[
                 { key: 'system', label: '시스템', icon: <Monitor size={14} /> },
                 { key: 'light', label: '라이트', icon: <Sun size={14} /> },
@@ -651,31 +864,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
               })}
             </div>
             <p className="text-[11px] mt-2.5 px-1" style={{ color: 'var(--qp-text-muted)' }}>
-              기기 설정을 따라가요. 현재 <b style={{ color: 'var(--qp-text-strong)' }}>{resolvedTheme === 'dark' ? '다크' : '라이트'} 모드</b>.
+              기기 설정을 따라가요. 현재{' '}
+              <b style={{ color: 'var(--qp-text-strong)' }}>{resolvedTheme === 'dark' ? '다크' : '라이트'} 모드</b>.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="mb-2">
-        <SectionTitle icon={<Info size={13} />} title="기타" />
+      <section>
+        <SectionLabel icon={<Info size={13} />} title="기타" />
         <div style={panelStyle}>
           <div className="px-4 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--qp-divider)' }}>
-            <p className="text-[15px] font-semibold" style={{ color: 'var(--qp-text-strong)' }}>
+            <p className="text-[14px] font-semibold" style={{ color: 'var(--qp-text-strong)' }}>
               앱 버전
             </p>
             <span className="text-[12px] font-mono" style={{ color: 'var(--qp-text-faint)' }}>
               v0.4.2 · build 217
             </span>
           </div>
-          {['이용약관', '문의하기', '회원탈퇴'].map((menu, idx) => (
+          {['이용약관', '문의하기', '회원탈퇴'].map((menu, index) => (
             <button
               key={menu}
               onClick={() => pushToast('info', '준비 중인 기능입니다')}
               className="w-full px-4 py-3.5 flex items-center justify-between text-left"
-              style={{ borderBottom: idx === 2 ? 'none' : '1px solid var(--qp-divider)' }}
+              style={{ borderBottom: index === 2 ? 'none' : '1px solid var(--qp-divider)' }}
             >
-              <span className="text-[15px] font-semibold" style={{ color: 'var(--qp-text-muted)' }}>
+              <span className="text-[14px] font-semibold" style={{ color: 'var(--qp-text-muted)' }}>
                 {menu}
               </span>
               <span className="text-[10px] font-bold tracking-[0.16em]" style={{ color: 'var(--qp-text-faint)' }}>
@@ -686,35 +900,103 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
         </div>
       </section>
 
-      <p className="text-center text-[10px] tracking-[0.18em] pt-5" style={{ color: 'var(--qp-text-faint)' }}>
+      <p className="text-center text-[10px] tracking-[0.18em] pt-6" style={{ color: 'var(--qp-text-faint)' }}>
         QUIET PATH · © 2026
       </p>
 
-      <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50 flex flex-col gap-2 pointer-events-none">
+      {logoutModalOpen && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center px-5 pb-5 pt-20"
+          style={{ background: 'rgba(99,102,120,0.28)', backdropFilter: 'blur(14px)' }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !busy.logout) {
+              setLogoutModalOpen(false);
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-logout-title"
+        >
+          <div
+            className="w-full max-w-[360px] rounded-[24px] overflow-hidden"
+            style={{
+              background: 'rgba(255,255,255,0.96)',
+              border: '1px solid rgba(255,255,255,0.72)',
+              boxShadow: '0 24px 60px -12px rgba(15,17,30,0.18), 0 0 0 1px rgba(255,255,255,0.75) inset',
+            }}
+          >
+            <div className="px-7 pt-8 pb-2 text-center">
+              <div
+                className="w-16 h-16 mx-auto mb-5 rounded-full grid place-items-center"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(237,233,254,0.95) 0%, rgba(243,232,255,0.92) 100%)',
+                  color: 'var(--qp-accent-text)',
+                }}
+                aria-hidden="true"
+              >
+                <LogOut size={22} />
+              </div>
+              <h3 id="settings-logout-title" className="text-[17px] font-bold mb-3 tracking-tight" style={{ color: 'var(--qp-text-strong)' }}>
+                로그아웃할까요?
+              </h3>
+              <p className="text-[13px] leading-[1.75]" style={{ color: 'var(--qp-text-muted)' }}>
+                다시 로그인하면 모든 기록을 그대로 이어볼 수 있어요.
+                <br />
+                지금은 게스트 상태로 돌아갑니다.
+              </p>
+            </div>
+
+            <div className="flex gap-3 p-5 pt-6">
+              <button
+                type="button"
+                onClick={() => setLogoutModalOpen(false)}
+                disabled={!!busy.logout}
+                className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-semibold"
+                style={{
+                  background: '#F1F5F9',
+                  color: 'var(--qp-text-strong)',
+                }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmLogout()}
+                disabled={!!busy.logout}
+                className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-bold"
+                style={{
+                  background: '#FFF1F2',
+                  color: 'var(--qp-danger-text)',
+                  border: '1px solid #FB7185',
+                  opacity: busy.logout ? 0.7 : 1,
+                }}
+              >
+                {busy.logout ? '나가는 중…' : '로그아웃'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}
             className="px-4 py-2.5 rounded-full text-[12px] font-bold shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
             style={{
               background:
-                toast.type === 'ok'
-                  ? 'var(--qp-accent-soft)'
-                  : toast.type === 'error'
-                    ? 'var(--qp-danger-soft)'
-                    : 'var(--qp-overlay)',
+                toast.type === 'error'
+                  ? 'var(--qp-danger-soft)'
+                  : toast.type === 'info'
+                    ? 'var(--qp-overlay)'
+                    : 'var(--qp-accent-soft)',
               color:
-                toast.type === 'ok'
-                  ? 'var(--qp-accent-text)'
-                  : toast.type === 'error'
-                    ? 'var(--qp-danger-text)'
-                    : 'var(--qp-text-strong)',
-              border: `1px solid ${
-                toast.type === 'ok'
-                  ? 'var(--qp-accent-tint)'
-                  : toast.type === 'error'
-                    ? 'var(--qp-danger)'
-                    : 'var(--qp-border-line)'
-              }`,
+                toast.type === 'error'
+                  ? 'var(--qp-danger-text)'
+                  : toast.type === 'info'
+                    ? 'var(--qp-text-strong)'
+                    : 'var(--qp-accent-text)',
+              border: `1px solid ${toast.type === 'error' ? 'var(--qp-danger-border)' : 'var(--qp-accent-tint)'}`,
             }}
           >
             {toast.message}
