@@ -3,9 +3,11 @@ package kr.co.quietpath.api.auth.controller;
 import jakarta.validation.Valid;
 import kr.co.quietpath.api.auth.UserPrincipal;
 import kr.co.quietpath.api.auth.dto.request.AuthNicknameUpdateRequest;
+import kr.co.quietpath.api.auth.dto.request.AuthRefreshRequest;
 import kr.co.quietpath.api.auth.dto.response.AuthCallbackResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthLogoutResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthMeResponse;
+import kr.co.quietpath.api.auth.dto.response.AuthRefreshResponse;
 import kr.co.quietpath.api.auth.service.AuthService;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
@@ -52,12 +54,18 @@ public class AuthController {
         return authService.getMe(extractUserId(principal));
     }
 
+    @PostMapping("/refresh")
+    public AuthRefreshResponse refresh(
+        @Valid @RequestBody AuthRefreshRequest request
+    ) {
+        return authService.refresh(request.getRefreshToken());
+    }
+
     @PostMapping("/logout")
     public AuthLogoutResponse logout(
         @AuthenticationPrincipal UserPrincipal principal
     ) {
-        extractUserId(principal);
-        return authService.logout();
+        return authService.logout(extractUserId(principal), principal.getSessionId());
     }
 
     @PatchMapping("/me/nickname")

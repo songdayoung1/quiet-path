@@ -1,5 +1,6 @@
 package kr.co.quietpath.api.auth.service;
 
+import kr.co.quietpath.api.auth.config.JwtProperties;
 import kr.co.quietpath.api.auth.config.KakaoAuthProperties;
 import kr.co.quietpath.api.auth.dto.OnboardingStatus;
 import kr.co.quietpath.api.auth.dto.kakao.KakaoTokenResponse;
@@ -7,9 +8,12 @@ import kr.co.quietpath.api.auth.dto.kakao.KakaoUserResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthCallbackResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthLogoutResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthMeResponse;
+import kr.co.quietpath.api.auth.dto.response.AuthRefreshResponse;
 import kr.co.quietpath.api.auth.security.JwtTokenProvider;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
+import kr.co.quietpath.domain.auth.entity.RefreshTokenSession;
+import kr.co.quietpath.domain.auth.repository.RefreshTokenSessionRepository;
 import kr.co.quietpath.domain.user.entity.ProviderType;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
@@ -24,7 +28,14 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
@@ -44,10 +55,17 @@ public class AuthService {
         "맑아진호수빛"
     );
     private static final int NICKNAME_MAX_ATTEMPTS = 40;
-    private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[가-힣]{6}[0-9]{4}$");
+    private static final int NICKNAME_MIN_LENGTH = 2;
+    private static final int NICKNAME_MAX_LENGTH = 12;
+    private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[A-Za-z0-9가-힣]+$");
+    private static final int REFRESH_TOKEN_RANDOM_BYTES = 32;
+    private static final String SHA_256 = "SHA-256";
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
+    private final RefreshTokenSessionRepository refreshTokenSessionRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final JwtProperties jwtProperties;
     private final KakaoAuthProperties kakaoAuthProperties;
     private final RestClient restClient = RestClient.builder().build();
 
@@ -95,9 +113,12 @@ public class AuthService {
             onboardingStatus = OnboardingStatus.EXISTING;
         }
 
-        String appAccessToken = jwtTokenProvider.createAccessToken(user.getId());
+        String sessionId = UUID.randomUUID().toString();
+        String appAccessToken = jwtTokenProvider.createAccessToken(user.getId(), sessionId);
+        String appRefreshToken = issueRefreshToken(user.getId(), sessionId);
         return AuthCallbackResponse.builder()
             .token(appAccessToken)
+            .refreshToken(appRefreshToken)
             .onboardingStatus(onboardingStatus)
             .build();
     }
@@ -114,25 +135,60 @@ public class AuthService {
             .build();
     }
 
-    public AuthLogoutResponse logout() {
+    public AuthRefreshResponse refresh(String refreshToken) {
+        if (!StringUtils.hasText(refreshToken)) {
+            throw new ApiException(ErrorCode.REFRESH_TOKEN_REQUIRED);
+        }
+
+        RefreshTokenSession session = refreshTokenSessionRepository.findByTokenHash(hashToken(refreshToken))
+            .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
+
+        LocalDateTime now = LocalDateTime.now();
+        if (session.isRevoked()) {
+            throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
+        }
+        if (session.isExpired(now)) {
+            session.revoke();
+            throw new ApiException(ErrorCode.REFRESH_TOKEN_EXPIRED);
+        }
+
+        String rotatedRefreshToken = generateOpaqueRefreshToken();
+        session.rotate(
+            hashToken(rotatedRefreshToken),
+            now.plusSeconds(jwtProperties.getRefreshTokenTtlSeconds())
+        );
+        String newAccessToken = jwtTokenProvider.createAccessToken(session.getUserId(), session.getSessionId());
+
+        return AuthRefreshResponse.builder()
+            .token(newAccessToken)
+            .refreshToken(rotatedRefreshToken)
+            .build();
+    }
+
+    public AuthLogoutResponse logout(Long userId, String sessionId) {
+        if (StringUtils.hasText(sessionId)) {
+            refreshTokenSessionRepository.findByUserIdAndSessionId(userId, sessionId)
+                .ifPresent(RefreshTokenSession::revoke);
+        }
         return AuthLogoutResponse.builder()
             .success(true)
             .build();
     }
 
     public AuthMeResponse updateNickname(Long userId, String nickname) {
-        if (!StringUtils.hasText(nickname) || !NICKNAME_PATTERN.matcher(nickname).matches()) {
+        String normalizedNickname = normalizeNickname(nickname);
+        if (!isValidNickname(normalizedNickname)) {
             throw new ApiException(ErrorCode.INVALID_NICKNAME_FORMAT);
         }
 
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
 
-        if (!nickname.equals(user.getNickname()) && userRepository.existsByNickname(nickname)) {
+        if (!normalizedNickname.equals(user.getNickname()) && userRepository.existsByNickname(normalizedNickname)) {
             throw new ApiException(ErrorCode.NICKNAME_ALREADY_EXISTS);
         }
 
-        user.updateNickname(nickname);
+        user.updateNickname(normalizedNickname);
 
         return AuthMeResponse.builder()
             .id(user.getId())
@@ -198,6 +254,50 @@ public class AuthService {
             }
         }
         throw new ApiException(ErrorCode.NICKNAME_GENERATION_FAILED);
+    }
+
+    private String normalizeNickname(String nickname) {
+        return nickname == null ? "" : nickname.trim();
+    }
+
+    private boolean isValidNickname(String nickname) {
+        if (!StringUtils.hasText(nickname)) {
+            return false;
+        }
+        int length = nickname.length();
+        if (length < NICKNAME_MIN_LENGTH || length > NICKNAME_MAX_LENGTH) {
+            return false;
+        }
+        return NICKNAME_PATTERN.matcher(nickname).matches();
+    }
+
+    private String issueRefreshToken(Long userId, String sessionId) {
+        String refreshToken = generateOpaqueRefreshToken();
+        LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(jwtProperties.getRefreshTokenTtlSeconds());
+        refreshTokenSessionRepository.save(
+            RefreshTokenSession.issue(userId, sessionId, hashToken(refreshToken), expiresAt)
+        );
+        return refreshToken;
+    }
+
+    private String generateOpaqueRefreshToken() {
+        byte[] randomBytes = new byte[REFRESH_TOKEN_RANDOM_BYTES];
+        SECURE_RANDOM.nextBytes(randomBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    }
+
+    private String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance(SHA_256);
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte value : hash) {
+                builder.append(String.format("%02x", value));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("지원하지 않는 해시 알고리즘입니다.", ex);
+        }
     }
 
     private void validateKakaoAuthConfig() {

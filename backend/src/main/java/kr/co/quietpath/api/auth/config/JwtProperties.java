@@ -10,6 +10,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class JwtProperties {
     private String secret;
     private Long accessTokenTtlSeconds = 1_209_600L;
+    private Long refreshTokenTtlSeconds = 15_552_000L;
     private String issuer = "quiet-path";
 }
-

@@ -20,6 +20,7 @@ import java.util.Date;
 @RequiredArgsConstructor
 public class JwtTokenProvider {
 
+    private static final String SESSION_ID_CLAIM = "sid";
     private final JwtProperties jwtProperties;
     private SecretKey signingKey;
 
@@ -36,13 +37,14 @@ public class JwtTokenProvider {
         this.signingKey = Keys.hmacShaKeyFor(secretBytes);
     }
 
-    public String createAccessToken(Long userId) {
+    public String createAccessToken(Long userId, String sessionId) {
         long nowMillis = System.currentTimeMillis();
         Date issuedAt = new Date(nowMillis);
         Date expiresAt = new Date(nowMillis + (jwtProperties.getAccessTokenTtlSeconds() * 1000));
 
         return Jwts.builder()
             .subject(String.valueOf(userId))
+            .claim(SESSION_ID_CLAIM, sessionId)
             .issuer(jwtProperties.getIssuer())
             .issuedAt(issuedAt)
             .expiration(expiresAt)
@@ -68,5 +70,13 @@ public class JwtTokenProvider {
             return false;
         }
     }
-}
 
+    public String parseSessionId(String token) {
+        Claims claims = Jwts.parser()
+            .verifyWith(signingKey)
+            .build()
+            .parseSignedClaims(token)
+            .getPayload();
+        return claims.get(SESSION_ID_CLAIM, String.class);
+    }
+}

@@ -33,7 +33,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(token) && jwtTokenProvider.validate(token)) {
             Long userId = jwtTokenProvider.parseUserId(token);
-            UserPrincipal principal = new UserPrincipal(userId);
+            String sessionId = jwtTokenProvider.parseSessionId(token);
+            UserPrincipal principal = new UserPrincipal(userId, sessionId);
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 principal,
                 null,
@@ -53,4 +54,3 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return authorization.substring(BEARER_PREFIX.length()).trim();
     }
 }
-
