@@ -61,7 +61,7 @@ export interface Direction {
   aiSummary?: string; // The "Future Retrieval" summary
 }
 
-export type ViewState = 'ONBOARDING' | 'NOW' | 'RECORDS' | 'DIRECTION' | 'COMMUNITY' | 'WRITE_LOG' | 'SETTINGS' | 'PAST_DIRECTIONS';
+export type ViewState = 'ONBOARDING' | 'ACCOUNT_CONNECT' | 'OAUTH_CALLBACK' | 'NICKNAME_SETUP' | 'NOW' | 'RECORDS' | 'DIRECTION' | 'COMMUNITY' | 'WRITE_LOG' | 'SETTINGS' | 'PAST_DIRECTIONS';
 
 export type UserLevel = 'Beginning' | 'Recorder' | 'Observer' | 'Maintainer' | 'Reflector';
 
@@ -76,6 +76,21 @@ export interface DailyTone {
   plan: { title: string; placeholder: string };
 }
 
+export type OnboardingStatus = 'NEW' | 'EXISTING';
+
+export interface AuthState {
+  isLoggedIn: boolean;
+  token: string | null;
+  refreshToken: string | null;
+  onboardingStatus?: OnboardingStatus;
+}
+
+export interface MeResponse {
+  id: string;
+  name: string;
+  onboardingStatus: OnboardingStatus;
+}
+
 export interface AppState {
   currentDirection: Direction | null;
   pastDirections: Direction[];
@@ -83,5 +98,5 @@ export interface AppState {
   hasLoggedToday: boolean;
   hasSeenOnboarding: boolean;
   userLevel: UserLevel;
-  isLoggedIn?: boolean;
+  auth: AuthState;
 }

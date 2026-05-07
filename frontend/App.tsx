@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AppState, ViewState, Record, Direction } from './types';
 import { loadState, saveState, createDirectionId } from './storage';
 import { HomeView } from './views/HomeView';
@@ -8,10 +8,49 @@ import { LogEditorView } from './views/LogEditorView';
 import { OnboardingView } from './views/OnboardingView';
 import { CommunityView } from './views/CommunityView';
 import { PastDirectionsView } from './views/PastDirectionsView';
-import { Settings } from 'lucide-react';
+import { SettingsView } from './views/SettingsView';
+import { OAuthCallbackView } from './views/OAuthCallbackView';
+import { AccountConnectView } from './views/AccountConnectView';
+import { NicknameSetupView } from './views/NicknameSetupView';
+import { authApi } from './api/authApi';
+import { Settings, Compass } from 'lucide-react';
+
+const OAUTH_PENDING_CODE_KEY = 'qp.oauth.pending.code';
+const OAUTH_PENDING_ERROR_KEY = 'qp.oauth.pending.error';
+const SETTINGS_STORAGE_KEY = 'qp.settings.v2';
+const THEME_CHANGE_EVENT = 'qp:theme-mode-changed';
+
+type ThemeMode = 'system' | 'light' | 'dark';
+type ResolvedTheme = 'light' | 'dark';
+
+const readThemeMode = (): ThemeMode => {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return 'system';
+    const parsed = JSON.parse(raw) as { theme?: ThemeMode };
+    if (parsed.theme === 'light' || parsed.theme === 'dark' || parsed.theme === 'system') {
+      return parsed.theme;
+    }
+    return 'system';
+  } catch {
+    return 'system';
+  }
+};
+
+const resolveTheme = (mode: ThemeMode): ResolvedTheme => {
+  if (mode === 'system') {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return mode;
+};
+
+const applyDocumentTheme = (theme: ResolvedTheme) => {
+  document.documentElement.dataset.qpTheme = theme;
+  document.documentElement.style.colorScheme = theme;
+};
 
 /* ── Custom Nav Icons ───────────────────────────────────────────────────── */
-const NavIcon: React.FC<{ view: ViewState; active: boolean }> = ({ view, active }) => {
+const NavIcon: React.FC<{ view: ViewState | 'INITIALIZING'; active: boolean }> = ({ view, active }) => {
   const stroke = active ? '#FFFFFF' : '#94A3B8';
   const sp = { strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, strokeWidth: '2' };
 
@@ -47,7 +86,22 @@ const NavIcon: React.FC<{ view: ViewState; active: boolean }> = ({ view, active 
 
   return null;
 };
-import { SettingsView } from './views/SettingsView';
+
+const buildFlowBackground = (theme: ResolvedTheme): React.CSSProperties => {
+  if (theme === 'dark') {
+    return {
+      backgroundColor: '#0F172A',
+      backgroundImage:
+        'radial-gradient(circle at -30% -25%, rgba(51,65,85,0.62) 0%, rgba(51,65,85,0) 64%), radial-gradient(circle at 130% 120%, rgba(30,41,59,0.56) 0%, rgba(30,41,59,0) 64%), linear-gradient(180deg, #111827 0%, #0B1220 100%)',
+    };
+  }
+
+  return {
+    backgroundColor: '#F8FAFC',
+    backgroundImage:
+      'radial-gradient(circle at -30% -25%, rgba(194,209,255,0.55) 0%, rgba(194,209,255,0) 62%), radial-gradient(circle at 130% 120%, rgba(178,223,219,0.55) 0%, rgba(178,223,219,0) 62%), linear-gradient(180deg, #ECEFFE 0%, #E2EEEC 100%)',
+  };
+};
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -57,24 +111,152 @@ const App: React.FC = () => {
     hasLoggedToday: false,
     hasSeenOnboarding: false,
     userLevel: 'Beginning',
-    isLoggedIn: false
+    auth: { isLoggedIn: false, token: null, refreshToken: null }
   });
 
-  const [currentView, setCurrentView] = useState<ViewState>('ONBOARDING');
+  const [currentView, setCurrentView] = useState<ViewState | 'INITIALIZING'>('INITIALIZING');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [authCodeParam, setAuthCodeParam] = useState<string | null>(null);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
+  const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
+  const shellFrameStyle = useMemo<React.CSSProperties>(
+    () => ({
+      ...appFlowABgStyle,
+      boxShadow:
+        resolvedTheme === 'dark'
+          ? '0 24px 52px rgba(2,6,23,0.55)'
+          : '0 24px 52px rgba(148,163,184,0.24)',
+    }),
+    [appFlowABgStyle, resolvedTheme]
+  );
 
   useEffect(() => {
-    const loaded = loadState();
-    setState(loaded);
-    
-    // Logic to determine initial view
-    if (!loaded.hasSeenOnboarding) {
-        setCurrentView('ONBOARDING');
-    } else {
-        setCurrentView('NOW');
-    }
-    
-    setIsLoaded(true);
+    const syncTheme = (mode?: ThemeMode) => {
+      const nextMode = mode ?? readThemeMode();
+      setThemeMode(nextMode);
+      setResolvedTheme(resolveTheme(nextMode));
+    };
+
+    const onThemeChange = (event: Event) => {
+      const custom = event as CustomEvent<{ mode?: ThemeMode }>;
+      syncTheme(custom.detail?.mode);
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== SETTINGS_STORAGE_KEY) return;
+      syncTheme();
+    };
+
+    syncTheme();
+    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    applyDocumentTheme(resolvedTheme);
+  }, [resolvedTheme]);
+
+  useEffect(() => {
+    if (themeMode !== 'system') return;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setResolvedTheme(resolveTheme('system'));
+    media.addEventListener?.('change', onChange);
+    return () => media.removeEventListener?.('change', onChange);
+  }, [themeMode]);
+
+  useEffect(() => {
+    const initApp = async () => {
+        const loaded = loadState();
+        if (!loaded.auth) loaded.auth = { isLoggedIn: false, token: null, refreshToken: null };
+        if (loaded.auth && typeof loaded.auth.refreshToken === 'undefined') {
+          loaded.auth.refreshToken = null;
+        }
+        setState(loaded);
+
+        const params = new URLSearchParams(window.location.search);
+        const urlCode = params.get('code');
+        const urlError = params.get('error');
+
+        if (urlCode) {
+            window.sessionStorage.setItem(OAUTH_PENDING_CODE_KEY, urlCode);
+            window.sessionStorage.removeItem(OAUTH_PENDING_ERROR_KEY);
+        } else if (urlError) {
+            window.sessionStorage.setItem(OAUTH_PENDING_ERROR_KEY, urlError);
+        }
+
+        if (urlCode || urlError) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        const pendingCode = window.sessionStorage.getItem(OAUTH_PENDING_CODE_KEY);
+        const pendingError = window.sessionStorage.getItem(OAUTH_PENDING_ERROR_KEY);
+
+        if (pendingCode) {
+            setAuthCodeParam(pendingCode);
+            setCurrentView('OAUTH_CALLBACK');
+        } else if (pendingError) {
+            setAuthCodeParam('error_user');
+            setCurrentView('OAUTH_CALLBACK');
+        } else if (loaded.auth.token || loaded.auth.refreshToken) {
+            const restoreWithRefresh = async () => {
+              let accessToken = loaded.auth.token ?? null;
+              let refreshToken = loaded.auth.refreshToken ?? null;
+
+              if (accessToken) {
+                try {
+                  const me = await authApi.getMe(accessToken);
+                  return { me, accessToken, refreshToken };
+                } catch (err) {
+                  // access token 만료 가능성: refresh로 1회 복구 시도
+                }
+              }
+
+              if (!refreshToken) {
+                throw new Error('세션이 만료되었습니다.');
+              }
+
+              const refreshed = await authApi.refresh(refreshToken);
+              accessToken = refreshed.token;
+              refreshToken = refreshed.refreshToken;
+              const me = await authApi.getMe(accessToken);
+              return { me, accessToken, refreshToken };
+            };
+
+            try {
+                const restored = await restoreWithRefresh();
+                setState(prev => ({
+                    ...prev,
+                    auth: {
+                      isLoggedIn: true,
+                      token: restored.accessToken,
+                      refreshToken: restored.refreshToken,
+                      onboardingStatus: restored.me.onboardingStatus
+                    }
+                }));
+                if (restored.me.onboardingStatus === 'NEW') {
+                   setCurrentView('NICKNAME_SETUP');
+                } else {
+                   setCurrentView('NOW');
+                }
+            } catch (err) {
+                setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null, refreshToken: null } }));
+                setCurrentView('ONBOARDING');
+            }
+        } else {
+            if (!loaded.hasSeenOnboarding) {
+                setCurrentView('ONBOARDING');
+            } else {
+                setCurrentView('NOW');
+            }
+        }
+        setIsLoaded(true);
+    };
+    initApp();
   }, []);
 
   useEffect(() => {
@@ -160,31 +342,55 @@ const App: React.FC = () => {
       setCurrentView('DIRECTION');
       return;
     }
-
     setCurrentView('WRITE_LOG');
   };
 
-  const handleLogin = () => {
-    // Mock Login Logic
-    setState(prev => ({ ...prev, isLoggedIn: true }));
-    if (currentView === 'ONBOARDING') {
-      setCurrentView('NOW');
-    }
+  const handleLoginSuccess = (status: 'NEW' | 'EXISTING', token: string, refreshToken: string) => {
+      window.sessionStorage.removeItem(OAUTH_PENDING_CODE_KEY);
+      window.sessionStorage.removeItem(OAUTH_PENDING_ERROR_KEY);
+      setState(prev => ({ 
+         ...prev, 
+         auth: { isLoggedIn: true, token, refreshToken, onboardingStatus: status }
+      }));
+      
+      if (status === 'NEW') {
+          setCurrentView('NICKNAME_SETUP');
+      } else {
+          // Existing Users go to HOME. If they've never seen Onboarding, we assume they somehow bypassed it and it is now true.
+          setState(prev => ({ ...prev, hasSeenOnboarding: true }));
+          setCurrentView('NOW');
+      }
   };
 
-  const handleLogout = () => {
-    // Mock Logout Logic
-    if (window.confirm("로그아웃 하시겠습니까? 로컬 데이터는 유지되지만, 동기화가 중지됩니다.")) {
-         setState(prev => ({ ...prev, isLoggedIn: false }));
-         setCurrentView('ONBOARDING');
+  const handleLogout = async () => {
+    let accessToken = state.auth.token;
+    let refreshToken = state.auth.refreshToken;
+
+    if (accessToken) {
+      try {
+        await authApi.logout(accessToken);
+      } catch {
+        if (refreshToken) {
+          try {
+            const refreshed = await authApi.refresh(refreshToken);
+            accessToken = refreshed.token;
+            refreshToken = refreshed.refreshToken;
+            await authApi.logout(accessToken);
+          } catch {
+            // 서버 revoke 실패 시에도 로컬 세션은 종료
+          }
+        }
+      }
     }
+    setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null, refreshToken: null } }));
+    setCurrentView('NOW');
   };
 
-  const NavItem = ({ view, label }: { view: ViewState; label: string }) => {
+  const NavItem = ({ view, label }: { view: ViewState | 'INITIALIZING'; label: string }) => {
     const isActive = currentView === view;
     return (
       <button
-        onClick={() => setCurrentView(view)}
+        onClick={() => setCurrentView(view as ViewState)}
         className="relative flex flex-col items-center justify-center flex-1 h-full group pointer-events-auto"
       >
         <div
@@ -212,49 +418,150 @@ const App: React.FC = () => {
     );
   };
 
-  if (!isLoaded) return null;
+  /* ── 1. Fullscreen Loading ── */
+  if (!isLoaded || currentView === 'INITIALIZING') {
+    return (
+      <div className="flex h-screen w-full max-w-[430px] mx-auto items-center justify-center" style={shellFrameStyle}>
+         <Compass size={32} className="animate-spin" style={{ animationDuration: '3s', color: resolvedTheme === 'dark' ? '#A78BFA' : '#8B5CF6' }} />
+      </div>
+    );
+  }
 
-  // Onboarding Screen Overlay
-  if (currentView === 'ONBOARDING') {
+  /* ── 2. Fullscreen Auth Related Views ── */
+  if (currentView === 'ACCOUNT_CONNECT') {
       return (
-        <div className="min-h-screen max-w-md mx-auto dream-bg relative overflow-hidden">
+          <div className="min-h-screen max-w-[430px] mx-auto relative" style={shellFrameStyle}>
+             <AccountConnectView 
+                onBack={() => setCurrentView('ONBOARDING')}
+                onStartKakao={() => authApi.startKakaoLogin()}
+                onNavigateToMockKakao={(code) => {
+                    // 테스트 플로우: 리로드 없이 OAuth 화면으로 전환
+                    setAuthCodeParam(code);
+                    setCurrentView('OAUTH_CALLBACK');
+                }}
+             />
+          </div>
+      );
+  }
+
+  if (currentView === 'OAUTH_CALLBACK') {
+      return (
+        <div className="min-h-screen max-w-[430px] mx-auto relative overflow-hidden" style={shellFrameStyle}>
+           <OAuthCallbackView
+             authCode={authCodeParam || ''}
+             onSuccess={handleLoginSuccess}
+             onRetry={() => {
+               window.sessionStorage.removeItem(OAUTH_PENDING_CODE_KEY);
+               window.sessionStorage.removeItem(OAUTH_PENDING_ERROR_KEY);
+               setCurrentView('ACCOUNT_CONNECT');
+             }}
+           />
+        </div>
+      );
+  }
+
+  if (currentView === 'NICKNAME_SETUP') {
+      return (
+          <div className="min-h-screen max-w-[430px] mx-auto relative overflow-hidden" style={shellFrameStyle}>
+             <NicknameSetupView 
+                onComplete={async (nickname) => {
+                   const token = state.auth.token;
+                   if (token) {
+                      try {
+                        const me = await authApi.updateNickname(token, nickname);
+                        setState(prev => ({
+                          ...prev,
+                          auth: {
+                            ...prev.auth,
+                            onboardingStatus: me.onboardingStatus
+                          },
+                          hasSeenOnboarding: true
+                        }));
+                      } catch (err: any) {
+                        window.alert(err?.message || '닉네임 저장에 실패했습니다.');
+                        return;
+                      }
+                   } else {
+                      setState(prev => ({ ...prev, hasSeenOnboarding: true }));
+                   }
+                   setCurrentView('NOW');
+                }}
+             />
+          </div>
+      );
+  }
+
+  if (currentView === 'ONBOARDING') {
+      // 신규 유저가 방향 설정을 위해 넘어온 경우 처리를 위해,
+      // OnboardingView 내부 로직 대신 App에서 hasSeenOnboarding이 false면서 isLoggedIn이면
+      // 시작 화면 대신 방향 설정 뷰로 보내는 방식으로 처리해야 하지만 현재 OnboardingView는 상태를 자체관리합니다.
+      // E2E 상, 로그인된 상태로 온보딩이 마운트되면 이미 유저이므로 (아니면 신규 가입 프로세스 중이므로)
+      // OnboardingView 측에서 닉네임 후 처리 여부를 알 수 있도록 해야 합니다.
+      // 간략히 'ACCOUNT_CONNECT'만 호출하도록 수정된 OnboardingView를 띄웁니다. 
+      // 만약 이미 auth.isLoggedIn이면 무조건 Step 1(카테고리 선택)을 보여주는 로직을 OnboardingView 내에 구현해야 하지만
+      // OnboardingView를 살짝 편법으로 우회/조작 가능합니다.
+      return (
+        <div className="min-h-screen max-w-[430px] mx-auto relative overflow-hidden" style={shellFrameStyle}>
             <OnboardingView 
                 onComplete={handleOnboardingComplete} 
-                onLogin={handleLogin}
+                onStartAuth={() => setCurrentView('ACCOUNT_CONNECT')}
+                onStartGuest={() => {
+                   setState(prev => ({ ...prev, hasSeenOnboarding: true }));
+                   setCurrentView('NOW');
+                }}
+                initialStep={state.auth?.isLoggedIn ? 1 : 0}
             />
         </div>
       );
   }
 
+  /* ── 3. Main App Layout (Header + Bottom Nav) ── */
   return (
-    <div className="min-h-screen max-w-md mx-auto dream-bg relative shadow-2xl shadow-mist-200/40 flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div
+      className="min-h-screen max-w-[430px] mx-auto relative flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+      style={shellFrameStyle}
+    >
       
       {/* Header Overlay (Gradient Blur) */}
-      <div 
-        className="sticky top-0 h-20 -mb-20 z-20 pointer-events-none transition-opacity duration-500"
-        style={{
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
-          backgroundColor: 'rgba(255, 255, 255, 0.4)'
-        }}
-      />
+      {currentView !== 'SETTINGS' && (
+        <div 
+          className="sticky top-0 h-20 -mb-20 z-20 pointer-events-none transition-opacity duration-500"
+          style={{
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            maskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 40%, transparent 100%)',
+            backgroundColor: resolvedTheme === 'dark' ? 'rgba(15,23,42,0.5)' : 'rgba(255, 255, 255, 0.4)',
+          }}
+        />
+      )}
 
       {/* Top Bar */}
-      <div className="h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
-        <div className="w-6" />
-        <h1 className="text-mist-400 text-[10px] font-bold tracking-[0.3em] uppercase opacity-70">Quiet Path</h1>
-        <button 
-          onClick={() => setCurrentView('SETTINGS')} 
-          className="text-mist-400 hover:text-purple-500 transition-all p-2 rounded-full hover:bg-white/40 active:scale-95"
-        >
-          <Settings size={18} />
-        </button>
-      </div>
+      {currentView !== 'SETTINGS' && (
+        <div className="h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
+          <div className="w-6" />
+          <h1
+            className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-80"
+            style={{ color: resolvedTheme === 'dark' ? '#CBD5E1' : '#7B8794' }}
+          >
+            Quiet Path
+          </h1>
+          <button 
+            onClick={() => setCurrentView('SETTINGS')} 
+            aria-label="설정 열기"
+            className={`group p-2 rounded-full transition-all duration-200 active:scale-95 hover:scale-105 focus-visible:scale-105 focus-visible:outline-none ${
+              resolvedTheme === 'dark'
+                ? 'text-slate-400 bg-slate-900/15 hover:bg-slate-800/45 hover:text-violet-200 focus-visible:bg-slate-800/45 focus-visible:text-violet-200'
+                : 'text-slate-500 hover:bg-white/55 hover:text-violet-500 focus-visible:bg-white/55 focus-visible:text-violet-500'
+            }`}
+          >
+            <Settings size={18} className="transition-transform duration-200 group-hover:rotate-45 group-focus-visible:rotate-45" />
+          </button>
+        </div>
+      )}
 
       {/* Main Content Area */}
-      <main className="flex-1 px-6 pt-2 pb-32">
+      <main className={currentView === 'SETTINGS' ? 'flex-1 px-0 pt-0 pb-0' : 'flex-1 px-6 pt-2 pb-32'}>
         {currentView === 'NOW' && (
           <HomeView 
             state={state} 
@@ -284,7 +591,11 @@ const App: React.FC = () => {
           />
         )}
         {currentView === 'COMMUNITY' && (
-           <CommunityView records={state.records} />
+           <CommunityView 
+              records={state.records} 
+              isGuest={!state.auth?.isLoggedIn}
+              onLoginClick={() => setCurrentView('ACCOUNT_CONNECT')}
+           />
         )}
         {currentView === 'PAST_DIRECTIONS' && (
             <PastDirectionsView 
@@ -297,7 +608,7 @@ const App: React.FC = () => {
            <SettingsView
               state={state}
               onClose={() => setCurrentView('NOW')}
-              onLogin={handleLogin}
+              onLogin={() => setCurrentView('ACCOUNT_CONNECT')}
               onLogout={handleLogout}
            />
         )}
@@ -314,13 +625,22 @@ const App: React.FC = () => {
       )}
 
       {/* Floating Bottom Navigation */}
-      {currentView !== 'WRITE_LOG' && (
-        <div className="fixed bottom-6 left-0 w-full flex justify-center z-20 px-6 pointer-events-none">
-           <nav className="h-[64px] px-2 bg-white/94 backdrop-blur-2xl border border-white/80 rounded-[28px] shadow-[0_12px_40px_rgba(0,0,0,0.06)] flex items-center justify-between w-full max-w-[340px] pointer-events-auto">
-            <NavItem view="NOW" label="오늘" />
-            <NavItem view="RECORDS" label="기록" />
-            <NavItem view="COMMUNITY" label="둘러보기" />
-            <NavItem view="DIRECTION" label="여정" />
+      {currentView !== 'WRITE_LOG' && currentView !== 'SETTINGS' && (
+        <div className="fixed bottom-6 left-0 w-full flex justify-center z-40 px-6 pointer-events-none">
+           <nav
+             className="h-[64px] px-2 backdrop-blur-2xl rounded-[28px] flex items-center justify-between w-full max-w-[340px] pointer-events-auto"
+             style={{
+               background: resolvedTheme === 'dark' ? 'rgba(15,23,42,0.86)' : 'rgba(255,255,255,0.94)',
+               border: `1px solid ${resolvedTheme === 'dark' ? 'rgba(148,163,184,0.3)' : 'rgba(255,255,255,0.8)'}`,
+               boxShadow: resolvedTheme === 'dark'
+                 ? '0 12px 40px rgba(2,6,23,0.52)'
+                 : '0 12px 40px rgba(0,0,0,0.06)',
+             }}
+           >
+             <NavItem view="NOW" label="오늘" />
+             <NavItem view="RECORDS" label="기록" />
+             <NavItem view="COMMUNITY" label="둘러보기" />
+             <NavItem view="DIRECTION" label="여정" />
           </nav>
         </div>
       )}

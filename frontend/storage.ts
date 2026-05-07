@@ -8,7 +8,8 @@ const INITIAL_STATE: AppState = {
   records: [],
   hasLoggedToday: false,
   hasSeenOnboarding: false,
-  userLevel: 'Beginning'
+  userLevel: 'Beginning',
+  auth: { isLoggedIn: false, token: null, refreshToken: null },
 };
 
 // TONE DATA DEFINITION
@@ -104,6 +105,11 @@ export const loadState = (): AppState => {
     return {
       ...INITIAL_STATE, // Ensure shape
       ...sanitized,
+      auth: {
+        ...INITIAL_STATE.auth,
+        ...(sanitized.auth || {}),
+        refreshToken: sanitized.auth?.refreshToken ?? null,
+      },
       hasLoggedToday: isToday,
       userLevel: level
     };

@@ -92,6 +92,22 @@ public class User {
             .build();
     }
 
+    public static User createKakao(
+        String providerUserId,
+        String email,
+        String nickname
+    ) {
+        Objects.requireNonNull(providerUserId, "providerUserId는 필수입니다.");
+        Objects.requireNonNull(nickname, "nickname은 필수입니다.");
+
+        return User.builder()
+            .provider(ProviderType.KAKAO)
+            .providerUserId(providerUserId)
+            .email(email)
+            .nickname(nickname)
+            .build();
+    }
+
     private void touch() {
         this.updatedAt = LocalDateTime.now();
     }

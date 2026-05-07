@@ -158,7 +158,7 @@ public void share() {
 - 생성 규칙은 Entity 내부의 정적 팩토리 메서드로 캡슐화한다.
 
 ### 생성 규칙
-- User 생성은 `User.createGoogle(...)` 같은 정적 팩토리로만 한다.
+- User 생성은 `User.createKakao(...)` 같은 provider별 정적 팩토리로만 한다.
 - 정적 팩토리는 필수값 검증(Objects.requireNonNull)을 포함한다.
 - 기본값(level, steps, dataSyncEnabled, createdAt/updatedAt)은 생성 과정에서 단일 위치에서 설정한다.
 
@@ -204,9 +204,10 @@ public void share() {
 ---
 
 ## 인증/회원 정책 (고정)
-- 로그인/회원가입 Provider는 현재 GOOGLE만 지원한다.
-- ProviderType enum에는 GOOGLE만 정의한다.
-- Apple 등 다른 provider 관련 코드(createApple, APPLE enum 등)는 생성/추가 금지.
+- 로그인/회원가입 Provider는 현재 KAKAO만 지원한다.
+- ProviderType enum에는 KAKAO만 정의한다.
+- Google 로그인은 추후 추가 예정 (ProviderType 확장 구조로 대비되어 있음).
+- Apple 등 그 외 provider 관련 코드는 생성/추가 금지.
 - 추후 provider 추가는 요구사항 변경 시에만 진행한다.
 
 ---

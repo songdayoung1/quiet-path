@@ -12,6 +12,8 @@ import java.util.Optional;
 
 public interface PathRepository extends JpaRepository<Path, Long> {
 
+    boolean existsByUserId(Long userId);
+
     List<Path> findByUserIdOrderByReviewAtDesc(Long userId);
 
     List<Path> findByUserIdAndStatusOrderByReviewAtDesc(Long userId, String status);
