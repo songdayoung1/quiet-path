@@ -7,22 +7,46 @@ interface NicknameSetupViewProps {
 }
 
 export const NICKNAME_STEMS = [
-  '조용한물결빛',
-  '새벽숲길산책',
-  '고요한하늘빛',
-  '느린바람소리',
-  '포근한봄햇살',
-  '잔잔한호수결',
+  '고요한',
+  '잔잔한',
+  '맑은',
+  '느린',
+  '따뜻한',
+  '은은한',
 ];
 
-const NICKNAME_REGEX = /^[가-힣]{6}[0-9]{4}$/;
+const NICKNAME_SUFFIXES = [
+  '물결',
+  '바람',
+  '숲길',
+  '새벽',
+  '호수',
+  '달빛',
+  '별빛',
+  '노을',
+];
 
-const pad4 = (num: number) => String(num).padStart(4, '0');
+const NICKNAME_REGEX = /^[A-Za-z0-9가-힣]+$/;
+const NICKNAME_MIN_LENGTH = 2;
+const NICKNAME_MAX_LENGTH = 12;
 
 export const generateNickname = () => {
   const stem = NICKNAME_STEMS[Math.floor(Math.random() * NICKNAME_STEMS.length)];
-  const suffix = Math.floor(Math.random() * 10000);
-  return `${stem}${pad4(suffix)}`;
+  const suffix = NICKNAME_SUFFIXES[Math.floor(Math.random() * NICKNAME_SUFFIXES.length)];
+  const maybeDigits = Math.random() < 0.45 ? String(Math.floor(Math.random() * 100)).padStart(2, '0') : '';
+  return `${stem}${suffix}${maybeDigits}`.slice(0, NICKNAME_MAX_LENGTH);
+};
+
+const validateNickname = (value: string): string => {
+  const normalized = value.trim();
+  if (!normalized) return '닉네임을 입력해주세요.';
+  if (normalized.length < NICKNAME_MIN_LENGTH || normalized.length > NICKNAME_MAX_LENGTH) {
+    return '2~12자 범위로 입력해주세요.';
+  }
+  if (!NICKNAME_REGEX.test(normalized)) {
+    return '한글·영문·숫자만 사용할 수 있어요.';
+  }
+  return '';
 };
 
 export const NicknameSetupView: React.FC<NicknameSetupViewProps> = ({ onComplete }) => {
@@ -30,13 +54,17 @@ export const NicknameSetupView: React.FC<NicknameSetupViewProps> = ({ onComplete
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<'checking' | 'available' | 'invalid'>('checking');
+  const [validationMessage, setValidationMessage] = useState('');
 
   useEffect(() => {
-    if (!nickname || !NICKNAME_REGEX.test(nickname)) {
+    const message = validateNickname(nickname);
+    if (message) {
+      setValidationMessage(message);
       setStatus('invalid');
       return;
     }
 
+    setValidationMessage('');
     setStatus('checking');
     const timer = setTimeout(() => setStatus('available'), 250);
     return () => clearTimeout(timer);
@@ -70,7 +98,7 @@ export const NicknameSetupView: React.FC<NicknameSetupViewProps> = ({ onComplete
       icon: <CheckCircle2 size={14} strokeWidth={2} className="text-emerald-500" />,
     },
     invalid: {
-      label: '한글 6글자 + 숫자 4자리 형식이어야 해요.',
+      label: validationMessage || '닉네임 형식을 다시 확인해주세요.',
       color: 'text-rose-500',
       icon: <AlertCircle size={14} strokeWidth={2} className="text-rose-500" />,
     },
@@ -98,7 +126,7 @@ export const NicknameSetupView: React.FC<NicknameSetupViewProps> = ({ onComplete
         </h2>
         <p className="text-[15px] text-mist-400 leading-relaxed mb-8">
           이곳에서는 어떤 이름으로 부를까요?<br />
-          <span className="text-mist-500 font-medium">한글 6글자 + 숫자 4자리</span> 형식으로 설정해요.
+          <span className="text-mist-500 font-medium">2~12자, 한글·영문·숫자</span>로 자유롭게 설정해요.
         </p>
 
         <div className="relative mb-2">
@@ -106,8 +134,8 @@ export const NicknameSetupView: React.FC<NicknameSetupViewProps> = ({ onComplete
             type="text"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            placeholder="조용한물결빛1234"
-            maxLength={10}
+            placeholder="고요한물결"
+            maxLength={NICKNAME_MAX_LENGTH}
             className={`w-full bg-white/85 border rounded-[18px] px-5 py-4 text-lg font-bold text-mist-600 focus:outline-none focus:ring-4 transition-all shadow-sm pr-14 ${
               status === 'invalid'
                 ? 'border-rose-300 focus:border-rose-300 focus:ring-rose-100/60'
@@ -130,10 +158,10 @@ export const NicknameSetupView: React.FC<NicknameSetupViewProps> = ({ onComplete
 
         <div className="p-4 bg-white/65 border border-mist-100 rounded-[14px] mb-10">
           <p className="text-[10px] font-bold text-mist-400 tracking-[0.14em] mb-2">GUIDELINE</p>
-          <p className="text-[11px] text-mist-500 leading-6">· 설정에서 언제든 닉네임 변경 가능</p>
-          <p className="text-[11px] text-mist-500 leading-6">· 커뮤니티 표시 이름으로 사용됨</p>
-          <p className="text-[11px] text-mist-500 leading-6">· 형식이 맞아야 다음 단계로 이동 가능</p>
-        </div>
+                <p className="text-[11px] text-mist-500 leading-6">· 설정에서 언제든 닉네임 변경 가능</p>
+                <p className="text-[11px] text-mist-500 leading-6">· 커뮤니티 표시 이름으로 사용됨</p>
+                <p className="text-[11px] text-mist-500 leading-6">· 형식이 맞으면 다음 단계로 이동 가능</p>
+              </div>
       </div>
 
       <div className="pb-8">

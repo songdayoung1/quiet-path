@@ -8,6 +8,10 @@ import { OnboardingStatus, MeResponse } from '../types';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MOCK_CODES = new Set(['new_user', 'existing_user', 'error_user']);
+const isMockAccessToken = (token: string) =>
+  token.startsWith('mock_token_') || token.startsWith('mock_access_');
+const mockStatusByToken = (token: string): OnboardingStatus =>
+  token.includes('new') ? 'NEW' : 'EXISTING';
 
 const resolveApiBaseUrl = () => {
   const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
@@ -32,14 +36,16 @@ export const authApi = {
     window.location.href = apiUrl('/api/v1/auth/kakao/start');
   },
 
-  loginWithKakao: async (code: string): Promise<{ token: string; onboardingStatus: OnboardingStatus }> => {
+  loginWithKakao: async (
+    code: string
+  ): Promise<{ token: string; refreshToken: string; onboardingStatus: OnboardingStatus }> => {
     if (import.meta.env.DEV && MOCK_CODES.has(code)) {
       await delay(1500);
       if (code === 'new_user') {
-        return { token: 'mock_token_new', onboardingStatus: 'NEW' };
+        return { token: 'mock_token_new', refreshToken: 'mock_refresh_new', onboardingStatus: 'NEW' };
       }
       if (code === 'existing_user') {
-        return { token: 'mock_token_existing', onboardingStatus: 'EXISTING' };
+        return { token: 'mock_token_existing', refreshToken: 'mock_refresh_existing', onboardingStatus: 'EXISTING' };
       }
       throw new Error('카카오 로그인에 실패했습니다. (Mock Error)');
     }
@@ -58,14 +64,15 @@ export const authApi = {
     const data = await response.json();
     return {
       token: data.token,
+      refreshToken: data.refreshToken,
       onboardingStatus: data.onboardingStatus,
     };
   },
 
   getMe: async (token: string): Promise<MeResponse> => {
-    if (import.meta.env.DEV && token.startsWith('mock_token_')) {
+    if (import.meta.env.DEV && isMockAccessToken(token)) {
       await delay(300);
-      if (token === 'mock_token_new') {
+      if (mockStatusByToken(token) === 'NEW') {
           return { id: 'u1', name: '새내기', onboardingStatus: 'NEW' };
       }
       return { id: 'u2', name: '단골손님', onboardingStatus: 'EXISTING' };
@@ -90,24 +97,55 @@ export const authApi = {
     };
   },
 
+  refresh: async (refreshToken: string): Promise<{ token: string; refreshToken: string }> => {
+    if (import.meta.env.DEV && refreshToken.startsWith('mock_refresh_')) {
+      await delay(250);
+      if (refreshToken.includes('new')) {
+        return { token: `mock_access_new_${Date.now()}`, refreshToken: 'mock_refresh_new' };
+      }
+      return { token: `mock_access_existing_${Date.now()}`, refreshToken: 'mock_refresh_existing' };
+    }
+
+    const response = await fetch(apiUrl('/api/v1/auth/refresh'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
+
+    const data = await response.json();
+    return {
+      token: data.token,
+      refreshToken: data.refreshToken,
+    };
+  },
+
   logout: async (token: string): Promise<void> => {
-    if (import.meta.env.DEV && token.startsWith('mock_token_')) {
+    if (import.meta.env.DEV && isMockAccessToken(token)) {
       return;
     }
-    await fetch(apiUrl('/api/v1/auth/logout'), {
+    const response = await fetch(apiUrl('/api/v1/auth/logout'), {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
   },
 
   updateNickname: async (token: string, nickname: string): Promise<MeResponse> => {
-    if (import.meta.env.DEV && token.startsWith('mock_token_')) {
+    if (import.meta.env.DEV && isMockAccessToken(token)) {
       return {
-        id: token === 'mock_token_new' ? 'u1' : 'u2',
+        id: mockStatusByToken(token) === 'NEW' ? 'u1' : 'u2',
         name: nickname,
-        onboardingStatus: token === 'mock_token_new' ? 'NEW' : 'EXISTING',
+        onboardingStatus: mockStatusByToken(token),
       };
     }
 

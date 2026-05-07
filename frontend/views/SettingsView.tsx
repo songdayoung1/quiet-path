@@ -22,7 +22,7 @@ interface SettingsViewProps {
   state: AppState;
   onClose: () => void;
   onLogin: () => void;
-  onLogout: () => void;
+  onLogout: () => void | Promise<void>;
 }
 
 type ThemeMode = 'system' | 'light' | 'dark';
@@ -201,6 +201,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
           ['--qp-bg-grad-to' as string]: '#132028',
           ['--qp-surface' as string]: 'rgba(30,41,59,0.72)',
           ['--qp-surface-solid' as string]: '#1E293B',
+          ['--qp-input-bg' as string]: 'rgba(15,23,42,0.82)',
+          ['--qp-input-soft-bg' as string]: 'rgba(15,23,42,0.7)',
+          ['--qp-modal-surface' as string]: 'rgba(15,23,42,0.96)',
+          ['--qp-modal-border' as string]: 'rgba(148,163,184,0.24)',
+          ['--qp-neutral-btn-bg' as string]: 'rgba(30,41,59,0.92)',
+          ['--qp-neutral-btn-text' as string]: '#E2E8F0',
+          ['--qp-danger-btn-bg' as string]: 'rgba(127,29,29,0.3)',
+          ['--qp-danger-btn-border' as string]: 'rgba(251,113,133,0.55)',
           ['--qp-text-strong' as string]: '#E2E8F0',
           ['--qp-text-muted' as string]: '#94A3B8',
           ['--qp-text-faint' as string]: '#64748B',
@@ -225,6 +233,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
           ['--qp-bg-grad-to' as string]: '#E2EEEC',
           ['--qp-surface' as string]: 'rgba(255,255,255,0.70)',
           ['--qp-surface-solid' as string]: '#F8FAFC',
+          ['--qp-input-bg' as string]: 'rgba(255,255,255,0.92)',
+          ['--qp-input-soft-bg' as string]: 'rgba(255,255,255,0.82)',
+          ['--qp-modal-surface' as string]: 'rgba(255,255,255,0.96)',
+          ['--qp-modal-border' as string]: 'rgba(255,255,255,0.72)',
+          ['--qp-neutral-btn-bg' as string]: '#F1F5F9',
+          ['--qp-neutral-btn-text' as string]: '#334155',
+          ['--qp-danger-btn-bg' as string]: '#FFF1F2',
+          ['--qp-danger-btn-border' as string]: '#FB7185',
           ['--qp-text-strong' as string]: '#334155',
           ['--qp-text-muted' as string]: '#64748B',
           ['--qp-text-faint' as string]: '#94A3B8',
@@ -454,10 +470,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
   const confirmLogout = async () => {
     if (!isLoggedIn || busy.logout) return;
     setBusy((prev) => ({ ...prev, logout: true }));
-    onLogout();
-    setBusy((prev) => ({ ...prev, logout: false }));
-    setLogoutModalOpen(false);
-    pushToast('ok', '로그아웃되었어요');
+    try {
+      await onLogout();
+      setLogoutModalOpen(false);
+      pushToast('ok', '로그아웃되었어요');
+    } finally {
+      setBusy((prev) => ({ ...prev, logout: false }));
+    }
   };
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -468,7 +487,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
 
   return (
     <div
-      className="relative min-h-[calc(100dvh-56px)] w-full px-6 pb-10 pt-5 animate-fade-in overflow-y-auto"
+      className="relative min-h-[calc(100dvh-56px)] w-full px-6 pb-10 pt-5 animate-slide-up overflow-y-auto"
       style={{
         ...themeVars,
         background: 'linear-gradient(180deg, var(--qp-bg-grad-from) 0%, var(--qp-bg-grad-to) 100%)',
@@ -513,7 +532,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                   <div
                     className="w-full min-h-[52px] rounded-[16px] px-3 py-2 flex items-center gap-2"
                     style={{
-                      background: 'rgba(255,255,255,0.92)',
+                      background: 'var(--qp-input-bg)',
                       border: `1.5px solid ${nicknameError ? 'var(--qp-danger-border)' : 'var(--qp-accent)'}`,
                       boxShadow: '0 0 0 2px rgba(139,92,246,0.05)',
                     }}
@@ -567,9 +586,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                       disabled={!!busy.nickname}
                       className="shrink-0 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10.5px] font-bold"
                       style={{
-                        background: 'rgba(255,255,255,0.82)',
+                        background: 'var(--qp-input-soft-bg)',
                         color: 'var(--qp-accent-text)',
-                        border: '1px solid rgba(139,92,246,0.14)',
+                        border: '1px solid var(--qp-border)',
                         opacity: busy.nickname ? 0.55 : 1,
                       }}
                     >
@@ -585,8 +604,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                       disabled={!!busy.nickname}
                       className="flex-1 min-h-[40px] rounded-[14px] text-[12.5px] font-semibold"
                       style={{
-                        background: 'rgba(255,255,255,0.9)',
-                        color: 'var(--qp-text-muted)',
+                        background: 'var(--qp-input-bg)',
+                        color: 'var(--qp-text-strong)',
                         border: '1px solid var(--qp-border)',
                       }}
                     >
@@ -920,9 +939,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
           <div
             className="w-full max-w-[360px] rounded-[24px] overflow-hidden"
             style={{
-              background: 'rgba(255,255,255,0.96)',
-              border: '1px solid rgba(255,255,255,0.72)',
-              boxShadow: '0 24px 60px -12px rgba(15,17,30,0.18), 0 0 0 1px rgba(255,255,255,0.75) inset',
+              background: 'var(--qp-modal-surface)',
+              border: '1px solid var(--qp-modal-border)',
+              boxShadow: '0 24px 60px -12px rgba(15,17,30,0.28), 0 0 0 1px rgba(255,255,255,0.06) inset',
             }}
           >
             <div className="px-7 pt-8 pb-2 text-center">
@@ -953,8 +972,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                 disabled={!!busy.logout}
                 className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-semibold"
                 style={{
-                  background: '#F1F5F9',
-                  color: 'var(--qp-text-strong)',
+                  background: 'var(--qp-neutral-btn-bg)',
+                  color: 'var(--qp-neutral-btn-text)',
                 }}
               >
                 취소
@@ -965,9 +984,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                 disabled={!!busy.logout}
                 className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-bold"
                 style={{
-                  background: '#FFF1F2',
+                  background: 'var(--qp-danger-btn-bg)',
                   color: 'var(--qp-danger-text)',
-                  border: '1px solid #FB7185',
+                  border: '1px solid var(--qp-danger-btn-border)',
                   opacity: busy.logout ? 0.7 : 1,
                 }}
               >

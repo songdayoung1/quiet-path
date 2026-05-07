@@ -111,7 +111,7 @@ const App: React.FC = () => {
     hasLoggedToday: false,
     hasSeenOnboarding: false,
     userLevel: 'Beginning',
-    auth: { isLoggedIn: false, token: null }
+    auth: { isLoggedIn: false, token: null, refreshToken: null }
   });
 
   const [currentView, setCurrentView] = useState<ViewState | 'INITIALIZING'>('INITIALIZING');
@@ -123,8 +123,6 @@ const App: React.FC = () => {
   const shellFrameStyle = useMemo<React.CSSProperties>(
     () => ({
       ...appFlowABgStyle,
-      borderLeft: `1px solid ${resolvedTheme === 'dark' ? 'rgba(148,163,184,0.22)' : 'rgba(255,255,255,0.82)'}`,
-      borderRight: `1px solid ${resolvedTheme === 'dark' ? 'rgba(148,163,184,0.22)' : 'rgba(255,255,255,0.82)'}`,
       boxShadow:
         resolvedTheme === 'dark'
           ? '0 24px 52px rgba(2,6,23,0.55)'
@@ -174,7 +172,10 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
         const loaded = loadState();
-        if (!loaded.auth) loaded.auth = { isLoggedIn: false, token: null };
+        if (!loaded.auth) loaded.auth = { isLoggedIn: false, token: null, refreshToken: null };
+        if (loaded.auth && typeof loaded.auth.refreshToken === 'undefined') {
+          loaded.auth.refreshToken = null;
+        }
         setState(loaded);
 
         const params = new URLSearchParams(window.location.search);
@@ -201,20 +202,49 @@ const App: React.FC = () => {
         } else if (pendingError) {
             setAuthCodeParam('error_user');
             setCurrentView('OAUTH_CALLBACK');
-        } else if (loaded.auth.token && !loaded.auth.isLoggedIn) {
+        } else if (loaded.auth.token || loaded.auth.refreshToken) {
+            const restoreWithRefresh = async () => {
+              let accessToken = loaded.auth.token ?? null;
+              let refreshToken = loaded.auth.refreshToken ?? null;
+
+              if (accessToken) {
+                try {
+                  const me = await authApi.getMe(accessToken);
+                  return { me, accessToken, refreshToken };
+                } catch (err) {
+                  // access token 만료 가능성: refresh로 1회 복구 시도
+                }
+              }
+
+              if (!refreshToken) {
+                throw new Error('세션이 만료되었습니다.');
+              }
+
+              const refreshed = await authApi.refresh(refreshToken);
+              accessToken = refreshed.token;
+              refreshToken = refreshed.refreshToken;
+              const me = await authApi.getMe(accessToken);
+              return { me, accessToken, refreshToken };
+            };
+
             try {
-                const me = await authApi.getMe(loaded.auth.token);
+                const restored = await restoreWithRefresh();
                 setState(prev => ({
                     ...prev,
-                    auth: { isLoggedIn: true, token: loaded.auth.token, onboardingStatus: me.onboardingStatus }
+                    auth: {
+                      isLoggedIn: true,
+                      token: restored.accessToken,
+                      refreshToken: restored.refreshToken,
+                      onboardingStatus: restored.me.onboardingStatus
+                    }
                 }));
-                if (me.onboardingStatus === 'NEW') {
-                   setCurrentView('NICKNAME_SETUP'); 
+                if (restored.me.onboardingStatus === 'NEW') {
+                   setCurrentView('NICKNAME_SETUP');
                 } else {
                    setCurrentView('NOW');
                 }
             } catch (err) {
-                setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null } }));
+                setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null, refreshToken: null } }));
                 setCurrentView('ONBOARDING');
             }
         } else {
@@ -315,12 +345,12 @@ const App: React.FC = () => {
     setCurrentView('WRITE_LOG');
   };
 
-  const handleLoginSuccess = (status: 'NEW' | 'EXISTING', token: string) => {
+  const handleLoginSuccess = (status: 'NEW' | 'EXISTING', token: string, refreshToken: string) => {
       window.sessionStorage.removeItem(OAUTH_PENDING_CODE_KEY);
       window.sessionStorage.removeItem(OAUTH_PENDING_ERROR_KEY);
       setState(prev => ({ 
          ...prev, 
-         auth: { isLoggedIn: true, token, onboardingStatus: status }
+         auth: { isLoggedIn: true, token, refreshToken, onboardingStatus: status }
       }));
       
       if (status === 'NEW') {
@@ -332,12 +362,27 @@ const App: React.FC = () => {
       }
   };
 
-  const handleLogout = () => {
-    const token = state.auth.token;
-    if (token) {
-      authApi.logout(token).catch(() => undefined);
+  const handleLogout = async () => {
+    let accessToken = state.auth.token;
+    let refreshToken = state.auth.refreshToken;
+
+    if (accessToken) {
+      try {
+        await authApi.logout(accessToken);
+      } catch {
+        if (refreshToken) {
+          try {
+            const refreshed = await authApi.refresh(refreshToken);
+            accessToken = refreshed.token;
+            refreshToken = refreshed.refreshToken;
+            await authApi.logout(accessToken);
+          } catch {
+            // 서버 revoke 실패 시에도 로컬 세션은 종료
+          }
+        }
+      }
     }
-    setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null } }));
+    setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null, refreshToken: null } }));
     setCurrentView('NOW');
   };
 
@@ -503,13 +548,14 @@ const App: React.FC = () => {
           </h1>
           <button 
             onClick={() => setCurrentView('SETTINGS')} 
-            className="transition-all p-2 rounded-full active:scale-95"
-            style={{
-              color: resolvedTheme === 'dark' ? '#94A3B8' : '#7B8794',
-              backgroundColor: resolvedTheme === 'dark' ? 'rgba(15,23,42,0.16)' : 'transparent',
-            }}
+            aria-label="설정 열기"
+            className={`group p-2 rounded-full transition-all duration-200 active:scale-95 hover:scale-105 focus-visible:scale-105 focus-visible:outline-none ${
+              resolvedTheme === 'dark'
+                ? 'text-slate-400 bg-slate-900/15 hover:bg-slate-800/45 hover:text-violet-200 focus-visible:bg-slate-800/45 focus-visible:text-violet-200'
+                : 'text-slate-500 hover:bg-white/55 hover:text-violet-500 focus-visible:bg-white/55 focus-visible:text-violet-500'
+            }`}
           >
-            <Settings size={18} />
+            <Settings size={18} className="transition-transform duration-200 group-hover:rotate-45 group-focus-visible:rotate-45" />
           </button>
         </div>
       )}

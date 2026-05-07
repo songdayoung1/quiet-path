@@ -3,7 +3,7 @@ import { AlertCircle, Check, Compass } from 'lucide-react';
 import { authApi } from '../api/authApi';
 import { OnboardingStatus } from '../types';
 
-type LoginResult = { token: string; onboardingStatus: OnboardingStatus };
+type LoginResult = { token: string; refreshToken: string; onboardingStatus: OnboardingStatus };
 const authCodeRequestCache = new Map<string, Promise<LoginResult>>();
 
 const requestLoginOnce = (authCode: string) => {
@@ -24,7 +24,7 @@ const requestLoginOnce = (authCode: string) => {
 
 interface OAuthCallbackViewProps {
   authCode: string;
-  onSuccess: (status: OnboardingStatus, token: string) => void;
+  onSuccess: (status: OnboardingStatus, token: string, refreshToken: string) => void;
   onRetry: () => void;
 }
 
@@ -58,7 +58,7 @@ export const OAuthCallbackView: React.FC<OAuthCallbackViewProps> = ({ authCode, 
         setSuccessKind(response.onboardingStatus);
         setPhase('success');
         successTimer = setTimeout(() => {
-          if (mounted) onSuccess(response.onboardingStatus, response.token);
+          if (mounted) onSuccess(response.onboardingStatus, response.token, response.refreshToken);
         }, 1200);
       } catch (err: any) {
         if (!mounted) return;
