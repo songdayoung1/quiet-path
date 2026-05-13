@@ -6,6 +6,7 @@ const mascotExcited = '/assets/mascot/mascot_3d_EXCITED.png';
 const mascotBlank = '/assets/mascot/mascot_3d_BLANK.png';
 const mascotSparkle = '/assets/mascot/mascot_3d_SPARKLE.png';
 const mascotHolding = '/assets/mascot/mascot_3d_HOLDING.png';
+const mascotSleeping = '/assets/mascot/mascot_3d_SLEEPING.png';
 
 export type CharacterMood =
   | 'waiting'
@@ -23,6 +24,7 @@ export type CharacterMood =
   | '두근'
   | 'happy'
   | 'EXCITED'
+  | 'SLEEPING'
   | 'neutral'
   | 'default';
 export type CharacterTone = CharacterMood;
@@ -30,7 +32,7 @@ export type CharacterTone = CharacterMood;
 interface WaterDropCharacterProps {
   size?: number;
   mood?: CharacterMood;
-  tone?: CharacterTone; // Compatibility for legacy 'tone' prop
+  tone?: CharacterTone;
   className?: string;
   animate?: boolean;
 }
@@ -44,8 +46,8 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
 }) => {
   const activeMood = mood || tone || 'waiting';
 
-  const getMascotImage = (m: CharacterMood) => {
-    switch (m) {
+  const getMascotImage = (value: CharacterMood) => {
+    switch (value) {
       case '잔잔':
       case 'CALM':
         return mascotCalm;
@@ -56,6 +58,8 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
       case 'happy':
       case 'EXCITED':
         return mascotExcited;
+      case 'SLEEPING':
+        return mascotSleeping;
       case '멍함':
       case '망함':
       case 'BLANK':
@@ -74,14 +78,20 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
 
   const mascotSrc = getMascotImage(activeMood);
 
-  const animationStyle = animate ? {
-    animation: (activeMood === 'waiting' || activeMood === 'neutral' || activeMood === 'default')
-      ? 'float 3s ease-in-out infinite' 
-      : 'breathe 4s ease-in-out infinite'
-  } : {};
+  const getAnimationStyle = () => {
+    if (!animate) return {};
+
+    if (activeMood === 'waiting' || activeMood === 'neutral' || activeMood === 'default') {
+      return { animation: 'float 3s ease-in-out infinite' };
+    }
+    if (activeMood === 'SLEEPING') {
+      return { animation: 'sleep 5s ease-in-out infinite' };
+    }
+    return { animation: 'breathe 4s ease-in-out infinite' };
+  };
 
   return (
-    <div 
+    <div
       className={`relative inline-flex items-center justify-center ${className}`}
       style={{ width: size, height: size }}
     >
@@ -95,18 +105,22 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.03); }
           }
+          @keyframes sleep {
+            0%, 100% { transform: scale(1) translateY(0) rotate(0deg); }
+            50% { transform: scale(1.03) translateY(-4px) rotate(3deg); }
+          }
         `}
       </style>
-      
+
       <img
         src={mascotSrc}
         alt="Mascot"
         className="w-full h-full object-contain relative z-10"
-        style={{ 
-          ...animationStyle,
+        style={{
+          ...getAnimationStyle(),
           maxWidth: '100%',
           maxHeight: '100%',
-          filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.08))'
+          filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.08))',
         }}
       />
     </div>

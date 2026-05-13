@@ -30,6 +30,11 @@ public class GlobalExceptionHandler {
                 .status(ErrorCode.CONTENT_REQUIRED.getHttpStatus())
                 .body(ErrorResponse.of(ErrorCode.CONTENT_REQUIRED));
         }
+        if (fieldError != null && "refreshToken".equals(fieldError.getField())) {
+            return ResponseEntity
+                .status(ErrorCode.REFRESH_TOKEN_REQUIRED.getHttpStatus())
+                .body(ErrorResponse.of(ErrorCode.REFRESH_TOKEN_REQUIRED));
+        }
         return ResponseEntity
             .status(ErrorCode.INVALID_REQUEST.getHttpStatus())
             .body(ErrorResponse.of(ErrorCode.INVALID_REQUEST));

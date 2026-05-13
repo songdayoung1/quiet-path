@@ -21,12 +21,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
   const { currentDirection, records, hasLoggedToday } = state;
   const hasActiveDirection = !!currentDirection;
   const sortedRecords = [...records].filter(r => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp);
+  const effectiveHasLoggedToday = hasActiveDirection && hasLoggedToday;
   
   // Find today's record accurately matching local date
   const todayDateStr = new Date().toLocaleDateString('ko-KR');
   const todayRecord = sortedRecords.find(r => 
     new Date(r.timestamp).toLocaleDateString('ko-KR') === todayDateStr
   ) || null;
+  const visibleTodayRecord = hasActiveDirection ? todayRecord : null;
   
   const lastRecord = sortedRecords[0]; // Kept for top right mood indicator
 
@@ -75,13 +77,13 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
 
   const heroTitle = !hasActiveDirection
     ? '지금은 잠시 쉬고 있어요.'
-    : hasLoggedToday
+    : effectiveHasLoggedToday
       ? '오늘도 방향을 찾았네요.'
       : '오늘은 어디로 움직였나요?';
 
   const heroSubtitle = !hasActiveDirection
     ? '원할 때 새 방향을 시작해요.'
-    : hasLoggedToday
+    : effectiveHasLoggedToday
       ? '기록이 안전하게 쌓이고 있어요.'
       : '하루를 돌아보며 방향을 만들어가요.';
 
@@ -99,7 +101,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
              {heroSubtitle}
           </p>
         </div>
-        {hasActiveDirection && !hasLoggedToday && lastRecord?.moodCode && (
+        {hasActiveDirection && !effectiveHasLoggedToday && lastRecord?.moodCode && (
           <div className="shrink-0 flex flex-col items-center">
              <span className="text-[10px] text-mist-300 mb-1">최근 무드</span>
              <MoodSticker code={lastRecord.moodCode} className="opacity-100" />
@@ -109,9 +111,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
 
       {/* Tier 1: Action (TodaysCard) */}
       <TodaysCard 
-        hasLoggedToday={hasLoggedToday} 
+        hasLoggedToday={effectiveHasLoggedToday} 
         hasActiveDirection={hasActiveDirection}
-        todayRecord={todayRecord} 
+        todayRecord={visibleTodayRecord} 
         onLogClick={handleLogClick} 
         onEditClick={handleLogClick} // Simplify for now, editing uses the same form 
       />
@@ -119,20 +121,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
       {/* Tier 2: Path & Progress */}
       <div className="flex flex-col gap-4">
         {/* Condensed Path Information */}
-        <CurrentPathStrip 
-          currentDirection={currentDirection} 
-          currentPathConsistency={currentPathConsistency} 
-          currentPathRecordCount={currentPathRecordCount} 
-        />
-        {!hasActiveDirection && hasLoggedToday && (
-          <div className="px-1 -mt-1">
-            <button
-              onClick={onStartDirectionClick}
-              className="w-full rounded-[1.6rem] border border-point-100 bg-white/80 px-4 py-3 text-sm font-bold text-point-500 shadow-sm transition-colors hover:border-point-200 hover:bg-white"
-            >
-              새 방향 시작하기
-            </button>
-          </div>
+        {hasActiveDirection && (
+          <CurrentPathStrip 
+            currentDirection={currentDirection} 
+            currentPathConsistency={currentPathConsistency} 
+            currentPathRecordCount={currentPathRecordCount} 
+          />
         )}
         
         {/* Cumulative Progress Section */}

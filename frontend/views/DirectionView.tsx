@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Direction, Record as RecordType } from '../types';
 import { Card, PageHeader, SoftButton, MoodSticker, CategoryIcon, WaterDropOverlay } from '../components/UI';
-import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight, Wind } from 'lucide-react';
+import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight } from 'lucide-react';
 import { CATEGORIES } from '../constants';
 import { DirectionSetupForm } from '../components/DirectionSetupForm';
+import { WaterDropCharacter } from '../components/WaterDropCharacter';
+import { AppModal } from '../components/AppModal';
 
 interface DirectionViewProps {
   currentDirection: Direction | null;
@@ -15,6 +17,7 @@ interface DirectionViewProps {
 
 export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, records, onStartDirection, onFinishDirection, onHistoryClick }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [finishModalOpen, setFinishModalOpen] = useState(false);
   const [showCategorySelect, setShowCategorySelect] = useState(false);
   const [question, setQuestion] = useState('');
   const [description, setDescription] = useState('');
@@ -77,9 +80,12 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   };
 
   const handleFinishDirection = () => {
-    if (window.confirm("이 방향을 마무리할까요?\n마무리 후 새 방향은 원할 때 시작할 수 있어요.")) {
-      onFinishDirection();
-    }
+    setFinishModalOpen(true);
+  };
+
+  const confirmFinishDirection = () => {
+    setFinishModalOpen(false);
+    onFinishDirection();
   };
 
   const currentPathRecords = useMemo(() => {
@@ -292,8 +298,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
               </div>
             ) : (
               <div className="text-center py-6 flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-mist-50/80 flex items-center justify-center mb-2 border border-mist-100/50 shadow-inner">
-                  <Wind size={28} className="text-mist-300" strokeWidth={1.5} />
+                <div className="mb-2">
+                  <WaterDropCharacter size={84} mood="SLEEPING" animate={true} />
                 </div>
                 <div>
                   <p className="text-mist-600 text-base font-bold tracking-wide mb-1">지금은 잠시 쉬고 있어요</p>
@@ -330,6 +336,22 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
           </div>
         </div>
       </div>
+
+      <AppModal
+        open={finishModalOpen}
+        icon={<Compass size={22} />}
+        title="이 방향을 마무리할까요?"
+        description={
+          <>
+            마무리 후 새 방향은 원할 때 시작할 수 있어요.
+            <br />
+            지금의 기록과 흐름은 지나온 방향에 남습니다.
+          </>
+        }
+        confirmLabel="마무리하기"
+        onClose={() => setFinishModalOpen(false)}
+        onConfirm={confirmFinishDirection}
+      />
     </div>
   );
 };

@@ -22,7 +22,35 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
   const [showShareMenu, setShowShareMenu] = useState(false);
   const isRestingState = !hasActiveDirection;
 
-  // 1. Before Record State — character waits for you
+  // 1. Resting state - no active direction
+  if (isRestingState) {
+    return (
+      <Card className="!bg-white/85 backdrop-blur-md border border-white/50 shadow-sm !p-6 hover:scale-[1.01] hover:shadow-md transition-all duration-300">
+        <div className="flex items-center gap-5">
+          <div className="shrink-0">
+            <WaterDropCharacter size={90} mood="waiting" animate={true} />
+          </div>
+          <div className="flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-point-300 mb-2">RESTING NOW</p>
+            <h2 className="text-lg font-bold text-mist-600 leading-tight break-keep whitespace-pre-line">
+              지금은 잠시
+              <br />
+              쉬고 있어요
+            </h2>
+            <p className="text-sm text-mist-400 mt-2 break-keep">원할 때 새 방향을 시작해요.</p>
+          </div>
+        </div>
+        <div className="mt-4">
+          <SoftButton onClick={onLogClick} className="!py-3 shadow-lg shadow-point-200/30">
+            <PenLine size={16} />
+            <span className="text-sm font-semibold">새 방향 시작하기</span>
+          </SoftButton>
+        </div>
+      </Card>
+    );
+  }
+
+  // 2. Before Record State — character waits for you
   if (!hasLoggedToday) {
     return (
       <Card className="!bg-white/85 backdrop-blur-md border border-white/50 shadow-sm !p-6 hover:scale-[1.01] hover:shadow-md transition-all duration-300">
@@ -31,28 +59,26 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
             <WaterDropCharacter size={90} mood="waiting" animate={true} />
           </div>
           <div className="flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-point-300 mb-2">
-              {isRestingState ? 'RESTING NOW' : "TODAY'S RECORD"}
-            </p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-point-300 mb-2">TODAY&apos;S RECORD</p>
             <h2 className="text-lg font-bold text-mist-600 leading-tight break-keep whitespace-pre-line">
-              {isRestingState ? '지금은 잠시\n쉬고 있어요' : '오늘 남기고 싶은\n장면이 있나요?'}
+              오늘 남기고 싶은
+              <br />
+              장면이 있나요?
             </h2>
-            <p className="text-sm text-mist-400 mt-2 break-keep">
-              {isRestingState ? '원할 때 새 방향을 시작해요.' : '한 줄만 남겨도 충분해요.'}
-            </p>
+            <p className="text-sm text-mist-400 mt-2 break-keep">한 줄만 남겨도 충분해요.</p>
           </div>
         </div>
         <div className="mt-4">
           <SoftButton onClick={onLogClick} className="!py-3 shadow-lg shadow-point-200/30">
             <PenLine size={16} />
-            <span className="text-sm font-semibold">{isRestingState ? '새 방향 시작하기' : '기록 남기기'}</span>
+            <span className="text-sm font-semibold">기록 남기기</span>
           </SoftButton>
         </div>
       </Card>
     );
   }
 
-  // 2. After Record State (Result Display)
+  // 3. After Record State (Result Display)
   if (todayRecord) {
     const hasImage = !!todayRecord.imageUrl;
 
