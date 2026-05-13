@@ -14,6 +14,7 @@ import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
 import { authApi } from './api/authApi';
 import { Settings, Compass } from 'lucide-react';
+import { AppModal } from './components/AppModal';
 
 const OAUTH_PENDING_CODE_KEY = 'qp.oauth.pending.code';
 const OAUTH_PENDING_ERROR_KEY = 'qp.oauth.pending.error';
@@ -63,8 +64,9 @@ const NavIcon: React.FC<{ view: ViewState | 'INITIALIZING'; active: boolean }> =
 
   if (view === 'RECORDS') return (
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
-        <path d="M4 6h7c1 0 2 1 2 2v11c0-1-1-2-2-2H4V6z" stroke={stroke} {...sp} />
-        <path d="M20 6h-7c-1 0-2 1-2 2v11c0-1 1-2 2-2h7V6z" stroke={stroke} {...sp} />
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke={stroke} {...sp} />
+        <path d="M14 2v6h6" stroke={stroke} {...sp} />
+        <path d="M16 13H8M16 17H8M10 9H8" stroke={stroke} {...sp} />
     </svg>
   );
 
@@ -117,6 +119,8 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState | 'INITIALIZING'>('INITIALIZING');
   const [isLoaded, setIsLoaded] = useState(false);
   const [authCodeParam, setAuthCodeParam] = useState<string | null>(null);
+  const [settingsButtonHover, setSettingsButtonHover] = useState(false);
+  const [recordGuardModalOpen, setRecordGuardModalOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
   const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
@@ -338,8 +342,7 @@ const App: React.FC = () => {
 
   const handleOpenLogEditor = () => {
     if (!state.currentDirection) {
-      window.alert('기록하려면 먼저 방향을 시작해 주세요.');
-      setCurrentView('DIRECTION');
+      setRecordGuardModalOpen(true);
       return;
     }
     setCurrentView('WRITE_LOG');
@@ -401,7 +404,7 @@ const App: React.FC = () => {
               : 'bg-transparent hover:bg-white/40 group-hover:-translate-y-1',
           ].join(' ')}
         >
-          <div className={`transition-transform duration-500 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+          <div className="transition-transform duration-500">
             <NavIcon view={view} active={isActive} />
           </div>
         </div>
@@ -548,14 +551,43 @@ const App: React.FC = () => {
           </h1>
           <button 
             onClick={() => setCurrentView('SETTINGS')} 
+            onPointerEnter={() => setSettingsButtonHover(true)}
+            onPointerLeave={() => setSettingsButtonHover(false)}
+            onPointerCancel={() => setSettingsButtonHover(false)}
+            onMouseEnter={() => setSettingsButtonHover(true)}
+            onMouseLeave={() => setSettingsButtonHover(false)}
+            onFocus={() => setSettingsButtonHover(true)}
+            onBlur={() => setSettingsButtonHover(false)}
             aria-label="설정 열기"
-            className={`group p-2 rounded-full transition-all duration-200 active:scale-95 hover:scale-105 focus-visible:scale-105 focus-visible:outline-none ${
-              resolvedTheme === 'dark'
-                ? 'text-slate-400 bg-slate-900/15 hover:bg-slate-800/45 hover:text-violet-200 focus-visible:bg-slate-800/45 focus-visible:text-violet-200'
-                : 'text-slate-500 hover:bg-white/55 hover:text-violet-500 focus-visible:bg-white/55 focus-visible:text-violet-500'
-            }`}
+            className="group cursor-pointer p-2 rounded-full transition-all duration-200 active:scale-95 focus-visible:outline-none"
+            style={{
+              cursor: 'pointer',
+              color: settingsButtonHover
+                ? resolvedTheme === 'dark'
+                  ? '#DDD6FE'
+                  : '#7C3AED'
+                : resolvedTheme === 'dark'
+                  ? '#94A3B8'
+                  : '#7B8794',
+              backgroundColor: settingsButtonHover
+                ? resolvedTheme === 'dark'
+                  ? 'rgba(51,65,85,0.52)'
+                  : 'rgba(255,255,255,0.58)'
+                : resolvedTheme === 'dark'
+                  ? 'rgba(15,23,42,0.16)'
+                  : 'transparent',
+              boxShadow: settingsButtonHover
+                ? resolvedTheme === 'dark'
+                  ? '0 10px 24px rgba(15,23,42,0.28)'
+                  : '0 10px 24px rgba(148,163,184,0.18)'
+                : 'none',
+            }}
           >
-            <Settings size={18} className="transition-transform duration-200 group-hover:rotate-45 group-focus-visible:rotate-45" />
+            <Settings
+              size={18}
+              className="transition-transform duration-200"
+              style={{ transform: settingsButtonHover ? 'rotate(20deg)' : 'rotate(0deg)' }}
+            />
           </button>
         </div>
       )}
@@ -623,6 +655,26 @@ const App: React.FC = () => {
           onCancel={() => setCurrentView('NOW')} 
         />
       )}
+
+      <AppModal
+        open={recordGuardModalOpen}
+        icon={<Compass size={22} />}
+        title="먼저 방향이 필요해요"
+        description={
+          <>
+            기록은 현재 방향 위에서만 남길 수 있어요.
+            <br />
+            새 방향을 시작한 뒤 기록을 이어가 주세요.
+          </>
+        }
+        confirmLabel="방향 시작하러 가기"
+        cancelLabel="닫기"
+        onClose={() => setRecordGuardModalOpen(false)}
+        onConfirm={() => {
+          setRecordGuardModalOpen(false);
+          setCurrentView('DIRECTION');
+        }}
+      />
 
       {/* Floating Bottom Navigation */}
       {currentView !== 'WRITE_LOG' && currentView !== 'SETTINGS' && (
