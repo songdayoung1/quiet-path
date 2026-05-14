@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.config.Customizer;
@@ -51,6 +52,11 @@ public class SecurityConfig {
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
                     "/api/v1/auth/**"
+                ).permitAll()
+                .requestMatchers(
+                    HttpMethod.GET,
+                    "/api/v1/feed",
+                    "/api/v1/feed/weekly-top3"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

@@ -1,11 +1,14 @@
 package kr.co.quietpath.api.feed.service;
 
+import kr.co.quietpath.api.common.error.ApiException;
+import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.feed.dto.response.OwnerSummary;
 import kr.co.quietpath.api.feed.dto.response.FeedItem;
 import kr.co.quietpath.api.feed.dto.response.FeedResponse;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Item;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Response;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Window;
+import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
@@ -25,6 +28,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -37,36 +41,36 @@ public class FeedService {
     private static final int TOP_LIMIT = 3;
     private static final int MAX_FEED_SIZE = 50;
     private static final String VISIBILITY_PUBLIC = "PUBLIC";
+    private static final Set<String> ALLOWED_CATEGORY_CODES = Set.of("job", "study", "workout", "hobby", "cert");
 
     private final ReactionRepository reactionRepository;
+    private final CommentRepository commentRepository;
     private final PathRepository pathRepository;
     private final UserRepository userRepository;
     private final RecordRepository recordRepository;
 
-    public FeedResponse getFeed(Long userId, int size, String cursor) {
+    public FeedResponse getFeed(Long userId, String category, int size, String cursor) {
         int pageSize = normalizeSize(size);
-        LocalDateTime cursorCreatedAt = null;
+        String normalizedCategory = normalizeCategory(category);
+        LocalDateTime cursorSharedAt = null;
         Long cursorId = null;
         if (cursor != null && !cursor.isBlank()) {
             String[] parts = cursor.split("_");
             if (parts.length != 2) {
-                throw new kr.co.quietpath.api.common.error.ApiException(
-                    kr.co.quietpath.api.common.error.ErrorCode.INVALID_CURSOR
-                );
+                throw new ApiException(ErrorCode.INVALID_CURSOR);
             }
             try {
-                cursorCreatedAt = LocalDateTime.parse(parts[0], DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+                cursorSharedAt = LocalDateTime.parse(parts[0], DateTimeFormatter.ISO_LOCAL_DATE_TIME);
                 cursorId = Long.parseLong(parts[1]);
             } catch (Exception e) {
-                throw new kr.co.quietpath.api.common.error.ApiException(
-                    kr.co.quietpath.api.common.error.ErrorCode.INVALID_CURSOR
-                );
+                throw new ApiException(ErrorCode.INVALID_CURSOR);
             }
         }
 
         List<Record> records = recordRepository.findPublicFeedRecords(
             VISIBILITY_PUBLIC,
-            cursorCreatedAt,
+            normalizedCategory,
+            cursorSharedAt,
             cursorId,
             org.springframework.data.domain.PageRequest.of(0, pageSize + 1)
         );
@@ -92,8 +96,14 @@ public class FeedService {
         reactionRepository.countByRecordIds(recordIds)
             .forEach(row -> reactionCountMap.put(row.getRecordId(), row.getReactionCount()));
 
-        Set<Long> reactedRecordIds = reactionRepository.findReactedRecordIds(userId, recordIds).stream()
-            .collect(Collectors.toSet());
+        Map<Long, Long> commentCountMap = new HashMap<>();
+        commentRepository.countByRecordIds(recordIds)
+            .forEach(row -> commentCountMap.put(row.getRecordId(), row.getCommentCount()));
+
+        Set<Long> reactedRecordIds = userId == null
+            ? Set.of()
+            : reactionRepository.findReactedRecordIds(userId, recordIds).stream()
+                .collect(Collectors.toSet());
 
         List<FeedItem> items = new ArrayList<>();
         for (Record record : records) {
@@ -113,15 +123,18 @@ public class FeedService {
                 .content(resolveContent(record))
                 .status(path != null ? mapStatus(path.getStatus()) : null)
                 .owner(ownerSummary)
+                .categoryCode(record.getCategoryCode())
                 .reactionCount(reactionCount)
+                .commentCount(commentCountMap.getOrDefault(record.getId(), 0L))
                 .isReacted(reactedRecordIds.contains(record.getId()))
+                .sharedAt(formatDateTime(record.getSharedAt()))
                 .createdAt(formatDateTime(record.getCreatedAt()))
                 .build());
         }
 
         Record lastRecord = records.get(records.size() - 1);
         String nextCursor = hasNext
-            ? formatDateTime(lastRecord.getCreatedAt()) + "_" + lastRecord.getId()
+            ? formatDateTime(lastRecord.getSharedAt()) + "_" + lastRecord.getId()
             : null;
 
         return FeedResponse.builder()
@@ -175,7 +188,7 @@ public class FeedService {
             : userRepository.findByIdIn(ownerIds).stream()
                 .collect(Collectors.toMap(User::getId, user -> user));
 
-        Set<Long> reactedPathIds = pathIds.isEmpty()
+        Set<Long> reactedPathIds = pathIds.isEmpty() || userId == null
             ? Set.of()
             : reactionRepository.findReactedPathIds(userId, pathIds).stream()
                 .collect(Collectors.toSet());
@@ -238,10 +251,23 @@ public class FeedService {
         return dateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
     }
 
+    private String normalizeCategory(String category) {
+        if (category == null || category.isBlank() || "all".equalsIgnoreCase(category)) {
+            return null;
+        }
+
+        String normalized = category.trim().toLowerCase(Locale.ROOT);
+        if (!ALLOWED_CATEGORY_CODES.contains(normalized)) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST);
+        }
+        return normalized;
+    }
+
     private int normalizeSize(int size) {
         if (size <= 0) {
             return 20;
         }
         return Math.min(size, MAX_FEED_SIZE);
     }
+
 }

@@ -45,16 +45,19 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
         join fetch r.path p
         join fetch r.user u
         where r.visibility = :visibility
+          and r.sharedAt is not null
+          and (:categoryCode is null or r.categoryCode = :categoryCode)
           and (
-            :cursorCreatedAt is null
-            or (r.createdAt < :cursorCreatedAt)
-            or (r.createdAt = :cursorCreatedAt and r.id < :cursorId)
+            :cursorSharedAt is null
+            or (r.sharedAt < :cursorSharedAt)
+            or (r.sharedAt = :cursorSharedAt and r.id < :cursorId)
           )
-        order by r.createdAt desc, r.id desc
+        order by r.sharedAt desc, r.id desc
         """)
     List<Record> findPublicFeedRecords(
         @Param("visibility") String visibility,
-        @Param("cursorCreatedAt") LocalDateTime cursorCreatedAt,
+        @Param("categoryCode") String categoryCode,
+        @Param("cursorSharedAt") LocalDateTime cursorSharedAt,
         @Param("cursorId") Long cursorId,
         Pageable pageable
     );

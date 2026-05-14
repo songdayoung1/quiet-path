@@ -624,7 +624,7 @@ const App: React.FC = () => {
         )}
         {currentView === 'COMMUNITY' && (
            <CommunityView 
-              records={state.records} 
+              accessToken={state.auth?.token}
               isGuest={!state.auth?.isLoggedIn}
               onLoginClick={() => setCurrentView('ACCOUNT_CONNECT')}
            />

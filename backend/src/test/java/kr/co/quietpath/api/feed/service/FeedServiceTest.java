@@ -1,6 +1,8 @@
 package kr.co.quietpath.api.feed.service;
 
+import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Response;
+import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
@@ -19,16 +21,21 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class FeedServiceTest {
 
     @Mock
     private ReactionRepository reactionRepository;
+
+    @Mock
+    private CommentRepository commentRepository;
 
     @Mock
     private RecordRepository recordRepository;
@@ -97,12 +104,12 @@ class FeedServiceTest {
     }
 
     @Test
-    void feed_cursorPaginationAndOrdering() {
-        Record r1 = buildRecord(101L, LocalDateTime.of(2026, 2, 8, 9, 12));
-        Record r2 = buildRecord(102L, LocalDateTime.of(2026, 2, 8, 8, 0));
-        Record r3 = buildRecord(103L, LocalDateTime.of(2026, 2, 7, 22, 0));
+    void feed_cursorPaginationAndOrderingUsesSharedAt() {
+        Record r1 = buildRecord(101L, "study", LocalDateTime.of(2026, 2, 8, 8, 40), LocalDateTime.of(2026, 2, 8, 9, 12));
+        Record r2 = buildRecord(102L, "study", LocalDateTime.of(2026, 2, 8, 7, 10), LocalDateTime.of(2026, 2, 8, 8, 0));
+        Record r3 = buildRecord(103L, "study", LocalDateTime.of(2026, 2, 7, 21, 5), LocalDateTime.of(2026, 2, 7, 22, 0));
 
-        when(recordRepository.findPublicFeedRecords(eq("PUBLIC"), any(), any(), any()))
+        when(recordRepository.findPublicFeedRecords(eq("PUBLIC"), eq(null), any(), any(), any()))
             .thenReturn(List.of(r1, r2, r3));
 
         when(reactionRepository.countByRecordIds(List.of(101L, 102L)))
@@ -110,29 +117,69 @@ class FeedServiceTest {
                 reactionCount(101L, 3L),
                 reactionCount(102L, 1L)
             ));
+        when(commentRepository.countByRecordIds(List.of(101L, 102L)))
+            .thenReturn(List.of(
+                commentCount(101L, 2L),
+                commentCount(102L, 5L)
+            ));
 
         when(reactionRepository.findReactedRecordIds(99L, List.of(101L, 102L)))
             .thenReturn(List.of());
 
-        var response = feedService.getFeed(99L, 2, null);
+        var response = feedService.getFeed(99L, null, 2, null);
 
         assertEquals(2, response.getItems().size());
         assertEquals(101L, response.getItems().get(0).getRecordId());
         assertEquals(102L, response.getItems().get(1).getRecordId());
+        assertEquals(2L, response.getItems().get(0).getCommentCount());
+        assertEquals("study", response.getItems().get(0).getCategoryCode());
         assertEquals(true, response.isHasNext());
         assertEquals("2026-02-08T08:00:00_102", response.getNextCursor());
     }
 
     @Test
     void feed_privateNotExposed() {
-        when(recordRepository.findPublicFeedRecords(eq("PUBLIC"), any(), any(), any()))
+        when(recordRepository.findPublicFeedRecords(eq("PUBLIC"), eq(null), any(), any(), any()))
             .thenReturn(List.of());
 
-        var response = feedService.getFeed(99L, 20, null);
+        var response = feedService.getFeed(99L, null, 20, null);
 
-        verify(recordRepository).findPublicFeedRecords(eq("PUBLIC"), any(), any(), any());
+        verify(recordRepository).findPublicFeedRecords(eq("PUBLIC"), eq(null), any(), any(), any());
         assertEquals(0, response.getItems().size());
         assertEquals(false, response.isHasNext());
+    }
+
+    @Test
+    void feedReadWithoutUserDoesNotLookupReactionState() {
+        Record record = buildRecord(201L, "hobby", LocalDateTime.of(2026, 2, 8, 8, 40), LocalDateTime.of(2026, 2, 8, 9, 12));
+
+        when(recordRepository.findPublicFeedRecords(eq("PUBLIC"), eq("hobby"), any(), any(), any()))
+            .thenReturn(List.of(record));
+        when(reactionRepository.countByRecordIds(List.of(201L)))
+            .thenReturn(List.of(reactionCount(201L, 4L)));
+        when(commentRepository.countByRecordIds(List.of(201L)))
+            .thenReturn(List.of(commentCount(201L, 1L)));
+
+        var response = feedService.getFeed(null, "hobby", 20, null);
+
+        assertEquals(1, response.getItems().size());
+        assertEquals(false, response.getItems().get(0).isReacted());
+        verify(reactionRepository, never()).findReactedRecordIds(any(), any());
+    }
+
+    @Test
+    void feed_categoryFilterPassesNormalizedCategoryCode() {
+        when(recordRepository.findPublicFeedRecords(eq("PUBLIC"), eq("workout"), any(), any(), any()))
+            .thenReturn(List.of());
+
+        feedService.getFeed(99L, "WORKOUT", 20, null);
+
+        verify(recordRepository).findPublicFeedRecords(eq("PUBLIC"), eq("workout"), any(), any(), any());
+    }
+
+    @Test
+    void feed_invalidCategoryRejected() {
+        assertThrows(ApiException.class, () -> feedService.getFeed(99L, "invalid", 20, null));
     }
 
     private ReactionRepository.WeeklyTop3Projection projection(Long pathId, Long reactionCount, LocalDateTime updatedAt) {
@@ -168,13 +215,13 @@ class FeedServiceTest {
         return path;
     }
 
-    private Record buildRecord(Long recordId, LocalDateTime createdAt) {
+    private Record buildRecord(Long recordId, String categoryCode, LocalDateTime createdAt, LocalDateTime sharedAt) {
         User user = buildUser(1L);
         Path path = buildPath(201L, 1L, createdAt);
         Record record = Record.builder()
             .user(user)
             .path(path)
-            .categoryCode("DEFAULT")
+            .categoryCode(categoryCode)
             .recordDate(java.time.LocalDate.now())
             .sceneText("오늘은 10분 명상을 했다")
             .oneWordText(null)
@@ -183,6 +230,7 @@ class FeedServiceTest {
             .build();
         setField(record, "id", recordId);
         setField(record, "createdAt", createdAt);
+        setField(record, "sharedAt", sharedAt);
         return record;
     }
 
@@ -195,6 +243,20 @@ class FeedServiceTest {
 
             @Override
             public Long getReactionCount() {
+                return count;
+            }
+        };
+    }
+
+    private CommentRepository.RecordCommentCountProjection commentCount(Long recordId, Long count) {
+        return new CommentRepository.RecordCommentCountProjection() {
+            @Override
+            public Long getRecordId() {
+                return recordId;
+            }
+
+            @Override
+            public Long getCommentCount() {
                 return count;
             }
         };
