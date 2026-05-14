@@ -7,6 +7,7 @@ import { CharacterTone } from '../components/WaterDropCharacter';
 import { AlbumTab } from '../components/records/AlbumTab';
 import { RecordsListTab } from '../components/records/RecordsListTab';
 import { CalendarTab } from '../components/records/CalendarTab';
+import { getThemePalette, useResolvedTheme } from '../theme';
 
 interface RecordsViewProps {
   records: RecordType[];
@@ -22,6 +23,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   currentDirection,
   onUpdateRecord,
 }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<RecordType | null>(null);
   const [activeTab, setActiveTab] = useState<'album' | 'records' | 'calendar'>('album');
 
@@ -111,15 +114,16 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   if (selectedRecordForDetail) {
     const record = selectedRecordForDetail;
     return (
-      <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen bg-[#F5F7FA]">
+      <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen">
         <div className="px-4 flex justify-between items-center mb-6">
           <button
             onClick={() => setSelectedRecordForDetail(null)}
-            className="text-mist-500 hover:text-mist-600 transition-colors p-2 text-sm font-bold"
+            className="transition-colors p-2 text-sm font-bold"
+            style={{ color: palette.mutedText }}
           >
             닫기
           </button>
-          <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest">
+          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>
             {new Date(record.timestamp).toLocaleDateString()}
           </span>
           <div className="w-10" />
@@ -131,16 +135,16 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               <MoodSticker code={record.moodCode} className="mb-4 scale-125 hover:scale-125 pointer-events-none" />
             )}
             {record.action && (
-              <h2 className="text-2xl font-bold text-mist-600 mt-2 break-keep">{record.action}</h2>
+              <h2 className="text-2xl font-bold mt-2 break-keep" style={{ color: palette.strongText }}>{record.action}</h2>
             )}
-            <div className="mt-4 flex items-center justify-center gap-2 text-[11px] text-mist-400">
+            <div className="mt-4 flex items-center justify-center gap-2 text-[11px]" style={{ color: palette.mutedText }}>
               {record.isShared && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 shadow-sm border border-mist-100">
+                <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 shadow-sm border" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
                   <span className="text-point-400">●</span> 공유됨
                 </span>
               )}
               {record.isPinned && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 shadow-sm border border-mist-100">
+                <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 shadow-sm border" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
                   <Pin size={12} className="text-mist-400" /> 기억할 장면
                 </span>
               )}
@@ -148,27 +152,27 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           </div>
 
           {record.imageUrl && (
-            <div className="w-full rounded-3xl overflow-hidden shadow-sm border border-mist-100">
+            <div className="w-full rounded-3xl overflow-hidden shadow-sm border" style={{ borderColor: palette.border }}>
               <img src={record.imageUrl} alt="Scene" className="w-full object-cover aspect-[4/5] max-h-96" />
             </div>
           )}
 
           {record.oneWordText && (
-            <div className="bg-white/80 p-6 rounded-3xl shadow-sm border border-white">
+            <div className="p-6 rounded-3xl shadow-sm border" style={{ background: palette.cardBg, borderColor: palette.border }}>
               <p className="text-xs text-point-500 font-bold mb-3 uppercase tracking-wide">오늘을 한 단어로 표현한다면?</p>
-              <p className="text-mist-600 text-[15px] leading-relaxed whitespace-pre-line">{record.oneWordText}</p>
+              <p className="text-[15px] leading-relaxed whitespace-pre-line" style={{ color: palette.strongText }}>{record.oneWordText}</p>
             </div>
           )}
 
           {record.tomorrowText && (
-            <div className="bg-white/50 p-6 rounded-3xl shadow-sm border border-white">
-              <p className="text-xs text-mist-400 font-bold mb-3 uppercase tracking-wide">내일의 한 걸음</p>
-              <p className="text-mist-600 text-[14px] leading-relaxed">{record.tomorrowText}</p>
+            <div className="p-6 rounded-3xl shadow-sm border" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
+              <p className="text-xs font-bold mb-3 uppercase tracking-wide" style={{ color: palette.faintText }}>내일의 한 걸음</p>
+              <p className="text-[14px] leading-relaxed" style={{ color: palette.strongText }}>{record.tomorrowText}</p>
             </div>
           )}
 
           <div className="text-center mt-6 mb-4">
-            <p className="text-[10px] text-mist-300 tracking-wide">
+            <p className="text-[10px] tracking-wide" style={{ color: palette.faintText }}>
               이 기록은 당신의 궤적에 안전하게 보관되어 있습니다.
             </p>
           </div>
@@ -187,26 +191,28 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
       <div className="px-4 mb-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-mist-600 tracking-tight">
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: palette.strongText }}>
               {targetYear}년 {targetMonth + 1}월의 궤적
             </h1>
-            <p className="text-mist-400 text-sm mt-1">이번 달의 기록들을 돌아봅니다.</p>
+            <p className="text-sm mt-1" style={{ color: palette.mutedText }}>이번 달의 기록들을 돌아봅니다.</p>
           </div>
-          <div className="flex items-center gap-1 rounded-full bg-white/70 px-2 py-2 shadow-sm border border-white/70">
+          <div className="flex items-center gap-1 rounded-full px-2 py-2 shadow-sm border" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
             <button
               onClick={() => canGoPrevMonth && setSelectedMonthDate(new Date(targetYear, targetMonth - 1, 1))}
               disabled={!canGoPrevMonth}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-mist-500 hover:bg-mist-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="w-8 h-8 rounded-full flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              style={{ color: palette.mutedText }}
             >
               <ChevronLeft size={16} />
             </button>
-            <span className="text-[11px] font-bold text-mist-500 tracking-wide min-w-[40px] text-center">
+            <span className="text-[11px] font-bold tracking-wide min-w-[40px] text-center" style={{ color: palette.mutedText }}>
               {targetMonth + 1}월
             </span>
             <button
               onClick={() => canGoNextMonth && setSelectedMonthDate(new Date(targetYear, targetMonth + 1, 1))}
               disabled={!canGoNextMonth}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-mist-500 hover:bg-mist-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="w-8 h-8 rounded-full flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              style={{ color: palette.mutedText }}
             >
               <ChevronRight size={16} />
             </button>
@@ -217,9 +223,9 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
       <div className="px-4 mb-6">
         <div className="grid grid-cols-3 gap-3">
           {/* Records Card */}
-          <div className="bg-white/70 p-4 rounded-[2rem] border border-white shadow-sm flex flex-col items-center min-h-[105px]">
+          <div className="p-4 rounded-[2rem] border shadow-sm flex flex-col items-center min-h-[105px]" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
             <div className="h-6 flex items-center mb-1">
-              <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest text-center">Records</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-center" style={{ color: palette.faintText }}>Records</span>
             </div>
             <div className="flex-1 flex items-center justify-center w-full">
               <span className="text-3xl font-bold text-point-500 leading-none">{monthlyRecords.length}</span>
@@ -227,15 +233,15 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           </div>
           
           {/* Photos Card */}
-          <div className="bg-white/70 p-4 rounded-[2rem] border border-white shadow-sm flex flex-col items-center min-h-[105px]">
+          <div className="p-4 rounded-[2rem] border shadow-sm flex flex-col items-center min-h-[105px]" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
             <div className="h-6 flex items-center mb-1">
-              <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest text-center">Photos</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-center" style={{ color: palette.faintText }}>Photos</span>
             </div>
             <div className="flex-1 flex items-center justify-center w-full">
               <div className="relative flex items-baseline">
-                <span className="text-3xl font-bold text-mist-600 leading-none">{photoRecords.length}</span>
+                <span className="text-3xl font-bold leading-none" style={{ color: palette.strongText }}>{photoRecords.length}</span>
                 {photoCoverage > 0 && (
-                  <span className="absolute left-full ml-1 bottom-0.5 text-[10px] text-mist-300 font-bold whitespace-nowrap">
+                  <span className="absolute left-full ml-1 bottom-0.5 text-[10px] font-bold whitespace-nowrap" style={{ color: palette.faintText }}>
                     {photoCoverage}%
                   </span>
                 )}
@@ -244,9 +250,9 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           </div>
 
           {/* Top Mood Card */}
-          <div className="bg-white/70 p-4 rounded-[2rem] border border-white shadow-sm flex flex-col items-center min-h-[105px]">
+          <div className="p-4 rounded-[2rem] border shadow-sm flex flex-col items-center min-h-[105px]" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
             <div className="h-6 flex items-center mb-1">
-              <span className="text-[10px] font-bold text-mist-400 uppercase tracking-widest text-center">Top Mood</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-center" style={{ color: palette.faintText }}>Top Mood</span>
             </div>
             <div className="flex-1 flex items-center justify-center w-full">
               {topMoods.length > 0 ? (
@@ -254,7 +260,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
                   <MoodSticker key={code} code={code} className="scale-90 opacity-100" />
                 ))
               ) : (
-                <span className="text-sm text-mist-300">-</span>
+                <span className="text-sm" style={{ color: palette.faintText }}>-</span>
               )}
             </div>
           </div>
@@ -263,7 +269,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
       {/* ── Tab Bar ── */}
       <div className="px-4 mb-6">
-        <div className="bg-white/70 rounded-[2rem] p-1.5 border border-white shadow-sm grid grid-cols-3 gap-1">
+        <div className="rounded-[2rem] p-1.5 border shadow-sm grid grid-cols-3 gap-1" style={{ background: palette.tabBg, borderColor: palette.border }}>
           {(
             [
               { id: 'album', icon: <ImageIcon size={15} />, label: '앨범' },
@@ -274,11 +280,12 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`rounded-full px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === id
-                  ? 'bg-white text-point-500 shadow-sm'
-                  : 'text-mist-400 hover:text-mist-600'
-              }`}
+              className="rounded-full px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-1.5"
+              style={{
+                background: activeTab === id ? palette.activeTabBg : 'transparent',
+                color: activeTab === id ? palette.activeTabText : palette.mutedText,
+                boxShadow: activeTab === id ? palette.shadow : 'none',
+              }}
             >
               {icon}
               {label}

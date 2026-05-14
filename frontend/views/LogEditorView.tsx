@@ -5,6 +5,7 @@ import { SoftButton, AutoTextArea, MoodSticker, WaterDropOverlay } from '../comp
 import { X, Check, Image as ImageIcon } from 'lucide-react';
 import { MOOD_STICKERS } from '../constants';
 import { CharacterTone } from '../components/WaterDropCharacter';
+import { getThemePalette, useResolvedTheme } from '../theme';
 
 interface LogEditorViewProps {
   state: AppState;
@@ -14,6 +15,8 @@ interface LogEditorViewProps {
 }
 
 export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onCancel, onStartDirection }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
   const [action, setAction] = useState(''); // 오늘의 장면
   const [oneWordText, setOneWordText] = useState('');
   const [tomorrowText, setTomorrowText] = useState('');
@@ -68,29 +71,29 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
 
   if (!currentDirection) {
     return (
-      <div className="absolute inset-0 z-50 flex flex-col animate-fade-in bg-[#E8EDF2]/95 backdrop-blur-xl">
+      <div className="absolute inset-0 z-50 flex flex-col animate-fade-in backdrop-blur-xl" style={{ background: theme === 'dark' ? 'rgba(15,23,42,0.95)' : 'rgba(232,237,242,0.95)' }}>
         <div className="sticky top-0 bg-transparent p-4 flex justify-between items-center z-10 pt-6">
-          <button onClick={onCancel} className="p-3 rounded-full bg-white/50 hover:bg-white text-mist-400 transition-colors shadow-sm">
+          <button onClick={onCancel} className="p-3 rounded-full transition-colors shadow-sm" style={{ background: palette.pillBg, color: palette.mutedText, border: `1px solid ${palette.pillBorder}` }}>
             <X size={20} />
           </button>
           <div className="flex flex-col items-center">
              <span className="text-point-500 text-[10px] font-bold tracking-[0.2em] uppercase">Direction Required</span>
-             <span className="text-mist-400 text-[10px]">먼저 방향이 필요해요</span>
+             <span className="text-[10px]" style={{ color: palette.faintText }}>먼저 방향이 필요해요</span>
           </div>
           <div className="w-10"></div>
         </div>
 
         <div className="flex-1 px-6 flex items-center justify-center">
-          <div className="w-full max-w-sm rounded-[2rem] border border-white/70 bg-white/85 p-7 text-center shadow-sm">
-            <h2 className="text-lg font-bold text-mist-600 leading-tight">기록하려면 먼저 방향을 시작해 주세요.</h2>
-            <p className="mt-3 text-sm leading-relaxed text-mist-400">
+          <div className="w-full max-w-sm rounded-[2rem] border p-7 text-center shadow-sm" style={{ background: palette.cardBgStrong, borderColor: palette.border }}>
+            <h2 className="text-lg font-bold leading-tight" style={{ color: palette.strongText }}>기록하려면 먼저 방향을 시작해 주세요.</h2>
+            <p className="mt-3 text-sm leading-relaxed" style={{ color: palette.mutedText }}>
               지금은 쉬는 상태예요. 원할 때 새 방향을 만들고 다시 기록을 이어갈 수 있어요.
             </p>
             <div className="mt-6 flex flex-col gap-3">
               <SoftButton onClick={onStartDirection} className="shadow-lg shadow-point-200/40">
                 <span>새 방향 시작하기</span>
               </SoftButton>
-              <SoftButton variant="secondary" onClick={onCancel} className="!bg-white/60">
+              <SoftButton variant="secondary" onClick={onCancel} style={{ background: palette.cardBgSoft, borderColor: palette.border, color: palette.strongText }}>
                 <span>돌아가기</span>
               </SoftButton>
             </div>
@@ -101,15 +104,15 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
   }
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col animate-fade-in bg-[#E8EDF2]/95 backdrop-blur-xl">
+    <div className="absolute inset-0 z-50 flex flex-col animate-fade-in backdrop-blur-xl" style={{ background: theme === 'dark' ? 'rgba(15,23,42,0.95)' : 'rgba(232,237,242,0.95)' }}>
       {/* Header */}
       <div className="sticky top-0 bg-transparent p-4 flex justify-between items-center z-10 pt-6">
-        <button onClick={onCancel} className="p-3 rounded-full bg-white/50 hover:bg-white text-mist-400 transition-colors shadow-sm">
+        <button onClick={onCancel} className="p-3 rounded-full transition-colors shadow-sm" style={{ background: palette.pillBg, color: palette.mutedText, border: `1px solid ${palette.pillBorder}` }}>
           <X size={20} />
         </button>
         <div className="flex flex-col items-center">
              <span className="text-point-500 text-[10px] font-bold tracking-[0.2em] uppercase">Today's Log</span>
-             <span className="text-mist-400 text-[10px]">새로운 기록</span>
+             <span className="text-[10px]" style={{ color: palette.faintText }}>새로운 기록</span>
         </div>
         <div className="w-10"></div>
       </div>
@@ -118,15 +121,15 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
         
         {/* Context: Current Direction */}
         <div className="text-center pb-2">
-           <h2 className="text-sm text-mist-500 font-medium">
+           <h2 className="text-sm font-medium" style={{ color: palette.mutedText }}>
              {currentDirection.question}
            </h2>
         </div>
 
         {/* 1. Mood Sticker Picker */}
         <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
-           <label className="block text-[11px] font-bold text-mist-400 mb-3 ml-1 text-center uppercase tracking-wide">오늘의 기분</label>
-           <div className="flex flex-wrap justify-center gap-2 bg-white/70 p-4 rounded-3xl border border-white/80 shadow-sm">
+           <label className="block text-[11px] font-bold mb-3 ml-1 text-center uppercase tracking-wide" style={{ color: palette.faintText }}>오늘의 기분</label>
+           <div className="flex flex-wrap justify-center gap-2 p-4 rounded-3xl border shadow-sm" style={{ background: palette.cardBg, borderColor: palette.border }}>
               {MOOD_STICKERS.map(s => (
                 <MoodSticker 
                   key={s.code} 
@@ -140,7 +143,7 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
         </div>
 
         {/* 2. Scene (Action) */}
-        <div className="animate-slide-up bg-white/90 rounded-3xl p-6 shadow-sm border border-white/50" style={{ animationDelay: '0.2s' }}>
+        <div className="animate-slide-up rounded-3xl p-6 shadow-sm border" style={{ animationDelay: '0.2s', background: palette.cardBgStrong, borderColor: palette.border }}>
           <label className="block text-sm text-point-600 mb-4 ml-1 font-bold leading-relaxed">
             오늘의 장면을 남겨볼까요?
           </label>
@@ -150,12 +153,13 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
             value={action}
             onChange={(e) => setAction(e.target.value)}
             autoFocus
-            className="!bg-mist-50/50 !p-4 !border-none !rounded-xl focus:!ring-1 focus:!ring-point-200 text-sm placeholder:text-mist-300/80 transition-shadow"
+            className="!p-4 !rounded-xl focus:!ring-1 focus:!ring-point-200 text-sm transition-shadow"
+            style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}`, color: palette.strongText } as React.CSSProperties}
           />
         </div>
 
         {/* 3. One Word */}
-        <div className="animate-slide-up bg-white/90 rounded-3xl p-6 shadow-sm border border-white/50" style={{ animationDelay: '0.3s' }}>
+        <div className="animate-slide-up rounded-3xl p-6 shadow-sm border" style={{ animationDelay: '0.3s', background: palette.cardBgStrong, borderColor: palette.border }}>
           <label className="block text-sm text-point-600 mb-4 ml-1 font-bold leading-relaxed">
             오늘을 한 단어로 표현한다면?
           </label>
@@ -164,29 +168,31 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
             placeholder="다짐, 평온, 위로 등..."
             value={oneWordText}
             onChange={(e) => setOneWordText(e.target.value)}
-            className="w-full bg-mist-50/50 p-4 rounded-xl border-none focus:ring-1 focus:ring-point-200 transition-shadow text-sm placeholder:text-mist-300/80 outline-none text-mist-600"
+            className="w-full p-4 rounded-xl focus:ring-1 focus:ring-point-200 transition-shadow text-sm outline-none"
+            style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}`, color: palette.strongText }}
           />
         </div>
 
         {/* 4. Tomorrow Step & Image */}
-        <div className="animate-slide-up bg-white/90 rounded-3xl p-6 shadow-sm border border-white/50 flex flex-col gap-6" style={{ animationDelay: '0.4s' }}>
+        <div className="animate-slide-up rounded-3xl p-6 shadow-sm border flex flex-col gap-6" style={{ animationDelay: '0.4s', background: palette.cardBgStrong, borderColor: palette.border }}>
              
              <div>
-                <label className="block text-xs text-mist-500 font-bold mb-3 ml-1">내일은 무엇을 해볼까요? <span className="text-mist-300 font-normal">(선택)</span></label>
+                <label className="block text-xs font-bold mb-3 ml-1" style={{ color: palette.mutedText }}>내일은 무엇을 해볼까요? <span style={{ color: palette.faintText, fontWeight: 400 }}>(선택)</span></label>
                 <input 
                     type="text"
                     placeholder="내일의 작은 목표나 계획을 적어보세요."
                     value={tomorrowText}
                     onChange={(e) => setTomorrowText(e.target.value)}
-                    className="w-full bg-mist-50/50 p-4 rounded-xl border-none focus:ring-1 focus:ring-mist-200 text-sm placeholder:text-mist-300/80 outline-none text-mist-600 transition-shadow"
+                    className="w-full p-4 rounded-xl focus:ring-1 focus:ring-mist-200 text-sm outline-none transition-shadow"
+                    style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}`, color: palette.strongText }}
                 />
              </div>
 
              <div>
-                <label className="block text-xs text-mist-500 font-bold mb-3 ml-1">오늘의 사진 한 장 <span className="text-mist-300 font-normal">(선택)</span></label>
+                <label className="block text-xs font-bold mb-3 ml-1" style={{ color: palette.mutedText }}>오늘의 사진 한 장 <span style={{ color: palette.faintText, fontWeight: 400 }}>(선택)</span></label>
                 {imageUrl ? (
                     <div className="relative group w-full aspect-video">
-                        <img src={imageUrl} alt="Uploaded scene" className="w-full h-full object-cover rounded-xl shadow-sm border border-mist-100" />
+                        <img src={imageUrl} alt="Uploaded scene" className="w-full h-full object-cover rounded-xl shadow-sm border" style={{ borderColor: palette.border }} />
                         <button 
                             onClick={() => setImageUrl('')}
                             className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all shadow-md"
@@ -197,7 +203,8 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
                 ) : (
                     <button 
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-full flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-mist-200 rounded-xl text-mist-400 hover:text-point-500 hover:border-point-300 hover:bg-point-50/30 transition-all bg-mist-50/50"
+                        className="w-full flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed rounded-xl hover:text-point-500 hover:border-point-300 transition-all"
+                        style={{ borderColor: palette.border, color: palette.mutedText, background: palette.cardBgSoft }}
                     >
                         <ImageIcon size={24} />
                         <span className="text-xs font-medium">사진 첨부하기</span>
@@ -217,7 +224,15 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
       </div>
 
       {/* Footer Action */}
-      <div className="absolute bottom-0 left-0 w-full flex justify-center bg-gradient-to-t from-[#E8EDF2] via-[#E8EDF2]/90 to-transparent z-20 pb-[env(safe-area-inset-bottom)]">
+      <div
+        className="absolute bottom-0 left-0 w-full flex justify-center z-20 pb-[env(safe-area-inset-bottom)]"
+        style={{
+          backgroundImage:
+            theme === 'dark'
+              ? 'linear-gradient(to top, rgba(15,23,42,1), rgba(15,23,42,0.92), transparent)'
+              : 'linear-gradient(to top, rgba(232,237,242,1), rgba(232,237,242,0.9), transparent)',
+        }}
+      >
         <div className="w-full max-w-md px-6 pb-8 pt-8">
             <SoftButton
               onClick={handleSubmit}

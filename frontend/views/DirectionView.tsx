@@ -6,6 +6,7 @@ import { CATEGORIES } from '../constants';
 import { DirectionSetupForm } from '../components/DirectionSetupForm';
 import { WaterDropCharacter } from '../components/WaterDropCharacter';
 import { AppModal } from '../components/AppModal';
+import { getThemePalette, useResolvedTheme } from '../theme';
 
 interface DirectionViewProps {
   currentDirection: Direction | null;
@@ -16,6 +17,8 @@ interface DirectionViewProps {
 }
 
 export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, records, onStartDirection, onFinishDirection, onHistoryClick }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
   const [isEditing, setIsEditing] = useState(false);
   const [finishModalOpen, setFinishModalOpen] = useState(false);
   const [showCategorySelect, setShowCategorySelect] = useState(false);
@@ -211,20 +214,28 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
       </div>
 
       <div className="relative px-2">
-        <div className="absolute top-4 left-6 bottom-0 w-[2px] bg-gradient-to-b from-mist-200/50 to-transparent z-0"></div>
+        <div
+          className="absolute top-4 left-6 bottom-0 w-[2px] z-0"
+          style={{
+            backgroundImage:
+              theme === 'dark'
+                ? 'linear-gradient(to bottom, rgba(148,163,184,0.30), transparent)'
+                : 'linear-gradient(to bottom, rgba(203,213,225,0.50), transparent)',
+          }}
+        ></div>
 
         <div className="relative z-10 mb-8">
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-12 h-12 rounded-[1.25rem] bg-white flex items-center justify-center text-point-500 shadow-sm border border-mist-100">
+            <div className="w-12 h-12 rounded-[1.25rem] flex items-center justify-center text-point-500 shadow-sm border" style={{ background: palette.cardBgStrong, borderColor: palette.border }}>
               <Compass size={24} />
             </div>
             <div>
               <span className="text-[10px] font-bold text-point-500 uppercase tracking-widest block mb-1">Current Path</span>
-              <span className="text-[15px] text-mist-600 font-bold tracking-wide">지금의 방향</span>
+              <span className="text-[15px] font-bold tracking-wide" style={{ color: palette.strongText }}>지금의 방향</span>
             </div>
           </div>
 
-          <Card className="ml-5 relative !bg-white/90 backdrop-blur-md shadow-md border border-white/50 !p-5">
+          <Card className="ml-5 relative backdrop-blur-md shadow-md !p-5" style={{ background: palette.cardBgStrong, borderColor: palette.border }}>
             {currentDirection ? (
               <div className="flex flex-col">
                 {/* 1. Header (Category + Title + Question) */}
@@ -239,43 +250,43 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                         {currentDirection.categoryLabel}
                       </span>
                     )}
-                    <h2 className="text-[19px] text-mist-600 font-bold leading-tight break-keep">
+                    <h2 className="text-[19px] font-bold leading-tight break-keep" style={{ color: palette.strongText }}>
                       {currentDirection.description || '지금의 방향'}
                     </h2>
                   </div>
                 </div>
                 
-                <p className="text-mist-500 text-[13px] font-medium leading-relaxed whitespace-pre-line bg-mist-50/70 border border-mist-100/50 py-3 px-4 rounded-[1.25rem]">
+                <p className="text-[13px] font-medium leading-relaxed whitespace-pre-line py-3 px-4 rounded-[1.25rem] border" style={{ color: palette.mutedText, background: palette.cardBgSoft, borderColor: palette.border }}>
                   {currentDirection.question}
                 </p>
 
                 {/* 2. Combined Stats & Dates Dashboard */}
-                <div className="bg-white border border-mist-100 rounded-[1.25rem] p-4 mt-5 shadow-sm">
+                <div className="border rounded-[1.25rem] p-4 mt-5 shadow-sm" style={{ background: palette.cardBg, borderColor: palette.border }}>
                   {/* Stats Row */}
-                  <div className="flex items-center justify-between mb-4 border-b border-mist-50 pb-4">
+                  <div className="flex items-center justify-between mb-4 border-b pb-4" style={{ borderColor: palette.divider }}>
                     <div className="flex flex-col items-center flex-1">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-mist-300">Consistency</p>
+                      <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Rate</p>
                       <p className="text-[17px] font-bold text-point-500 mt-1 leading-none">{pathConsistency}%</p>
                     </div>
-                    <div className="w-px h-6 bg-mist-100"></div>
+                    <div className="w-px h-6" style={{ background: palette.divider }}></div>
                     <div className="flex flex-col items-center flex-1">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-mist-300">Days</p>
-                      <p className="text-[17px] font-bold text-mist-600 mt-1 leading-none">{currentPathRecords.length}</p>
+                      <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Days</p>
+                      <p className="text-[17px] font-bold mt-1 leading-none" style={{ color: palette.strongText }}>{currentPathRecords.length}</p>
                     </div>
-                    <div className="w-px h-6 bg-mist-100"></div>
+                    <div className="w-px h-6" style={{ background: palette.divider }}></div>
                     <div className="flex flex-col items-center flex-1">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-mist-300">Mood</p>
+                      <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Mood</p>
                       <div className="mt-1 flex justify-center h-[17px] items-center">
-                        {topMood ? <MoodSticker code={topMood} className="scale-75 origin-center opacity-100" /> : <span className="text-sm text-mist-300">-</span>}
+                        {topMood ? <MoodSticker code={topMood} className="scale-75 origin-center opacity-100" /> : <span className="text-sm" style={{ color: palette.faintText }}>-</span>}
                       </div>
                     </div>
                   </div>
                   
                   {/* Dates Row */}
-                  <div className="flex items-center justify-center gap-2 text-[11px] font-medium text-mist-400">
+                  <div className="flex items-center justify-center gap-2 text-[11px] font-medium" style={{ color: palette.mutedText }}>
                     <CheckCircle2 size={12} className="text-point-300" />
                     <span>{new Date(currentDirection.createdAt).toLocaleDateString()} 시작</span>
-                    <ArrowRight size={10} className="text-mist-200" />
+                    <ArrowRight size={10} style={{ color: palette.faintText }} />
                     <Calendar size={12} className="text-point-300" />
                     <span>{currentDirection.reviewAt ? new Date(currentDirection.reviewAt).toLocaleDateString() : '-'} 회고</span>
                   </div>
@@ -283,10 +294,10 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
 
                 {/* 3. Compact Path Scene Board */}
                 {currentPathImages.length > 0 && (
-                  <div className="mt-5 flex items-center justify-between bg-mist-50/50 rounded-full py-2.5 px-4 border border-mist-100/50">
+                  <div className="mt-5 flex items-center justify-between rounded-full py-2.5 px-4 border" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
                     <div className="flex items-center gap-1.5">
-                       <ImageIcon size={14} className="text-mist-400" />
-                       <span className="text-[11px] font-bold text-mist-500">장면들 ({currentPathRecords.filter(r => r.imageUrl).length})</span>
+                       <ImageIcon size={14} style={{ color: palette.faintText }} />
+                       <span className="text-[11px] font-bold" style={{ color: palette.mutedText }}>장면들 ({currentPathRecords.filter(r => r.imageUrl).length})</span>
                     </div>
                     <div className="flex items-center -space-x-1.5">
                       {currentPathImages.map((record, idx) => (
@@ -302,8 +313,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                   <WaterDropCharacter size={84} mood="SLEEPING" animate={true} />
                 </div>
                 <div>
-                  <p className="text-mist-600 text-base font-bold tracking-wide mb-1">지금은 잠시 쉬고 있어요</p>
-                  <p className="text-mist-400 text-xs font-medium tracking-wide">원할 때 새 방향을 천천히 시작해요.</p>
+                  <p className="text-base font-bold tracking-wide mb-1" style={{ color: palette.strongText }}>지금은 잠시 쉬고 있어요</p>
+                  <p className="text-xs font-medium tracking-wide" style={{ color: palette.mutedText }}>원할 때 새 방향을 천천히 시작해요.</p>
                 </div>
               </div>
             )}
@@ -315,9 +326,10 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
             <SoftButton 
               variant="secondary" 
               onClick={handleFinishDirection} 
-              className="!bg-white/90 backdrop-blur-sm border border-mist-200 shadow-sm py-3.5 hover:border-point-300 transition-colors"
+              className="backdrop-blur-sm shadow-sm py-3.5 transition-colors"
+              style={{ background: palette.cardBgStrong, borderColor: palette.border }}
             >
-              <span className="text-mist-600 font-bold text-sm">현재 방향 마무리하기</span>
+              <span className="font-bold text-sm" style={{ color: palette.strongText }}>현재 방향 마무리하기</span>
             </SoftButton>
           ) : (
             <SoftButton onClick={handleStartEdit} className="py-3.5 shadow-lg shadow-point-200/50 font-bold text-sm">
@@ -328,7 +340,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
           <div className="flex justify-center mt-3">
             <button
               onClick={onHistoryClick}
-              className="flex items-center gap-2 text-xs font-bold text-mist-400 hover:text-mist-600 transition-colors bg-white/50 px-4 py-2 rounded-full border border-mist-100 shadow-sm"
+              className="flex items-center gap-2 text-xs font-bold transition-colors px-4 py-2 rounded-full border shadow-sm"
+              style={{ color: palette.mutedText, background: palette.pillBg, borderColor: palette.pillBorder }}
             >
               <History size={14} />
               <span>지나온 방향들 바로가기</span>

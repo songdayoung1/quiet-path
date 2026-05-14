@@ -119,7 +119,8 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState | 'INITIALIZING'>('INITIALIZING');
   const [isLoaded, setIsLoaded] = useState(false);
   const [authCodeParam, setAuthCodeParam] = useState<string | null>(null);
-  const [settingsButtonHover, setSettingsButtonHover] = useState(false);
+  const [settingsButtonHovered, setSettingsButtonHovered] = useState(false);
+  const [settingsButtonPressed, setSettingsButtonPressed] = useState(false);
   const [recordGuardModalOpen, setRecordGuardModalOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
@@ -164,6 +165,13 @@ const App: React.FC = () => {
   useEffect(() => {
     applyDocumentTheme(resolvedTheme);
   }, [resolvedTheme]);
+
+  useEffect(() => {
+    if (currentView === 'SETTINGS') {
+      setSettingsButtonHovered(false);
+      setSettingsButtonPressed(false);
+    }
+  }, [currentView]);
 
   useEffect(() => {
     if (themeMode !== 'system') return;
@@ -550,43 +558,71 @@ const App: React.FC = () => {
             Quiet Path
           </h1>
           <button 
-            onClick={() => setCurrentView('SETTINGS')} 
-            onPointerEnter={() => setSettingsButtonHover(true)}
-            onPointerLeave={() => setSettingsButtonHover(false)}
-            onPointerCancel={() => setSettingsButtonHover(false)}
-            onMouseEnter={() => setSettingsButtonHover(true)}
-            onMouseLeave={() => setSettingsButtonHover(false)}
-            onFocus={() => setSettingsButtonHover(true)}
-            onBlur={() => setSettingsButtonHover(false)}
+            onClick={() => {
+              setSettingsButtonHovered(false);
+              setSettingsButtonPressed(false);
+              setCurrentView('SETTINGS');
+            }}
+            onMouseEnter={() => setSettingsButtonHovered(true)}
+            onMouseLeave={() => {
+              setSettingsButtonHovered(false);
+              setSettingsButtonPressed(false);
+            }}
+            onPointerDown={() => setSettingsButtonPressed(true)}
+            onPointerUp={() => setSettingsButtonPressed(false)}
+            onPointerCancel={() => setSettingsButtonPressed(false)}
             aria-label="설정 열기"
-            className="group cursor-pointer p-2 rounded-full transition-all duration-200 active:scale-95 focus-visible:outline-none"
+            className="group cursor-pointer rounded-full p-2 transition-all duration-200 focus-visible:outline-none"
             style={{
               cursor: 'pointer',
-              color: settingsButtonHover
+              color: settingsButtonPressed
                 ? resolvedTheme === 'dark'
-                  ? '#DDD6FE'
-                  : '#7C3AED'
-                : resolvedTheme === 'dark'
-                  ? '#94A3B8'
-                  : '#7B8794',
-              backgroundColor: settingsButtonHover
+                  ? '#EDE9FE'
+                  : '#6D28D9'
+                : settingsButtonHovered
+                  ? resolvedTheme === 'dark'
+                    ? '#E9D5FF'
+                    : '#7C3AED'
+                  : resolvedTheme === 'dark'
+                    ? '#94A3B8'
+                    : '#64748B',
+              backgroundColor: settingsButtonPressed
                 ? resolvedTheme === 'dark'
-                  ? 'rgba(51,65,85,0.52)'
-                  : 'rgba(255,255,255,0.58)'
-                : resolvedTheme === 'dark'
-                  ? 'rgba(15,23,42,0.16)'
-                  : 'transparent',
-              boxShadow: settingsButtonHover
+                  ? 'rgba(88,28,135,0.56)'
+                  : 'rgba(237,233,254,0.98)'
+                : settingsButtonHovered
+                  ? resolvedTheme === 'dark'
+                    ? 'rgba(51,65,85,0.86)'
+                    : 'rgba(255,255,255,0.96)'
+                  : resolvedTheme === 'dark'
+                    ? 'rgba(15,23,42,0.18)'
+                    : 'rgba(255,255,255,0.28)',
+              boxShadow: settingsButtonPressed
                 ? resolvedTheme === 'dark'
-                  ? '0 10px 24px rgba(15,23,42,0.28)'
-                  : '0 10px 24px rgba(148,163,184,0.18)'
-                : 'none',
+                  ? '0 14px 30px rgba(15,23,42,0.40), 0 0 0 1px rgba(196,181,253,0.28) inset'
+                  : '0 12px 28px rgba(148,163,184,0.24), 0 0 0 1px rgba(124,58,237,0.10) inset'
+                : settingsButtonHovered
+                  ? resolvedTheme === 'dark'
+                    ? '0 12px 28px rgba(15,23,42,0.32), 0 0 0 1px rgba(196,181,253,0.18) inset'
+                    : '0 10px 24px rgba(148,163,184,0.18), 0 0 0 1px rgba(124,58,237,0.08) inset'
+                  : 'none',
+              transform: settingsButtonPressed
+                ? 'scale(0.95)'
+                : settingsButtonHovered
+                  ? 'scale(1.08)'
+                  : 'scale(1)',
             }}
           >
             <Settings
               size={18}
               className="transition-transform duration-200"
-              style={{ transform: settingsButtonHover ? 'rotate(20deg)' : 'rotate(0deg)' }}
+              style={{
+                transform: settingsButtonPressed
+                  ? 'rotate(28deg) scale(0.97)'
+                  : settingsButtonHovered
+                    ? 'rotate(18deg)'
+                    : 'rotate(0deg)',
+              }}
             />
           </button>
         </div>
@@ -639,7 +675,11 @@ const App: React.FC = () => {
         {currentView === 'SETTINGS' && (
            <SettingsView
               state={state}
-              onClose={() => setCurrentView('NOW')}
+              onClose={() => {
+                setSettingsButtonHovered(false);
+                setSettingsButtonPressed(false);
+                setCurrentView('NOW');
+              }}
               onLogin={() => setCurrentView('ACCOUNT_CONNECT')}
               onLogout={handleLogout}
            />
