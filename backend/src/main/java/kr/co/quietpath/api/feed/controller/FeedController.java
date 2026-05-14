@@ -1,8 +1,6 @@
 package kr.co.quietpath.api.feed.controller;
 
 import kr.co.quietpath.api.auth.UserPrincipal;
-import kr.co.quietpath.api.common.error.ApiException;
-import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.feed.dto.response.FeedResponse;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Response;
 import kr.co.quietpath.api.feed.service.FeedService;
@@ -25,25 +23,19 @@ public class FeedController {
     @GetMapping
     public FeedResponse getFeed(
         @AuthenticationPrincipal UserPrincipal principal,
+        @RequestParam(required = false) String category,
         @RequestParam(defaultValue = "20") int size,
         @RequestParam(required = false) String cursor
     ) {
-        Long userId = extractUserId(principal);
-        return feedService.getFeed(userId, size, cursor);
+        Long userId = principal != null ? principal.getUserId() : null;
+        return feedService.getFeed(userId, category, size, cursor);
     }
 
     @GetMapping("/weekly-top3")
     public WeeklyTop3Response getWeeklyTop3(
         @AuthenticationPrincipal UserPrincipal principal
     ) {
-        Long userId = extractUserId(principal);
+        Long userId = principal != null ? principal.getUserId() : null;
         return feedService.getWeeklyTop3(userId);
-    }
-
-    private Long extractUserId(UserPrincipal principal) {
-        if (principal == null || principal.getUserId() == null) {
-            throw new ApiException(ErrorCode.INVALID_REQUEST);
-        }
-        return principal.getUserId();
     }
 }

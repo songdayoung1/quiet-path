@@ -4,6 +4,7 @@ import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.record.dto.request.RecordCreateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
+import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
 import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
@@ -153,6 +154,61 @@ class RecordServiceTest {
         assertEquals("반짝", record.getMoodCode());
     }
 
+    @Test
+    void updateRecord_keepsPublicRecordPublicWithoutDuplicateShareError() {
+        User owner = User.createGoogle("provider", "owner@example.com", "owner");
+        setId(owner, 1L);
+        Record record = buildRecord(owner, LocalDate.now());
+        record.share();
+        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+
+        RecordUpdateRequest request = new RecordUpdateRequest();
+        request.setContent("공개 상태로 내용만 수정");
+        request.setVisibility("PUBLIC");
+
+        var response = recordService.updateRecord(1L, 10L, request);
+
+        assertEquals("PUBLIC", response.getVisibility());
+        assertEquals("PUBLIC", record.getVisibility());
+    }
+
+    @Test
+    void updateVisibility_publicSetsSharedAt() {
+        User owner = User.createGoogle("provider", "owner@example.com", "owner");
+        setId(owner, 1L);
+        Record record = buildRecord(owner, LocalDate.now().minusDays(3));
+        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+
+        RecordVisibilityRequest request = new RecordVisibilityRequest();
+        request.setVisibility("PUBLIC");
+
+        var response = recordService.updateVisibility(1L, 10L, request);
+
+        assertEquals("PUBLIC", response.getVisibility());
+        assertEquals("PUBLIC", record.getVisibility());
+        assertEquals(true, record.getSharedAt() != null);
+        assertEquals(true, response.getSharedAt() != null);
+    }
+
+    @Test
+    void updateVisibility_privateClearsSharedAtEvenAfterRecordDate() {
+        User owner = User.createGoogle("provider", "owner@example.com", "owner");
+        setId(owner, 1L);
+        Record record = buildRecord(owner, LocalDate.now().minusDays(3));
+        record.share();
+        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+
+        RecordVisibilityRequest request = new RecordVisibilityRequest();
+        request.setVisibility("PRIVATE");
+
+        var response = recordService.updateVisibility(1L, 10L, request);
+
+        assertEquals("PRIVATE", response.getVisibility());
+        assertEquals("PRIVATE", record.getVisibility());
+        assertEquals(null, record.getSharedAt());
+        assertEquals(null, response.getSharedAt());
+    }
+
     private Path buildPath(Long id) {
         Path path = Path.builder()
             .userId(1L)
@@ -163,6 +219,22 @@ class RecordServiceTest {
             .build();
         setId(path, id);
         return path;
+    }
+
+    private Record buildRecord(User owner, LocalDate recordDate) {
+        Path activePath = buildPath(1L);
+        Record record = Record.builder()
+            .user(owner)
+            .path(activePath)
+            .categoryCode("DEFAULT")
+            .recordDate(recordDate)
+            .sceneText("기존 내용")
+            .oneWordText(null)
+            .tomorrowText(null)
+            .moodCode(null)
+            .build();
+        setId(record, 10L);
+        return record;
     }
 
     private void setId(Object target, Long id) {

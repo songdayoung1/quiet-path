@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { TreeDeciduous, TreePine, Shrub, Mountain, Cloud, Star, Sparkles, Flower, Tent } from 'lucide-react';
 import { MOOD_STICKERS } from '../constants';
+import { getThemePalette, useResolvedTheme } from '../theme';
 
 // Enhanced Card with Depth, Gradient, and optional Traces
 export const Card: React.FC<{
@@ -11,10 +12,18 @@ export const Card: React.FC<{
   withTraces?: boolean;
   style?: React.CSSProperties;
 }> = ({ children, className = '', onClick, breathe = false, withTraces = false, style }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
+
   return (
     <div
       onClick={onClick}
-      style={style}
+      style={{
+        background: palette.cardBg,
+        border: `1px solid ${palette.border}`,
+        boxShadow: palette.shadow,
+        ...style,
+      }}
       className={`
         glass-panel rounded-[2rem] p-6 transition-all duration-300 ease-out 
         relative overflow-hidden
@@ -25,7 +34,15 @@ export const Card: React.FC<{
       `}
     >
       {/* 2. Card Layer Depth: Subtle Gradient Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/60 via-transparent to-lavender-50/20 pointer-events-none opacity-50" />
+      <div
+        className="absolute inset-0 pointer-events-none opacity-50"
+        style={{
+          background:
+            theme === 'dark'
+              ? 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 42%, rgba(129,140,248,0.08) 100%)'
+              : 'linear-gradient(to bottom right, rgba(255,255,255,0.60) 0%, transparent 52%, rgba(237,233,254,0.22) 100%)',
+        }}
+      />
       
       {/* 3. Abstract Background Traces */}
       {withTraces && (
@@ -51,14 +68,19 @@ export const SoftButton: React.FC<{
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'text';
   className?: string;
-}> = ({ onClick, children, disabled, variant = 'primary', className = '' }) => {
+  style?: React.CSSProperties;
+}> = ({ onClick, children, disabled, variant = 'primary', className = '', style }) => {
+  const theme = useResolvedTheme();
   
   const baseStyle = "w-full rounded-2xl py-4 px-6 text-sm font-medium tracking-wide transition-all duration-300 flex items-center justify-center gap-2 transform active:scale-[0.98]";
   
   const variants = {
     primary: "bg-point-500 text-white shadow-lg shadow-point-400/30 hover:bg-point-600 hover:shadow-point-400/50 disabled:opacity-50 disabled:cursor-not-allowed border border-point-400/20",
-    secondary: "bg-white/80 backdrop-blur-md text-mist-500 border border-mist-200 hover:bg-white disabled:opacity-50 shadow-sm",
-    text: "bg-transparent text-mist-400 hover:text-mist-600"
+    secondary:
+      theme === 'dark'
+        ? "bg-slate-900/80 backdrop-blur-md text-slate-200 border border-slate-700 hover:bg-slate-800 disabled:opacity-50 shadow-sm"
+        : "bg-white/80 backdrop-blur-md text-mist-500 border border-mist-200 hover:bg-white disabled:opacity-50 shadow-sm",
+    text: theme === 'dark' ? "bg-transparent text-slate-400 hover:text-slate-200" : "bg-transparent text-mist-400 hover:text-mist-600"
   };
 
   return (
@@ -66,6 +88,7 @@ export const SoftButton: React.FC<{
       onClick={onClick} 
       disabled={disabled}
       className={`${baseStyle} ${variants[variant]} ${className}`}
+      style={style}
     >
       {children}
     </button>
@@ -74,16 +97,27 @@ export const SoftButton: React.FC<{
 
 // Minimal text input
 export const SoftInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
+
   return (
     <input
       {...props}
-      className={`w-full bg-surface-subtle/50 border border-transparent rounded-2xl p-4 text-mist-600 placeholder-mist-300 focus:bg-white focus:ring-1 focus:ring-point-300 outline-none transition-all ${props.className}`}
+      className={`w-full rounded-2xl p-4 outline-none transition-all ${props.className}`}
+      style={{
+        background: palette.cardBgSoft,
+        border: `1px solid ${palette.border}`,
+        color: palette.strongText,
+        ...(props.style ?? {}),
+      }}
     />
   );
 };
 
 // Auto-expanding text area
 export const AutoTextArea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement>> = (props) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const adjustHeight = () => {
@@ -107,19 +141,36 @@ export const AutoTextArea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaEle
         adjustHeight();
         if (props.onChange) props.onChange(e);
       }}
-      className={`w-full bg-surface-subtle/50 border border-transparent rounded-2xl p-4 text-mist-600 placeholder-mist-300 focus:bg-white focus:ring-1 focus:ring-point-300 outline-none transition-all resize-none overflow-hidden min-h-[80px] leading-relaxed ${props.className}`}
+      className={`w-full rounded-2xl p-4 outline-none transition-all resize-none overflow-hidden min-h-[80px] leading-relaxed ${props.className}`}
+      style={{
+        background: palette.cardBgSoft,
+        border: `1px solid ${palette.border}`,
+        color: palette.strongText,
+        ...(props.style ?? {}),
+      }}
     />
   );
 };
 
 export const SoftTextArea = AutoTextArea;
 
-export const PageHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
-  <div className="mb-8 px-2 animate-fade-in relative z-10 text-center">
-    <h1 className="text-2xl font-semibold text-mist-600 tracking-tight leading-relaxed">{title}</h1>
-    {subtitle && <p className="text-mist-400 text-sm mt-2 font-normal leading-loose opacity-80">{subtitle}</p>}
-  </div>
-);
+export const PageHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
+
+  return (
+    <div className="mb-8 px-2 animate-fade-in relative z-10 text-center">
+      <h1 className="text-2xl font-semibold tracking-tight leading-relaxed" style={{ color: palette.strongText }}>
+        {title}
+      </h1>
+      {subtitle && (
+        <p className="text-sm mt-2 font-normal leading-loose opacity-90" style={{ color: palette.mutedText }}>
+          {subtitle}
+        </p>
+      )}
+    </div>
+  );
+};
 
 // Mood Sticker Component for v1.5
 export const MoodSticker: React.FC<{
@@ -135,15 +186,15 @@ export const MoodSticker: React.FC<{
       onClick={onClick}
       disabled={!onClick}
       className={`
-        px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide transition-all duration-300
-        border-2 border-white
+        inline-flex shrink-0 items-center justify-center whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide leading-none transition-all duration-300
+        border-[1.5px]
         ${sticker.color}
-        ${selected ? 'scale-110 ring-2 ring-white/50 ring-offset-1 opacity-100 rotate-2 origin-bottom-right z-10' : 'opacity-90 hover:opacity-100 hover:rotate-2 hover:scale-105 origin-bottom-right'}
+        ${selected ? 'scale-105 ring-2 ring-violet-300/35 ring-offset-1 opacity-100 z-10' : 'opacity-95 hover:opacity-100 hover:scale-105'}
         ${!onClick ? 'cursor-default' : ''}
         ${className}
       `}
       style={{
-          boxShadow: selected ? '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255,255,255,0.5)' : '0 1px 2px 0 rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255,255,255,0.5)'
+          boxShadow: selected ? '0 4px 10px rgba(15,23,42,0.08), inset 0 1px 0 rgba(255,255,255,0.4)' : '0 1px 2px rgba(15,23,42,0.04), inset 0 1px 0 rgba(255,255,255,0.35)'
       }}
     >
       {sticker.label}
@@ -367,20 +418,19 @@ export const StreakHeatmap: React.FC<{
   records: { timestamp: number; isHidden?: boolean; moodCode?: string }[];
   className?: string;
 }> = ({ records, className = '' }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Build 35-day grid (5 weeks) ending today
+  // Build fixed 5-week grid (Sun-Sat aligned) that always includes today
   const days: { date: Date; hasRecord: boolean; moodCode?: string; isToday: boolean; isFuture: boolean }[] = [];
 
-  // Calculate start: go back to fill complete weeks
-  const todayDay = today.getDay(); // 0=Sun
   const totalCells = 35; // 5 weeks
-  const daysBack = totalCells - 1 - (6 - todayDay); // align so today falls on correct weekday
-  const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - (totalCells - 1));
-  // Align to Sunday
-  startDate.setDate(startDate.getDate() - startDate.getDay());
+  const endDate = new Date(today);
+  endDate.setDate(endDate.getDate() + (6 - today.getDay())); // this week's Saturday
+  const startDate = new Date(endDate);
+  startDate.setDate(startDate.getDate() - (totalCells - 1)); // aligned Sunday
 
   const activeRecords = records.filter(r => !r.isHidden);
   const recordDateMap = new Map<string, string>();
@@ -391,11 +441,11 @@ export const StreakHeatmap: React.FC<{
     else recordDateMap.set(key, '__recorded__');
   });
 
+  const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
   for (let i = 0; i < totalCells; i++) {
     const d = new Date(startDate);
     d.setDate(d.getDate() + i);
     const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
     days.push({
       date: d,
       hasRecord: recordDateMap.has(key),
@@ -446,21 +496,21 @@ export const StreakHeatmap: React.FC<{
         <div className="flex items-center gap-3">
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold text-point-500">{currentStreak}</span>
-            <span className="text-xs font-medium text-mist-400">일 연속</span>
+            <span className="text-xs font-medium" style={{ color: palette.mutedText }}>일 연속</span>
           </div>
-          <div className="w-px h-5 bg-mist-200" />
+          <div className="w-px h-5" style={{ background: palette.divider }} />
           <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold text-mist-600">{last30Records}</span>
-            <span className="text-[10px] text-mist-300">/30일</span>
+            <span className="text-sm font-bold" style={{ color: palette.strongText }}>{last30Records}</span>
+            <span className="text-[10px]" style={{ color: palette.faintText }}>/30일</span>
           </div>
         </div>
-        <span className="text-[10px] font-bold text-mist-300 uppercase tracking-widest">Streak</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Streak</span>
       </div>
 
       {/* Weekday labels */}
       <div className="grid grid-cols-7 gap-[5px] mb-1.5">
         {weekLabels.map(label => (
-          <div key={label} className="text-center text-[9px] font-medium text-mist-300 tracking-wide">
+          <div key={label} className="text-center text-[9px] font-medium tracking-wide" style={{ color: palette.faintText }}>
             {label}
           </div>
         ))}
@@ -479,10 +529,18 @@ export const StreakHeatmap: React.FC<{
                   ? 'bg-transparent'
                   : day.hasRecord
                     ? `${color} shadow-sm`
-                    : 'bg-mist-100/60'
+                    : ''
                 }
                 ${day.isToday ? 'ring-2 ring-point-300 ring-offset-1' : ''}
               `}
+              style={{
+                backgroundColor:
+                  day.isFuture
+                    ? 'transparent'
+                    : day.hasRecord
+                      ? undefined
+                      : palette.emptyCell,
+              }}
               title={`${day.date.getMonth() + 1}/${day.date.getDate()}`}
             >
               {day.isToday && !day.hasRecord && (
@@ -498,8 +556,8 @@ export const StreakHeatmap: React.FC<{
       {/* Mood legend */}
       <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-sm bg-mist-100/60" />
-          <span className="text-[9px] text-mist-300">없음</span>
+          <div className="w-2.5 h-2.5 rounded-sm" style={{ background: palette.emptyCell }} />
+          <span className="text-[9px]" style={{ color: palette.faintText }}>없음</span>
         </div>
         {[
           { code: '포근', color: 'bg-point-400' },
@@ -510,7 +568,7 @@ export const StreakHeatmap: React.FC<{
         ].map(m => (
           <div key={m.code} className="flex items-center gap-1">
             <div className={`w-2.5 h-2.5 rounded-sm ${m.color}`} />
-            <span className="text-[9px] text-mist-400">{m.code}</span>
+            <span className="text-[9px]" style={{ color: palette.mutedText }}>{m.code}</span>
           </div>
         ))}
       </div>
@@ -550,6 +608,8 @@ export const WaterDropOverlay: React.FC<{
   title = "오늘의 장면이 담겼어요",
   subtitle = "하루를 잘 기록했어요 ✨"
 }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
   const droplets = [
     { dx: '-28px', dy: '-36px', delay: '0.28s', size: 8 },
     { dx: '32px',  dy: '-30px', delay: '0.32s', size: 6 },
@@ -564,7 +624,11 @@ export const WaterDropOverlay: React.FC<{
   return (
     <div
       className={`water-drop-overlay${leaving ? ' leaving' : ''} absolute inset-0 z-50 flex flex-col items-center justify-center`}
-      style={{ background: 'rgba(245,243,255,0.92)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}
+      style={{
+        background: theme === 'dark' ? 'rgba(15,23,42,0.90)' : 'rgba(245,243,255,0.92)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+      }}
     >
       {/* Character + ripples */}
       <div className="relative flex items-center justify-center">
@@ -596,10 +660,10 @@ export const WaterDropOverlay: React.FC<{
         ))}
       </div>
 
-      <p className="success-text mt-8 text-base font-semibold text-point-600 tracking-wide">
+      <p className="success-text mt-8 text-base font-semibold tracking-wide" style={{ color: theme === 'dark' ? '#C4B5FD' : '#7C3AED' }}>
         {title}
       </p>
-      <p className="success-text mt-1 text-xs text-mist-400" style={{ animationDelay: '0.65s' }}>
+      <p className="success-text mt-1 text-xs" style={{ animationDelay: '0.65s', color: palette.mutedText }}>
         {subtitle}
       </p>
     </div>

@@ -6,11 +6,13 @@ import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.record.dto.request.RecordCreateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
+import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
 import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
 import kr.co.quietpath.api.record.dto.response.RecordShareResponse;
 import kr.co.quietpath.api.record.dto.response.RecordTodayResponse;
 import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
+import kr.co.quietpath.api.record.dto.response.RecordVisibilityResponse;
 import kr.co.quietpath.api.record.service.RecordService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -77,6 +79,16 @@ public class RecordController {
     ) {
         Long userId = extractUserId(principal);
         return recordService.shareRecord(userId, recordId);
+    }
+
+    @PatchMapping("/{recordId}/visibility")
+    public RecordVisibilityResponse updateVisibility(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long recordId,
+        @Valid @RequestBody RecordVisibilityRequest request
+    ) {
+        Long userId = extractUserId(principal);
+        return recordService.updateVisibility(userId, recordId, request);
     }
 
     private Long extractUserId(UserPrincipal principal) {

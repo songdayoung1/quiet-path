@@ -2,6 +2,7 @@ import React from 'react';
 import { AppState } from '../types';
 import { MoodSticker, SoftButton } from '../components/UI';
 import { History, BookOpen } from 'lucide-react';
+import { getThemePalette, useResolvedTheme } from '../theme';
 
 // Import New Components
 import { TodaysCard } from '../components/TodaysCard';
@@ -18,6 +19,8 @@ interface HomeViewProps {
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDirectionClick, onHistoryClick, onRecordsClick }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
   const { currentDirection, records, hasLoggedToday } = state;
   const hasActiveDirection = !!currentDirection;
   const sortedRecords = [...records].filter(r => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp);
@@ -93,11 +96,18 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
       {/* 0. Hero Header */}
       <div className="px-2 mt-2 flex justify-between items-start">
         <div>
-          <span className="text-[10px] px-3 py-1 bg-white/40 rounded-full text-mist-500 backdrop-blur-sm border border-white/40 shadow-sm font-medium tracking-wide">
+          <span
+            className="text-[10px] px-3 py-1 rounded-full backdrop-blur-sm shadow-sm font-medium tracking-wide"
+            style={{
+              background: palette.pillBg,
+              border: `1px solid ${palette.pillBorder}`,
+              color: palette.mutedText,
+            }}
+          >
             {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
           </span>
-          <h1 className="text-xl font-semibold text-mist-600 mt-3 px-1">{heroTitle}</h1>
-          <p className="text-sm text-mist-400 mt-1 px-1">
+          <h1 className="text-xl font-semibold mt-3 px-1" style={{ color: palette.strongText }}>{heroTitle}</h1>
+          <p className="text-sm mt-1 px-1" style={{ color: palette.mutedText }}>
              {heroSubtitle}
           </p>
         </div>
@@ -146,13 +156,19 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
 
       {/* Tier 4: Utility functions */}
       <div className="grid grid-cols-2 gap-3 px-1 mt-4">
-        <SoftButton variant="secondary" onClick={onRecordsClick} className="!py-4 bg-white/70 hover:bg-white shadow-[0_4px_15px_rgba(0,0,0,0.02)] border border-white/50">
+        <SoftButton variant="secondary" onClick={onRecordsClick} className="!py-4 shadow-[0_4px_15px_rgba(0,0,0,0.02)]" style={{
+          background: palette.cardBgMuted,
+          border: `1px solid ${palette.border}`,
+        } as React.CSSProperties}>
           <BookOpen size={16} className="text-point-400" />
-          <span className="text-mist-600 text-xs font-semibold">이번 달 보기</span>
+          <span className="text-xs font-semibold" style={{ color: palette.strongText }}>이번 달 보기</span>
         </SoftButton>
-        <SoftButton variant="secondary" onClick={onHistoryClick} className="!py-4 bg-white/70 hover:bg-white shadow-[0_4px_15px_rgba(0,0,0,0.02)] border border-white/50">
+        <SoftButton variant="secondary" onClick={onHistoryClick} className="!py-4 shadow-[0_4px_15px_rgba(0,0,0,0.02)]" style={{
+          background: palette.cardBgMuted,
+          border: `1px solid ${palette.border}`,
+        } as React.CSSProperties}>
           <History size={16} className="text-mist-400" />
-          <span className="text-mist-600 text-xs font-semibold">지난 흐름 보기</span>
+          <span className="text-xs font-semibold" style={{ color: palette.strongText }}>지난 흐름 보기</span>
         </SoftButton>
       </div>
 

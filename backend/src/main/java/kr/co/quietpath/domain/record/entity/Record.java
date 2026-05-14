@@ -121,6 +121,15 @@ public class Record {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void unshare() {
+        if ("PRIVATE".equals(this.visibility)) {
+            return;
+        }
+        this.visibility = "PRIVATE";
+        this.sharedAt = null;
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public void updateContent(
         String sceneText,
         String oneWordText,

@@ -17,6 +17,7 @@ import {
 import { AppState } from '../types';
 import { authApi } from '../api/authApi';
 import { generateNickname } from './NicknameSetupView';
+import { AppModal } from '../components/AppModal';
 
 interface SettingsViewProps {
   state: AppState;
@@ -923,79 +924,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
         QUIET PATH · © 2026
       </p>
 
-      {logoutModalOpen && (
-        <div
-          className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center px-5 pb-5 pt-20"
-          style={{ background: 'rgba(99,102,120,0.28)', backdropFilter: 'blur(14px)' }}
-          onClick={(event) => {
-            if (event.target === event.currentTarget && !busy.logout) {
-              setLogoutModalOpen(false);
-            }
-          }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="settings-logout-title"
-        >
-          <div
-            className="w-full max-w-[360px] rounded-[24px] overflow-hidden"
-            style={{
-              background: 'var(--qp-modal-surface)',
-              border: '1px solid var(--qp-modal-border)',
-              boxShadow: '0 24px 60px -12px rgba(15,17,30,0.28), 0 0 0 1px rgba(255,255,255,0.06) inset',
-            }}
-          >
-            <div className="px-7 pt-8 pb-2 text-center">
-              <div
-                className="w-16 h-16 mx-auto mb-5 rounded-full grid place-items-center"
-                style={{
-                  background: 'linear-gradient(180deg, rgba(237,233,254,0.95) 0%, rgba(243,232,255,0.92) 100%)',
-                  color: 'var(--qp-accent-text)',
-                }}
-                aria-hidden="true"
-              >
-                <LogOut size={22} />
-              </div>
-              <h3 id="settings-logout-title" className="text-[17px] font-bold mb-3 tracking-tight" style={{ color: 'var(--qp-text-strong)' }}>
-                로그아웃할까요?
-              </h3>
-              <p className="text-[13px] leading-[1.75]" style={{ color: 'var(--qp-text-muted)' }}>
-                다시 로그인하면 모든 기록을 그대로 이어볼 수 있어요.
-                <br />
-                지금은 게스트 상태로 돌아갑니다.
-              </p>
-            </div>
-
-            <div className="flex gap-3 p-5 pt-6">
-              <button
-                type="button"
-                onClick={() => setLogoutModalOpen(false)}
-                disabled={!!busy.logout}
-                className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-semibold"
-                style={{
-                  background: 'var(--qp-neutral-btn-bg)',
-                  color: 'var(--qp-neutral-btn-text)',
-                }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmLogout()}
-                disabled={!!busy.logout}
-                className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-bold"
-                style={{
-                  background: 'var(--qp-danger-btn-bg)',
-                  color: 'var(--qp-danger-text)',
-                  border: '1px solid var(--qp-danger-btn-border)',
-                  opacity: busy.logout ? 0.7 : 1,
-                }}
-              >
-                {busy.logout ? '나가는 중…' : '로그아웃'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AppModal
+        open={logoutModalOpen}
+        icon={<LogOut size={22} />}
+        title="로그아웃할까요?"
+        description={
+          <>
+            다시 로그인하면 모든 기록을 그대로 이어볼 수 있어요.
+            <br />
+            지금은 게스트 상태로 돌아갑니다.
+          </>
+        }
+        confirmLabel={busy.logout ? '나가는 중…' : '로그아웃'}
+        confirmVariant="danger"
+        confirmDisabled={!!busy.logout}
+        cancelDisabled={!!busy.logout}
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={() => void confirmLogout()}
+      />
 
       <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none">
         {toasts.map((toast) => (

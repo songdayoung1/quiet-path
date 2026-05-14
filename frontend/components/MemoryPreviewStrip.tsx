@@ -2,6 +2,7 @@ import React from 'react';
 import { Record } from '../types';
 import { Card, MoodSticker } from './UI';
 import { Image as ImageIcon, ArrowRight } from 'lucide-react';
+import { getThemePalette, useResolvedTheme } from '../theme';
 
 interface MemoryPreviewStripProps {
   records: Record[];
@@ -12,6 +13,9 @@ export const MemoryPreviewStrip: React.FC<MemoryPreviewStripProps> = ({
   records, 
   onMoreClick 
 }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
+
   // Sort and filter active records
   const activeRecords = [...records].filter(r => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp);
   
@@ -26,11 +30,11 @@ export const MemoryPreviewStrip: React.FC<MemoryPreviewStripProps> = ({
   }
 
   return (
-    <Card className="!bg-white/70 border border-white/50 shadow-sm !p-5">
+    <Card className="shadow-sm !p-5" style={{ background: palette.cardBgMuted, borderColor: palette.border }}>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <ImageIcon size={16} className="text-mist-400" />
-          <span className="text-sm font-medium text-mist-600">장면 미리보기</span>
+          <span className="text-sm font-medium" style={{ color: palette.strongText }}>장면 미리보기</span>
         </div>
         <button 
           onClick={onMoreClick} 
@@ -45,27 +49,27 @@ export const MemoryPreviewStrip: React.FC<MemoryPreviewStripProps> = ({
         // Strategy A: We have photos, show a grid
         <div className="grid grid-cols-4 gap-3">
           {photoRecords.map((record) => (
-            <div key={`memory-photo-${record.id}`} className="aspect-square rounded-2xl overflow-hidden border border-white shadow-sm bg-mist-50 relative group cursor-pointer" onClick={onMoreClick}>
+            <div key={`memory-photo-${record.id}`} className="aspect-square rounded-2xl overflow-hidden border shadow-sm relative group cursor-pointer" style={{ borderColor: palette.border, background: palette.cardBgSoft }} onClick={onMoreClick}>
               <img src={record.imageUrl} alt="Memory preview" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
               <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           ))}
           {/* Fill empty slots nicely if less than 4 photos */}
           {Array.from({ length: Math.max(0, 4 - photoRecords.length) }).map((_, i) => (
-            <div key={`empty-slot-${i}`} className="aspect-square rounded-2xl border border-dashed border-mist-200 bg-mist-50/30 flex items-center justify-center">
-              <span className="w-1 h-1 rounded-full bg-mist-200"></span>
+            <div key={`empty-slot-${i}`} className="aspect-square rounded-2xl border border-dashed flex items-center justify-center" style={{ borderColor: palette.divider, background: palette.cardBgSoft }}>
+              <span className="w-1 h-1 rounded-full" style={{ background: palette.faintText }}></span>
             </div>
           ))}
         </div>
       ) : (
         // Strategy B: No photos, fallback to the most recent scene description
         recentTextRecord ? (
-          <div className="rounded-2xl bg-white/60 p-4 border border-white shadow-inner cursor-pointer hover:bg-white/80 transition-colors" onClick={onMoreClick}>
-            <p className="text-sm text-mist-600 leading-relaxed line-clamp-2 mb-3">
+          <div className="rounded-2xl p-4 border shadow-inner cursor-pointer transition-colors" style={{ background: palette.cardBgSoft, borderColor: palette.border }} onClick={onMoreClick}>
+            <p className="text-sm leading-relaxed line-clamp-2 mb-3" style={{ color: palette.strongText }}>
               "{recentTextRecord.action}"
             </p>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-mist-400 font-medium tracking-wide">
+              <span className="text-[10px] font-medium tracking-wide" style={{ color: palette.mutedText }}>
                 {new Date(recentTextRecord.timestamp).toLocaleDateString('ko-KR')}
               </span>
               {recentTextRecord.moodCode && (
@@ -74,9 +78,9 @@ export const MemoryPreviewStrip: React.FC<MemoryPreviewStripProps> = ({
             </div>
           </div>
         ) : (
-             <div className="rounded-2xl border border-dashed border-mist-200 bg-mist-50/30 p-6 flex flex-col items-center justify-center text-center">
-                <ImageIcon size={20} className="text-mist-200 mb-2" />
-                <p className="text-xs text-mist-400">아직 저장된 사진이 없어요</p>
+             <div className="rounded-2xl border border-dashed p-6 flex flex-col items-center justify-center text-center" style={{ borderColor: palette.divider, background: palette.cardBgSoft }}>
+                <ImageIcon size={20} className="mb-2" style={{ color: palette.faintText }} />
+                <p className="text-xs" style={{ color: palette.mutedText }}>아직 저장된 사진이 없어요</p>
             </div>
         )
       )}

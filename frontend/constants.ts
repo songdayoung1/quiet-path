@@ -57,10 +57,10 @@ export const CATEGORIES = [
 ];
 
 export const MOOD_STICKERS = [
-  { code: '포근', label: '포근', color: 'bg-point-100/50 text-point-600 border border-point-200' },
-  { code: '멍함', label: '멍함', color: 'bg-mist-100 text-mist-500 border border-mist-200' },
-  { code: '반짝', label: '반짝', color: 'bg-amber-100/50 text-amber-600 border border-amber-200' },
-  { code: '잔잔', label: '잔잔', color: 'bg-blue-50 text-blue-500 border border-blue-100' },
-  { code: '버팀', label: '버팀', color: 'bg-green-50 text-green-600 border border-green-200' },
-  { code: '두근', label: '두근', color: 'bg-rose-50 text-rose-500 border border-rose-200' },
+  { code: '포근', label: '포근', color: 'bg-point-100/75 text-point-600 border-point-300' },
+  { code: '멍함', label: '멍함', color: 'bg-slate-100/85 text-slate-500 border-slate-300' },
+  { code: '반짝', label: '반짝', color: 'bg-amber-100/70 text-amber-600 border-amber-300' },
+  { code: '잔잔', label: '잔잔', color: 'bg-blue-50/90 text-blue-500 border-blue-300' },
+  { code: '버팀', label: '버팀', color: 'bg-green-50/90 text-green-600 border-green-300' },
+  { code: '두근', label: '두근', color: 'bg-rose-50/90 text-rose-500 border-rose-300' },
 ];

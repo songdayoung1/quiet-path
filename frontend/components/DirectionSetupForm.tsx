@@ -2,6 +2,7 @@ import React from 'react';
 import { Calendar } from 'lucide-react';
 import { CATEGORIES } from '../constants';
 import { Card, CategoryIcon, SoftButton, SoftInput } from './UI';
+import { getThemePalette, useResolvedTheme } from '../theme';
 
 type Category = (typeof CATEGORIES)[number];
 
@@ -48,10 +49,13 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
   onCancel,
   submitLabel = '새 방향 만들기',
 }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
+
   return (
-    <Card className="!bg-white/90 backdrop-blur-md shadow-md border-white/80 p-6 rounded-[2rem]">
+    <Card className="backdrop-blur-md shadow-md p-6 rounded-[2rem]" style={{ background: palette.cardBgStrong, borderColor: palette.border }}>
       <div className="flex flex-col gap-5">
-        <div className="flex items-center gap-3 pb-5 border-b border-mist-100/50">
+        <div className="flex items-center gap-3 pb-5 border-b" style={{ borderColor: palette.divider }}>
           <CategoryIcon categoryId={selectedCategory.id} size="sm" />
           <div className="flex-1 min-w-0">
             <span
@@ -60,14 +64,14 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
             >
               {selectedCategory.label}
             </span>
-            <span className="text-[11px] text-mist-400 block">
+            <span className="text-[11px] block" style={{ color: palette.faintText }}>
               이 카테고리 안에서 새로운 방향을 시작해요.
             </span>
           </div>
         </div>
 
         <div>
-          <label className="flex items-center gap-2 text-[11px] font-bold text-mist-500 mb-2 ml-1 uppercase tracking-widest">
+          <label className="flex items-center gap-2 text-[11px] font-bold mb-2 ml-1 uppercase tracking-widest" style={{ color: palette.mutedText }}>
             <span>방향 제목</span>
           </label>
           <SoftInput
@@ -75,21 +79,22 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
             onChange={(e) => onDirectionNameChange(e.target.value)}
             placeholder={`예: ${selectedCategory.defaultTitle}`}
             autoFocus
-            className={`w-full bg-white/60 text-[15px] py-4 px-5 rounded-2xl border border-white focus:border-point-200 focus:bg-white shadow-sm transition-all placeholder:text-mist-300 placeholder:font-medium ${
-              directionName ? 'font-bold text-mist-600' : 'font-medium'
-            } ${isNameMissing ? 'border-rose-200 focus:ring-rose-200 bg-rose-50/30' : ''}`}
+            className={`w-full text-[15px] py-4 px-5 rounded-2xl shadow-sm transition-all placeholder:font-medium ${
+              directionName ? 'font-bold' : 'font-medium'
+            } ${isNameMissing ? 'focus:ring-rose-200' : ''}`}
+            style={isNameMissing ? ({ borderColor: '#FDA4AF', background: theme === 'dark' ? 'rgba(127,29,29,0.18)' : 'rgba(255,241,242,0.82)' } as React.CSSProperties) : undefined}
           />
           {isNameMissing ? (
             <p className="text-[10px] text-rose-400 mt-2 ml-1 font-medium">방향 제목을 입력해주세요.</p>
           ) : (
-            <p className="text-[10px] text-mist-300 mt-2 ml-1">이 방향을 떠올릴 수 있는 이름을 적어주세요.</p>
+            <p className="text-[10px] mt-2 ml-1" style={{ color: palette.faintText }}>이 방향을 떠올릴 수 있는 이름을 적어주세요.</p>
           )}
         </div>
 
         <div>
-          <label className="flex items-center gap-2 text-[11px] font-bold text-mist-500 mb-2 ml-1 uppercase tracking-widest">
+          <label className="flex items-center gap-2 text-[11px] font-bold mb-2 ml-1 uppercase tracking-widest" style={{ color: palette.mutedText }}>
             <span>나아갈 방향 한 줄</span>
-            <span className="text-[9px] text-mist-300 font-medium normal-case tracking-normal border border-mist-200 px-1.5 py-0.5 rounded-md">
+            <span className="text-[9px] font-medium normal-case tracking-normal border px-1.5 py-0.5 rounded-md" style={{ color: palette.faintText, borderColor: palette.border, background: palette.cardBgSoft }}>
               선택
             </span>
           </label>
@@ -97,13 +102,13 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
             value={directionText}
             onChange={(e) => onDirectionTextChange(e.target.value)}
             placeholder="예: 나는 이 방향으로 조금씩 나아가고 있을까?"
-            className="w-full bg-white/60 text-[14px] py-4 px-5 rounded-2xl border border-white focus:border-point-200 focus:bg-white shadow-sm transition-all font-medium text-mist-500 placeholder:text-mist-300"
+            className="w-full text-[14px] py-4 px-5 rounded-2xl shadow-sm transition-all font-medium"
           />
-          <p className="text-[10px] text-mist-300 mt-2 ml-1">비워두면 기본 문장으로 시작합니다.</p>
+          <p className="text-[10px] mt-2 ml-1" style={{ color: palette.faintText }}>비워두면 기본 문장으로 시작합니다.</p>
         </div>
 
         <div>
-          <label className="flex items-center gap-2 text-[11px] font-bold text-mist-500 mb-3 ml-1 uppercase tracking-widest">
+          <label className="flex items-center gap-2 text-[11px] font-bold mb-3 ml-1 uppercase tracking-widest" style={{ color: palette.mutedText }}>
             <span>언제 돌아볼까요?</span>
           </label>
           <div className="grid grid-cols-2 gap-3 mb-4">
@@ -114,8 +119,13 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
                 className={`py-3.5 px-4 rounded-[1.15rem] text-[13px] font-bold transition-all flex items-center justify-center border ${
                   durationDays === days && !customReviewDate
                     ? 'bg-point-500 text-white border-point-500 shadow-md shadow-point-200/50 scale-[1.02]'
-                    : 'bg-white/60 text-mist-500 border-white hover:bg-white hover:border-mist-100 shadow-sm'
+                    : 'shadow-sm'
                 }`}
+                style={
+                  durationDays === days && !customReviewDate
+                    ? undefined
+                    : { background: palette.cardBgSoft, color: palette.mutedText, borderColor: palette.border }
+                }
               >
                 {days}일 후
               </button>
@@ -125,10 +135,15 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
               className={`py-3.5 px-4 rounded-[1.15rem] text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 border ${
                 showDateInput || customReviewDate
                   ? 'bg-point-500 text-white border-point-500 shadow-md shadow-point-200/50 scale-[1.02]'
-                  : 'bg-white/60 text-mist-500 border-white hover:bg-white hover:border-mist-100 shadow-sm'
+                  : 'shadow-sm'
               }`}
+              style={
+                showDateInput || customReviewDate
+                  ? undefined
+                  : { background: palette.cardBgSoft, color: palette.mutedText, borderColor: palette.border }
+              }
             >
-              <Calendar size={14} className={showDateInput || customReviewDate ? 'text-white' : 'text-mist-400'} />
+              <Calendar size={14} className={showDateInput || customReviewDate ? 'text-white' : ''} style={showDateInput || customReviewDate ? undefined : { color: palette.faintText }} />
               직접 선택
             </button>
           </div>
@@ -140,11 +155,12 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
                 min={todayStr}
                 value={customReviewDate}
                 onChange={(e) => onReviewDateChange(e.target.value)}
-                className="w-full bg-white border border-point-100 shadow-sm rounded-2xl px-5 py-3.5 text-sm font-medium text-mist-600 outline-none focus:ring-1 focus:ring-point-300 transition-all mb-2"
+                className="w-full shadow-sm rounded-2xl px-5 py-3.5 text-sm font-medium outline-none focus:ring-1 focus:ring-point-300 transition-all mb-2"
+                style={{ background: palette.cardBgSoft, border: `1px solid ${theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'rgba(221,214,254,0.9)'}`, color: palette.strongText }}
               />
             )}
             {reviewDateDisplay && (
-              <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-point-50 border border-point-100/50 text-point-600 shadow-sm">
+              <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl border text-point-600 shadow-sm" style={{ background: theme === 'dark' ? 'rgba(76,29,149,0.20)' : 'rgba(245,243,255,0.95)', borderColor: theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'rgba(221,214,254,0.9)' }}>
                 <Calendar size={14} className="text-point-400 shrink-0" />
                 <span className="text-[13px] font-bold">{reviewDateDisplay}</span>
                 <span className="text-[11px] font-medium text-point-400">에 돌아볼게요</span>
@@ -158,7 +174,7 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col gap-2.5 pt-4 border-t border-mist-100/50 mt-2">
+        <div className="flex flex-col gap-2.5 pt-4 border-t mt-2" style={{ borderColor: palette.divider }}>
           <SoftButton onClick={onSubmit} disabled={submitDisabled} className="py-4 text-[15px] font-bold shadow-point-200/50">
             {submitLabel}
           </SoftButton>
@@ -166,7 +182,8 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
             <SoftButton
               variant="secondary"
               onClick={onCancel}
-              className="bg-transparent border-none hover:bg-mist-50 shadow-none text-mist-400 py-3"
+              className="shadow-none py-3"
+              style={{ background: 'transparent', borderColor: 'transparent', color: palette.mutedText }}
             >
               <span className="text-sm font-bold">취소</span>
             </SoftButton>

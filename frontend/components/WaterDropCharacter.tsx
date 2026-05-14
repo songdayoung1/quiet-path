@@ -32,7 +32,7 @@ export type CharacterTone = CharacterMood;
 interface WaterDropCharacterProps {
   size?: number;
   mood?: CharacterMood;
-  tone?: CharacterTone; // Compatibility for legacy 'tone' prop
+  tone?: CharacterTone;
   className?: string;
   animate?: boolean;
 }
@@ -46,8 +46,8 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
 }) => {
   const activeMood = mood || tone || 'waiting';
 
-  const getMascotImage = (m: CharacterMood) => {
-    switch (m) {
+  const getMascotImage = (value: CharacterMood) => {
+    switch (value) {
       case '잔잔':
       case 'CALM':
         return mascotCalm;
@@ -80,7 +80,7 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
 
   const getAnimationStyle = () => {
     if (!animate) return {};
-    
+
     if (activeMood === 'waiting' || activeMood === 'neutral' || activeMood === 'default') {
       return { animation: 'float 3s ease-in-out infinite' };
     }
@@ -91,7 +91,7 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
   };
 
   return (
-    <div 
+    <div
       className={`relative inline-flex items-center justify-center ${className}`}
       style={{ width: size, height: size }}
     >
@@ -111,16 +111,16 @@ export const WaterDropCharacter: React.FC<WaterDropCharacterProps> = ({
           }
         `}
       </style>
-      
+
       <img
         src={mascotSrc}
         alt="Mascot"
         className="w-full h-full object-contain relative z-10"
-        style={{ 
+        style={{
           ...getAnimationStyle(),
           maxWidth: '100%',
           maxHeight: '100%',
-          filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.08))'
+          filter: 'drop-shadow(0 8px 16px rgba(0,0,0,0.08))',
         }}
       />
     </div>
