@@ -4,11 +4,13 @@ import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.record.dto.request.RecordCreateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
+import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
 import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
 import kr.co.quietpath.api.record.dto.response.RecordShareResponse;
 import kr.co.quietpath.api.record.dto.response.RecordTodayResponse;
 import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
+import kr.co.quietpath.api.record.dto.response.RecordVisibilityResponse;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.path.entity.Path;
@@ -184,6 +186,20 @@ public class RecordService {
             .build();
     }
 
+    public RecordVisibilityResponse updateVisibility(Long userId, Long recordId, RecordVisibilityRequest request) {
+        Record record = getRecord(recordId);
+        validateOwner(userId, record);
+
+        String visibility = normalizeVisibility(request.getVisibility());
+        applyVisibility(record, visibility);
+
+        return RecordVisibilityResponse.builder()
+            .id(record.getId())
+            .visibility(record.getVisibility())
+            .sharedAt(record.getSharedAt() != null ? formatDateTime(record.getSharedAt()) : null)
+            .build();
+    }
+
     private User getUser(Long userId) {
         return userRepository.findById(userId)
             .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
@@ -235,14 +251,13 @@ public class RecordService {
 
     private void applyVisibility(Record record, String visibility) {
         if (VISIBILITY_PUBLIC.equals(visibility)) {
-            if (VISIBILITY_PUBLIC.equals(record.getVisibility())) {
-                throw new ApiException(ErrorCode.RECORD_ALREADY_SHARED);
+            if (!VISIBILITY_PUBLIC.equals(record.getVisibility())) {
+                record.share();
             }
-            record.share();
             return;
         }
-        if (VISIBILITY_PRIVATE.equals(visibility) && VISIBILITY_PUBLIC.equals(record.getVisibility())) {
-            throw new ApiException(ErrorCode.RECORD_ALREADY_SHARED);
+        if (VISIBILITY_PRIVATE.equals(visibility)) {
+            record.unshare();
         }
     }
 
