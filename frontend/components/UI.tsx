@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { TreeDeciduous, TreePine, Shrub, Mountain, Cloud, Star, Sparkles, Flower, Tent } from 'lucide-react';
 import { MOOD_STICKERS } from '../constants';
+import { KPI_LABELS } from '../kpiLabels';
 import { getThemePalette, useResolvedTheme } from '../theme';
 import {
   DEFAULT_HEATMAP_CELLS,
@@ -453,19 +454,19 @@ export const StreakHeatmap: React.FC<{
         <div className="flex items-center gap-3">
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-bold text-point-500">{recentRate}%</span>
-            <span className="text-xs font-medium" style={{ color: palette.mutedText }}>최근 21일 기록 비율</span>
+            <span className="text-xs font-medium" style={{ color: palette.mutedText }}>{KPI_LABELS.recent21Rate}</span>
           </div>
           <div className="w-px h-5" style={{ background: palette.divider }} />
           <div className="flex items-baseline gap-1.5">
             <span className="text-sm font-bold" style={{ color: palette.strongText }}>{filledCells}</span>
-            <span className="text-[10px]" style={{ color: palette.faintText }}>/ {totalCells}일 기록</span>
+            <span className="text-[10px]" style={{ color: palette.faintText }}>/ {totalCells}{KPI_LABELS.recent21CountUnit}</span>
           </div>
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Activity</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>{KPI_LABELS.recent21Tag}</span>
       </div>
 
       <p className="text-[10px] font-medium mb-3" style={{ color: palette.faintText }}>
-        최근 21일 활동판
+        {KPI_LABELS.recent21Panel}
       </p>
 
       {/* Heatmap grid */}

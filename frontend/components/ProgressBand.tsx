@@ -2,6 +2,7 @@ import React from 'react';
 import { Record } from '../types';
 import { Card, MoodSticker, StreakHeatmap } from './UI';
 import { Flame } from 'lucide-react';
+import { KPI_LABELS } from '../kpiLabels';
 import { getThemePalette, useResolvedTheme } from '../theme';
 
 interface ProgressBandProps {
@@ -43,7 +44,7 @@ export const ProgressBand: React.FC<ProgressBandProps> = ({
             <p className="text-xl font-bold text-point-500 mt-2">{monthlyRecords.length}</p>
           </div>
           <div className="rounded-2xl p-3 text-center shadow-[0_2px_8px_rgba(0,0,0,0.02)]" style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}` }}>
-            <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Rate</p>
+            <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>{KPI_LABELS.monthRate}</p>
             <p className="text-xl font-bold mt-2" style={{ color: palette.strongText }}>{monthlyConsistency}%</p>
           </div>
           <div className="rounded-2xl p-3 text-center shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex flex-col items-center" style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}` }}>
