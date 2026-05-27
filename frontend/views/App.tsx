@@ -4,7 +4,7 @@ import { loadState, saveState, createDirectionId } from './storage';
 import { HomeView } from './views/HomeView';
 import { RecordsView } from './views/RecordsView';
 import { DirectionView } from './views/DirectionView';
-import { LogEditorView } from './views/LogEditorView';
+import { DailyRecordEditorView } from './views/DailyRecordEditorView';
 import { OnboardingView } from './views/OnboardingView';
 import { CommunityView } from './views/CommunityView';
 import { PastDirectionsView } from './views/PastDirectionsView';
@@ -197,7 +197,7 @@ const App: React.FC = () => {
 
       {/* Modal View for Logging */}
       {currentView === 'WRITE_LOG' && (
-        <LogEditorView 
+        <DailyRecordEditorView 
           state={state} 
           onSave={handleSaveLog} 
           onCancel={() => setCurrentView('NOW')} 

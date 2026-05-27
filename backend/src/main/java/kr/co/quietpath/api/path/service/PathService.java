@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Set;
 import java.util.List;
 
 @Service
@@ -37,7 +38,7 @@ public class PathService {
     private static final String SUMMARY_STATUS_DONE = "DONE";
     private static final String SUMMARY_STATUS_LOCKED = "LOCKED";
     private static final String SUMMARY_STATUS_UNLOCKED = "UNLOCKED";
-    private static final String DEFAULT_CATEGORY_CODE = "DEFAULT";
+    private static final Set<String> ALLOWED_CATEGORY_CODES = Set.of("job", "study", "workout", "hobby", "cert");
 
     private final PathRepository pathRepository;
     private final UserRepository userRepository;
@@ -54,6 +55,7 @@ public class PathService {
         }
         return PathActiveResponse.builder()
             .pathId(currentPath.getId())
+            .categoryCode(currentPath.getCategoryCode())
             .directionName(currentPath.getDirectionName())
             .directionText(currentPath.getDirectionText())
             .status(currentPath.getStatus())
@@ -69,23 +71,28 @@ public class PathService {
         }
         LocalDate createdAt = LocalDate.now();
         LocalDate reviewAt = resolveReviewAt(request, createdAt);
+        String categoryCode = normalizeCategoryCode(request.getCategoryCode());
 
         Path path = Path.builder()
             .userId(userId)
-            .categoryCode(DEFAULT_CATEGORY_CODE)
+            .categoryCode(categoryCode)
             .directionName(request.getDirectionName())
             .directionText(request.getDirectionText())
             .reviewAt(reviewAt.atStartOfDay())
             .build();
 
         try {
-            pathRepository.save(path);
+            pathRepository.saveAndFlush(path);
         } catch (DataIntegrityViolationException ex) {
-            throw new ApiException(ErrorCode.PATH_ALREADY_ACTIVE);
+            if (isActivePathUniqueViolation(ex)) {
+                throw new ApiException(ErrorCode.PATH_ALREADY_ACTIVE);
+            }
+            throw ex;
         }
 
         return PathCreateResponse.builder()
             .pathId(path.getId())
+            .categoryCode(path.getCategoryCode())
             .status(path.getStatus())
             .createdAt(createdAt.toString())
             .reviewAt(reviewAt.toString())
@@ -212,6 +219,12 @@ public class PathService {
             .orElseThrow(() -> new ApiException(ErrorCode.USER_NOT_FOUND));
     }
 
+    private boolean isActivePathUniqueViolation(DataIntegrityViolationException ex) {
+        Throwable cause = ex.getMostSpecificCause();
+        String message = cause == null ? ex.getMessage() : cause.getMessage();
+        return message != null && message.contains("uk_paths_active_user");
+    }
+
     private LocalDate resolveReviewAt(PathCreateRequest request, LocalDate createdAt) {
         if (request.getReviewAt() == null) {
             throw new ApiException(ErrorCode.INVALID_PERIOD);
@@ -220,6 +233,16 @@ public class PathService {
             throw new ApiException(ErrorCode.INVALID_PERIOD);
         }
         return request.getReviewAt();
+    }
+
+    private String normalizeCategoryCode(String categoryCode) {
+        if (categoryCode == null || categoryCode.isBlank()) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST);
+        }
+        if (!ALLOWED_CATEGORY_CODES.contains(categoryCode)) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST);
+        }
+        return categoryCode;
     }
 
     private String resolveSummaryStatus(Long pathId, LocalDate unlockAtDate) {

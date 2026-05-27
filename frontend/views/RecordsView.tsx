@@ -16,12 +16,16 @@ interface RecordsViewProps {
   onUpdateRecord: (record: RecordType) => void;
   hasLoggedToday: boolean;
   onLogClick: () => void;
+  accessToken?: string | null;
+  onLoginRequired: () => void;
 }
 
 export const RecordsView: React.FC<RecordsViewProps> = ({
   records,
   currentDirection,
   onUpdateRecord,
+  accessToken,
+  onLoginRequired,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
@@ -307,6 +311,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           records={monthlyRecords}
           onSelectRecord={setSelectedRecordForDetail}
           onUpdateRecord={onUpdateRecord}
+          accessToken={accessToken}
+          onLoginRequired={onLoginRequired}
         />
       )}
       {activeTab === 'calendar' && (

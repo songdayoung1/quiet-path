@@ -7,6 +7,7 @@ import lombok.Getter;
 @Builder
 public class PathCreateResponse {
     private Long pathId;
+    private String categoryCode;
     private String status;
     private String createdAt;
     private String reviewAt;

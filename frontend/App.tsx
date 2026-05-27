@@ -4,7 +4,7 @@ import { loadState, saveState, createDirectionId } from './storage';
 import { HomeView } from './views/HomeView';
 import { RecordsView } from './views/RecordsView';
 import { DirectionView } from './views/DirectionView';
-import { LogEditorView } from './views/LogEditorView';
+import { DailyRecordEditorView } from './views/DailyRecordEditorView';
 import { OnboardingView } from './views/OnboardingView';
 import { CommunityView } from './views/CommunityView';
 import { PastDirectionsView } from './views/PastDirectionsView';
@@ -13,8 +13,11 @@ import { OAuthCallbackView } from './views/OAuthCallbackView';
 import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
 import { authApi } from './api/authApi';
-import { Settings, Compass } from 'lucide-react';
+import { pathApi, PathActiveResponse, PathCreateResponse } from './api/pathApi';
+import { recordApi, RecordResponse } from './api/recordApi';
+import { Settings, Compass, AlertCircle } from 'lucide-react';
 import { AppModal } from './components/AppModal';
+import { CATEGORIES } from './constants';
 
 const OAUTH_PENDING_CODE_KEY = 'qp.oauth.pending.code';
 const OAUTH_PENDING_ERROR_KEY = 'qp.oauth.pending.error';
@@ -105,6 +108,77 @@ const buildFlowBackground = (theme: ResolvedTheme): React.CSSProperties => {
   };
 };
 
+const toLocalDateString = (timestamp?: number) => {
+  const date = timestamp ? new Date(timestamp) : new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseLocalDateString = (value?: string) => {
+  if (!value) return undefined;
+  return new Date(`${value}T00:00:00`).getTime();
+};
+
+const buildDirectionFromActivePath = (
+  path: PathActiveResponse,
+  fallback?: Direction | null
+): Direction | null => {
+  if (!path.pathId) return null;
+  const category = CATEGORIES.find((item) => item.id === path.categoryCode);
+  return {
+    id: String(path.pathId),
+    question: path.directionText || fallback?.question || '이 방향으로 나는 어떻게 걸어가고 있을까?',
+    description: path.directionName || fallback?.description || '지금의 방향',
+    categoryId: path.categoryCode || fallback?.categoryId,
+    categoryLabel: category?.label || fallback?.categoryLabel,
+    createdAt: parseLocalDateString(path.createdAt) ?? fallback?.createdAt ?? Date.now(),
+    reviewAt: parseLocalDateString(path.reviewAt) ?? fallback?.reviewAt,
+    isActive: path.status ? path.status === 'ACTIVE' : true,
+  };
+};
+
+const buildDirectionFromCreatedPath = (
+  path: PathCreateResponse,
+  fallback: Direction
+): Direction => ({
+  ...fallback,
+  id: String(path.pathId),
+  categoryId: path.categoryCode || fallback.categoryId,
+  categoryLabel: CATEGORIES.find((item) => item.id === path.categoryCode)?.label || fallback.categoryLabel,
+  createdAt: parseLocalDateString(path.createdAt) ?? fallback.createdAt,
+  reviewAt: parseLocalDateString(path.reviewAt) ?? fallback.reviewAt,
+  isActive: path.status ? path.status === 'ACTIVE' : true,
+});
+
+const buildRecordFromResponse = (
+  record: RecordResponse,
+  fallbackDirection?: Direction | null
+): Record => {
+  const createdAt = record.createdAt || `${record.recordDate}T00:00:00`;
+  return {
+    id: String(record.id),
+    date: createdAt,
+    timestamp: new Date(createdAt).getTime(),
+    directionQuestion:
+      record.directionText ||
+      fallbackDirection?.question ||
+      '이 방향으로 나는 어떻게 걸어가고 있을까?',
+    action: record.content,
+    oneWordText: record.oneWordText ?? undefined,
+    tomorrowText: record.tomorrowText ?? undefined,
+    moodCode: record.moodCode ?? undefined,
+    imageUrl: record.imageUrl ?? undefined,
+    isShared: record.visibility === 'PUBLIC',
+  };
+};
+
+const hasLoggedTodayFromRecords = (records: Record[]) => {
+  const today = new Date().toDateString();
+  return records.some((record) => new Date(record.timestamp).toDateString() === today);
+};
+
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     currentDirection: null,
@@ -122,6 +196,10 @@ const App: React.FC = () => {
   const [settingsButtonHovered, setSettingsButtonHovered] = useState(false);
   const [settingsButtonPressed, setSettingsButtonPressed] = useState(false);
   const [recordGuardModalOpen, setRecordGuardModalOpen] = useState(false);
+  const [noticeModal, setNoticeModal] = useState<{
+    title: string;
+    description: string;
+  } | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
   const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
@@ -241,8 +319,23 @@ const App: React.FC = () => {
 
             try {
                 const restored = await restoreWithRefresh();
+                let activeDirection: Direction | null = null;
+                const activePath = await pathApi.getActive(restored.accessToken);
+                activeDirection = buildDirectionFromActivePath(activePath, loaded.currentDirection);
+                let restoredRecords: Record[] = loaded.records || [];
+                try {
+                  const recordsResponse = await recordApi.getRecords(restored.accessToken);
+                  restoredRecords = recordsResponse.items.map((record) =>
+                    buildRecordFromResponse(record, activeDirection)
+                  );
+                } catch {
+                  restoredRecords = loaded.records || [];
+                }
                 setState(prev => ({
                     ...prev,
+                    currentDirection: activeDirection,
+                    records: restoredRecords,
+                    hasLoggedToday: hasLoggedTodayFromRecords(restoredRecords),
                     auth: {
                       isLoggedIn: true,
                       token: restored.accessToken,
@@ -277,10 +370,42 @@ const App: React.FC = () => {
     }
   }, [state, isLoaded]);
 
-  const handleOnboardingComplete = (initialDirection: Direction) => {
+  const handleOnboardingComplete = async (initialDirection: Direction) => {
+      let nextDirection = initialDirection;
+      const token = state.auth?.token;
+
+      if (state.auth?.isLoggedIn && token) {
+        try {
+          const activeDirection = await syncRemotePathAndRecords(token, state.currentDirection, false);
+          if (activeDirection) {
+            setCurrentView('NOW');
+            return;
+          }
+
+          const createdPath = await pathApi.create(token, {
+            directionName: initialDirection.description,
+            categoryCode: initialDirection.categoryId || 'job',
+            directionText: initialDirection.question,
+            reviewAt: toLocalDateString(initialDirection.reviewAt),
+          });
+          nextDirection = buildDirectionFromCreatedPath(createdPath, initialDirection);
+        } catch (err) {
+          if (err instanceof Error && err.message.includes('이미 진행 중인 방향')) {
+            await syncRemotePathAndRecords(token, state.currentDirection);
+            setCurrentView('NOW');
+            return;
+          }
+          setNoticeModal({
+            title: '방향을 시작하지 못했어요',
+            description: err instanceof Error ? err.message : '방향 생성에 실패했습니다.',
+          });
+          return;
+        }
+      }
+
       setState(prev => ({ 
           ...prev, 
-          currentDirection: initialDirection,
+          currentDirection: nextDirection,
           hasSeenOnboarding: true 
       }));
       setCurrentView('NOW');
@@ -310,28 +435,86 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleStartDirection = (updates: Partial<Direction>) => {
-    setState(prev => {
-      if (prev.currentDirection) {
-        return prev;
+  const syncRemotePathAndRecords = async (
+    token: string,
+    fallbackDirection?: Direction | null,
+    applyWhenEmpty = true
+  ) => {
+    const activePath = await pathApi.getActive(token);
+    const activeDirection = buildDirectionFromActivePath(activePath, fallbackDirection);
+    let records: Record[] = [];
+
+    try {
+      const recordsResponse = await recordApi.getRecords(token);
+      records = recordsResponse.items.map((record) => buildRecordFromResponse(record, activeDirection));
+    } catch {
+      records = [];
+    }
+
+    if (activeDirection || applyWhenEmpty) {
+      setState(prev => ({
+        ...prev,
+        currentDirection: activeDirection,
+        records,
+        hasLoggedToday: hasLoggedTodayFromRecords(records),
+        hasSeenOnboarding: true,
+      }));
+    }
+
+    return activeDirection;
+  };
+
+  const handleStartDirection = async (updates: Partial<Direction>) => {
+    if (state.currentDirection) return;
+
+    let newDir: Direction = {
+      id: createDirectionId(),
+      question: updates.question || '',
+      description: updates.description || '',
+      categoryId: updates.categoryId,
+      categoryLabel: updates.categoryLabel,
+      createdAt: Date.now(),
+      reviewAt: updates.reviewAt,
+      isActive: true
+    };
+
+    const token = state.auth?.token;
+    if (state.auth?.isLoggedIn && token) {
+      const activeDirection = await syncRemotePathAndRecords(token, state.currentDirection, false);
+      if (activeDirection) {
+        setCurrentView('NOW');
+        return;
       }
 
-      const newDir: Direction = {
-        id: createDirectionId(),
-        question: updates.question || '',
-        description: updates.description || '',
-        categoryId: updates.categoryId,
-        categoryLabel: updates.categoryLabel,
-        createdAt: Date.now(),
-        reviewAt: updates.reviewAt,
-        isActive: true
-      };
-      
+      try {
+        const createdPath = await pathApi.create(token, {
+          directionName: newDir.description,
+          categoryCode: newDir.categoryId || 'job',
+          directionText: newDir.question,
+          reviewAt: toLocalDateString(newDir.reviewAt),
+        });
+        newDir = buildDirectionFromCreatedPath(createdPath, newDir);
+        await syncRemotePathAndRecords(token, newDir);
+        setCurrentView('NOW');
+        return;
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('이미 진행 중인 방향')) {
+          await syncRemotePathAndRecords(token, state.currentDirection);
+          setCurrentView('NOW');
+          return;
+        }
+        throw err;
+      }
+    }
+
+    setState(prev => {
+      if (prev.currentDirection) return prev;
       return {
         ...prev,
         currentDirection: newDir
       };
     });
+    setCurrentView('NOW');
   };
 
   const handleFinishDirection = () => {
@@ -368,7 +551,27 @@ const App: React.FC = () => {
           setCurrentView('NICKNAME_SETUP');
       } else {
           // Existing Users go to HOME. If they've never seen Onboarding, we assume they somehow bypassed it and it is now true.
-          setState(prev => ({ ...prev, hasSeenOnboarding: true }));
+          pathApi.getActive(token)
+            .then(async (activePath) => {
+              const activeDirection = buildDirectionFromActivePath(activePath, state.currentDirection);
+              let records: Record[] = [];
+              try {
+                const recordsResponse = await recordApi.getRecords(token);
+                records = recordsResponse.items.map((record) => buildRecordFromResponse(record, activeDirection));
+              } catch {
+                records = [];
+              }
+              setState(prev => ({
+                ...prev,
+                currentDirection: activeDirection,
+                records,
+                hasLoggedToday: hasLoggedTodayFromRecords(records),
+                hasSeenOnboarding: true
+              }));
+            })
+            .catch(() => {
+              setState(prev => ({ ...prev, currentDirection: null, hasSeenOnboarding: true }));
+            });
           setCurrentView('NOW');
       }
   };
@@ -480,7 +683,8 @@ const App: React.FC = () => {
                    if (token) {
                       try {
                         const me = await authApi.updateNickname(token, nickname);
-                        setState(prev => ({
+                        await syncRemotePathAndRecords(token, state.currentDirection);
+                      setState(prev => ({
                           ...prev,
                           auth: {
                             ...prev.auth,
@@ -489,7 +693,10 @@ const App: React.FC = () => {
                           hasSeenOnboarding: true
                         }));
                       } catch (err: any) {
-                        window.alert(err?.message || '닉네임 저장에 실패했습니다.');
+                        setNoticeModal({
+                          title: '닉네임을 저장하지 못했어요',
+                          description: err?.message || '닉네임 저장에 실패했습니다.',
+                        });
                         return;
                       }
                    } else {
@@ -647,6 +854,8 @@ const App: React.FC = () => {
             onUpdateRecord={handleUpdateLog}
             hasLoggedToday={state.hasLoggedToday}
             onLogClick={handleOpenLogEditor}
+            accessToken={state.auth?.token}
+            onLoginRequired={() => setCurrentView('ACCOUNT_CONNECT')}
           />
         )}
         {currentView === 'DIRECTION' && (
@@ -688,7 +897,7 @@ const App: React.FC = () => {
 
       {/* Modal View for Logging */}
       {currentView === 'WRITE_LOG' && (
-        <LogEditorView 
+        <DailyRecordEditorView 
           state={state} 
           onSave={handleSaveLog} 
           onStartDirection={() => setCurrentView('DIRECTION')}
@@ -714,6 +923,18 @@ const App: React.FC = () => {
           setRecordGuardModalOpen(false);
           setCurrentView('DIRECTION');
         }}
+      />
+
+      <AppModal
+        open={noticeModal !== null}
+        icon={<AlertCircle size={22} />}
+        title={noticeModal?.title ?? ''}
+        description={noticeModal?.description ?? ''}
+        confirmLabel="확인"
+        hideCancel
+        confirmVariant="danger"
+        onClose={() => setNoticeModal(null)}
+        onConfirm={() => setNoticeModal(null)}
       />
 
       {/* Floating Bottom Navigation */}

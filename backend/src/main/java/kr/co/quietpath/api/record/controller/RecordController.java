@@ -9,6 +9,7 @@ import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
 import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
+import kr.co.quietpath.api.record.dto.response.RecordListResponse;
 import kr.co.quietpath.api.record.dto.response.RecordShareResponse;
 import kr.co.quietpath.api.record.dto.response.RecordTodayResponse;
 import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
@@ -29,6 +30,14 @@ import jakarta.validation.constraints.Positive;
 public class RecordController {
 
     private final RecordService recordService;
+
+    @GetMapping
+    public RecordListResponse getRecords(
+        @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        Long userId = extractUserId(principal);
+        return recordService.getRecords(userId);
+    }
 
     @GetMapping("/today")
     public ResponseEntity<RecordTodayResponse> getTodayRecord(

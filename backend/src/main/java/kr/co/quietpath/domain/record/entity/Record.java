@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "records",
     uniqueConstraints = {
-        @UniqueConstraint(name = "uk_user_date", columnNames = {"user_id", "record_date"}),
+        @UniqueConstraint(name = "uk_path_date", columnNames = {"path_id", "record_date"}),
         @UniqueConstraint(name = "uk_records_share_code", columnNames = {"share_code"})
     },
     indexes = {
@@ -134,12 +134,14 @@ public class Record {
         String sceneText,
         String oneWordText,
         String tomorrowText,
-        String moodCode
+        String moodCode,
+        String imageUrl
     ) {
         this.sceneText = sceneText;
         this.oneWordText = oneWordText;
         this.tomorrowText = tomorrowText;
         this.moodCode = moodCode;
+        this.imageUrl = imageUrl;
         this.updatedAt = LocalDateTime.now();
     }
 

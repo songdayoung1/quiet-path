@@ -26,6 +26,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -57,6 +59,7 @@ class PathServiceTest {
 
         PathCreateRequest request = new PathCreateRequest();
         request.setDirectionName("질문");
+        request.setCategoryCode("study");
         request.setDirectionText("설명");
         request.setReviewAt(LocalDate.now().plusDays(7));
 
@@ -98,11 +101,48 @@ class PathServiceTest {
 
         PathCreateRequest request = new PathCreateRequest();
         request.setDirectionName("질문");
+        request.setCategoryCode("study");
         request.setDirectionText("설명");
         request.setReviewAt(LocalDate.now());
 
         ApiException ex = assertThrows(ApiException.class, () -> pathService.createPath(1L, request));
         assertEquals(ErrorCode.INVALID_PERIOD, ex.getErrorCode());
+    }
+
+    @Test
+    void createPath_storesRequestedCategoryCode() {
+        User user = User.createGoogle("provider", "user@example.com", "nick");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.empty());
+
+        PathCreateRequest request = new PathCreateRequest();
+        request.setDirectionName("취업 준비");
+        request.setCategoryCode("job");
+        request.setDirectionText("지원 흐름을 만들고 있는가?");
+        request.setReviewAt(LocalDate.now().plusDays(7));
+
+        var response = pathService.createPath(1L, request);
+
+        verify(pathRepository).saveAndFlush(any(Path.class));
+        assertEquals("job", response.getCategoryCode());
+    }
+
+    @Test
+    void createPath_invalidCategoryCode_returns400() {
+        User user = User.createGoogle("provider", "user@example.com", "nick");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.empty());
+
+        PathCreateRequest request = new PathCreateRequest();
+        request.setDirectionName("방향");
+        request.setCategoryCode("invalid");
+        request.setDirectionText("설명");
+        request.setReviewAt(LocalDate.now().plusDays(7));
+
+        ApiException ex = assertThrows(ApiException.class, () -> pathService.createPath(1L, request));
+        assertEquals(ErrorCode.INVALID_REQUEST, ex.getErrorCode());
     }
 
     @Test
@@ -130,7 +170,7 @@ class PathServiceTest {
     private Path buildPath(Long id) {
         Path path = Path.builder()
             .userId(1L)
-            .categoryCode("DEFAULT")
+            .categoryCode("study")
             .directionName("질문")
             .directionText("설명")
             .reviewAt(LocalDateTime.now().plusDays(7))

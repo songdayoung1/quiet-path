@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AppState } from '../types';
 import { MoodSticker, SoftButton } from '../components/UI';
 import { History, BookOpen } from 'lucide-react';
@@ -9,6 +9,7 @@ import { TodaysCard } from '../components/TodaysCard';
 import { CurrentPathStrip } from '../components/CurrentPathStrip';
 import { ProgressBand } from '../components/ProgressBand';
 import { MemoryPreviewStrip } from '../components/MemoryPreviewStrip';
+import { ExpandedHeatmapSheet } from '../components/ExpandedHeatmapSheet';
 
 interface HomeViewProps {
   state: AppState;
@@ -21,6 +22,7 @@ interface HomeViewProps {
 export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDirectionClick, onHistoryClick, onRecordsClick }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
+  const [isHeatmapSheetOpen, setIsHeatmapSheetOpen] = useState(false);
   const { currentDirection, records, hasLoggedToday } = state;
   const hasActiveDirection = !!currentDirection;
   const sortedRecords = [...records].filter(r => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp);
@@ -140,11 +142,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
         )}
         
         {/* Cumulative Progress Section */}
-        <ProgressBand 
-          records={records} 
-          monthlyRecords={monthlyRecords} 
-          monthlyConsistency={monthlyConsistency} 
-          topMood={topMood} 
+        <ProgressBand
+          records={records}
+          monthlyRecords={monthlyRecords}
+          monthlyConsistency={monthlyConsistency}
+          topMood={topMood}
+          onExpandHeatmap={() => setIsHeatmapSheetOpen(true)}
         />
       </div>
 
@@ -172,6 +175,12 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
         </SoftButton>
       </div>
 
+      <ExpandedHeatmapSheet
+        open={isHeatmapSheetOpen}
+        records={records}
+        onClose={() => setIsHeatmapSheetOpen(false)}
+        onGoToRecords={onRecordsClick}
+      />
     </div>
   );
 };

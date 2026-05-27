@@ -5,9 +5,11 @@ import lombok.Getter;
 
 @Getter
 @Builder
-public class RecordCreateResponse {
+public class RecordListItem {
     private Long id;
     private Long pathId;
+    private String directionName;
+    private String directionText;
     private String categoryCode;
     private String recordDate;
     private String content;
@@ -18,4 +20,5 @@ public class RecordCreateResponse {
     private String visibility;
     private String sharedAt;
     private String createdAt;
+    private String updatedAt;
 }

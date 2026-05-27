@@ -1,7 +1,7 @@
 import React from 'react';
 import { Record } from '../types';
 import { Card, MoodSticker, StreakHeatmap } from './UI';
-import { Flame } from 'lucide-react';
+import { Flame, ChevronDown } from 'lucide-react';
 import { KPI_LABELS } from '../kpiLabels';
 import { getThemePalette, useResolvedTheme } from '../theme';
 
@@ -10,13 +10,15 @@ interface ProgressBandProps {
   monthlyRecords: Record[];
   monthlyConsistency: number;
   topMood?: string;
+  onExpandHeatmap?: () => void;
 }
 
-export const ProgressBand: React.FC<ProgressBandProps> = ({ 
-  records, 
-  monthlyRecords, 
-  monthlyConsistency, 
-  topMood 
+export const ProgressBand: React.FC<ProgressBandProps> = ({
+  records,
+  monthlyRecords,
+  monthlyConsistency,
+  topMood,
+  onExpandHeatmap,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
@@ -24,8 +26,20 @@ export const ProgressBand: React.FC<ProgressBandProps> = ({
   return (
     <div className="flex flex-col gap-3">
        {/* 1. Streak Heatmap Section */}
-      <Card className="backdrop-blur-md shadow-sm !p-5" style={{ background: palette.cardBg, borderColor: palette.border }}>
+      <Card
+        className="backdrop-blur-md shadow-sm !p-5 cursor-pointer transition-transform active:scale-[0.995]"
+        style={{ background: palette.cardBg, borderColor: palette.border }}
+        onClick={onExpandHeatmap}
+      >
         <StreakHeatmap records={records} />
+        {onExpandHeatmap && (
+          <div className="flex items-center justify-end gap-1 mt-3 pt-3" style={{ borderTop: `1px solid ${palette.divider}` }}>
+            <span className="text-[11px] font-medium" style={{ color: palette.mutedText }}>
+              더 길게 보기
+            </span>
+            <ChevronDown size={12} style={{ color: palette.mutedText }} />
+          </div>
+        )}
       </Card>
 
       {/* 2. Monthly Summary Stats */}

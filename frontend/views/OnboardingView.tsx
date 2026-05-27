@@ -6,8 +6,15 @@ import { Direction } from '../types';
 import { createDirectionId } from '../storage';
 import { CATEGORIES } from '../constants';
 
+const formatDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface OnboardingViewProps {
-  onComplete: (initialDirection: Direction) => void;
+  onComplete: (initialDirection: Direction) => void | Promise<void>;
   onStartAuth: () => void;
   onStartGuest: () => void;
   initialStep?: number;
@@ -40,10 +47,18 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
   const [customReviewDate, setCustomReviewDate] = useState('');
   const [showDateInput, setShowDateInput] = useState(false);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const minReviewDateStr = formatDateInputValue(tomorrow);
 
   const getReviewAt = () => {
-    if (customReviewDate) return new Date(customReviewDate + 'T00:00:00').getTime();
+    if (customReviewDate) {
+      const selected = new Date(customReviewDate + 'T00:00:00');
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      if (selected <= todayStart) return undefined;
+      return selected.getTime();
+    }
     if (durationDays) { const d = new Date(); d.setDate(d.getDate() + durationDays); return d.getTime(); }
     return undefined;
   };
@@ -203,7 +218,7 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
             durationDays={durationDays}
             customReviewDate={customReviewDate}
             showDateInput={showDateInput}
-            todayStr={todayStr}
+            todayStr={minReviewDateStr}
             reviewDateDisplay={reviewDateDisplay}
             isNameMissing={isTitleMissing}
             hasReviewAt={!!getReviewAt()}
@@ -216,11 +231,17 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
               setShowDateInput(false);
             }}
             onToggleDateInput={() => {
-              setShowDateInput(!showDateInput);
+              setShowDateInput((prev) => {
+                const willOpen = !prev;
+                if (willOpen && (!customReviewDate || customReviewDate < minReviewDateStr)) {
+                  setCustomReviewDate(minReviewDateStr);
+                }
+                return willOpen;
+              });
               setDurationDays(null);
             }}
             onReviewDateChange={(value) => {
-              setCustomReviewDate(value);
+              setCustomReviewDate(value < minReviewDateStr ? minReviewDateStr : value);
               setDurationDays(null);
             }}
             onSubmit={handleStart}
