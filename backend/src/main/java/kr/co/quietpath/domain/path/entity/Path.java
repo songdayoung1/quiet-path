@@ -74,23 +74,26 @@ public class Path {
         String directionText,
         LocalDateTime reviewAt
     ) {
+        LocalDateTime now = LocalDateTime.now();
+
         this.userId = userId;
         this.categoryCode = categoryCode;
         this.directionName = directionName;
         this.directionText = directionText;
         this.reviewAt = reviewAt;
         this.status = STATUS_ACTIVE;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
     public void complete() {
         if (STATUS_COMPLETED.equals(this.status)) {
             throw new IllegalStateException("이미 종료된 방향입니다.");
         }
+        LocalDateTime now = LocalDateTime.now();
         this.status = STATUS_COMPLETED;
-        this.completedAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+        this.completedAt = now;
+        this.updatedAt = now;
     }
 
     public void assignCoverRecord(Record coverRecord) {

@@ -16,6 +16,9 @@ public class PathCreateRequest {
     @NotBlank
     private String directionName;
 
+    @NotBlank
+    private String categoryCode;
+
     private String directionText;
 
     @JsonFormat(pattern = "yyyy-MM-dd")

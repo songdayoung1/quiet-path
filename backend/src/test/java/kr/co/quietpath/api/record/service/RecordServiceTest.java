@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,7 +59,7 @@ class RecordServiceTest {
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(activePath));
-        when(recordRepository.existsByUser_IdAndRecordDate(1L, LocalDate.now()))
+        when(recordRepository.existsByPath_IdAndRecordDate(1L, LocalDate.now()))
             .thenReturn(true);
 
         RecordCreateRequest request = new RecordCreateRequest();
@@ -77,7 +78,7 @@ class RecordServiceTest {
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(activePath));
-        when(recordRepository.existsByUser_IdAndRecordDate(1L, LocalDate.now()))
+        when(recordRepository.existsByPath_IdAndRecordDate(1L, LocalDate.now()))
             .thenReturn(false);
         when(recordRepository.save(any(Record.class))).thenAnswer(invocation -> {
             Record savedRecord = invocation.getArgument(0);
@@ -94,6 +95,26 @@ class RecordServiceTest {
 
         assertEquals(100L, response.getId());
         assertEquals("버팀", response.getMoodCode());
+        assertEquals("job", response.getCategoryCode());
+    }
+
+    @Test
+    void getRecords_returnsDirectionAndVisibilityMetadata() {
+        User user = User.createGoogle("provider", "user@example.com", "nick");
+        setId(user, 1L);
+        Record record = buildRecord(user, LocalDate.now());
+        record.share();
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(recordRepository.findByUser_IdOrderByRecordDateDescIdDesc(1L)).thenReturn(List.of(record));
+
+        var response = recordService.getRecords(1L);
+
+        assertEquals(1, response.getItems().size());
+        assertEquals("job", response.getItems().get(0).getCategoryCode());
+        assertEquals("질문", response.getItems().get(0).getDirectionName());
+        assertEquals("설명", response.getItems().get(0).getDirectionText());
+        assertEquals("PUBLIC", response.getItems().get(0).getVisibility());
     }
 
     @Test
@@ -104,7 +125,7 @@ class RecordServiceTest {
         Record record = Record.builder()
             .user(owner)
             .path(activePath)
-            .categoryCode("DEFAULT")
+            .categoryCode(activePath.getCategoryCode())
             .recordDate(LocalDate.now())
             .sceneText("기존 내용")
             .oneWordText(null)
@@ -117,7 +138,6 @@ class RecordServiceTest {
 
         RecordUpdateRequest request = new RecordUpdateRequest();
         request.setContent("수정 내용");
-        request.setVisibility("PRIVATE");
 
         ApiException ex = assertThrows(ApiException.class, () -> recordService.updateRecord(2L, 10L, request));
         assertEquals(ErrorCode.NOT_OWNER, ex.getErrorCode());
@@ -131,7 +151,7 @@ class RecordServiceTest {
         Record record = Record.builder()
             .user(owner)
             .path(activePath)
-            .categoryCode("DEFAULT")
+            .categoryCode(activePath.getCategoryCode())
             .recordDate(LocalDate.now())
             .sceneText("기존 내용")
             .oneWordText(null)
@@ -145,7 +165,6 @@ class RecordServiceTest {
         RecordUpdateRequest request = new RecordUpdateRequest();
         request.setContent("수정 내용");
         request.setMoodCode("반짝");
-        request.setVisibility("PRIVATE");
 
         var response = recordService.updateRecord(1L, 10L, request);
 
@@ -155,7 +174,7 @@ class RecordServiceTest {
     }
 
     @Test
-    void updateRecord_keepsPublicRecordPublicWithoutDuplicateShareError() {
+    void updateRecord_doesNotChangeVisibility() {
         User owner = User.createGoogle("provider", "owner@example.com", "owner");
         setId(owner, 1L);
         Record record = buildRecord(owner, LocalDate.now());
@@ -164,7 +183,6 @@ class RecordServiceTest {
 
         RecordUpdateRequest request = new RecordUpdateRequest();
         request.setContent("공개 상태로 내용만 수정");
-        request.setVisibility("PUBLIC");
 
         var response = recordService.updateRecord(1L, 10L, request);
 
@@ -212,7 +230,7 @@ class RecordServiceTest {
     private Path buildPath(Long id) {
         Path path = Path.builder()
             .userId(1L)
-            .categoryCode("DEFAULT")
+            .categoryCode("job")
             .directionName("질문")
             .directionText("설명")
             .reviewAt(LocalDateTime.now().plusDays(7))
@@ -226,7 +244,7 @@ class RecordServiceTest {
         Record record = Record.builder()
             .user(owner)
             .path(activePath)
-            .categoryCode("DEFAULT")
+            .categoryCode(activePath.getCategoryCode())
             .recordDate(recordDate)
             .sceneText("기존 내용")
             .oneWordText(null)

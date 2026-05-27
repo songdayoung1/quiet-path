@@ -9,6 +9,7 @@ import lombok.Getter;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class PathActiveResponse {
     private Long pathId;
+    private String categoryCode;
     private String directionName;
     private String directionText;
     private String status;

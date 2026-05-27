@@ -18,6 +18,8 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     Optional<Record> findByUser_IdAndRecordDate(Long userId, LocalDate recordDate);
 
+    Optional<Record> findByPath_IdAndRecordDate(Long pathId, LocalDate recordDate);
+
     List<Record> findByPathIdOrderByRecordDateDesc(Long pathId);
 
     List<Record> findByPath_IdOrderByRecordDateDesc(Long pathId);
@@ -30,6 +32,8 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     List<Record> findByUser_IdOrderByRecordDateDesc(Long userId);
 
+    List<Record> findByUser_IdOrderByRecordDateDescIdDesc(Long userId);
+
     Page<Record> findAllByVisibilityAndCategoryCode(
         String visibility,
         String categoryCode,
@@ -39,6 +43,8 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     boolean existsByUserIdAndRecordDate(Long userId, LocalDate recordDate);
 
     boolean existsByUser_IdAndRecordDate(Long userId, LocalDate recordDate);
+
+    boolean existsByPath_IdAndRecordDate(Long pathId, LocalDate recordDate);
 
     @Query("""
         select r from Record r

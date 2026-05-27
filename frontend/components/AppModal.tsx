@@ -13,6 +13,7 @@ interface AppModalProps {
   onConfirm: () => void;
   onClose: () => void;
   cancelLabel?: string;
+  hideCancel?: boolean;
   confirmVariant?: ConfirmVariant;
   confirmDisabled?: boolean;
   cancelDisabled?: boolean;
@@ -46,6 +47,7 @@ export const AppModal: React.FC<AppModalProps> = ({
   onConfirm,
   onClose,
   cancelLabel = '취소',
+  hideCancel = false,
   confirmVariant = 'primary',
   confirmDisabled = false,
   cancelDisabled = false,
@@ -109,20 +111,22 @@ export const AppModal: React.FC<AppModalProps> = ({
         </div>
 
         <div className="flex gap-3 p-5 pt-6">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={cancelDisabled}
-            className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-semibold"
-            style={cancelButtonStyle}
-          >
-            {cancelLabel}
-          </button>
+          {!hideCancel && (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={cancelDisabled}
+              className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-semibold"
+              style={cancelButtonStyle}
+            >
+              {cancelLabel}
+            </button>
+          )}
           <button
             type="button"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-bold"
+            className={`${hideCancel ? 'w-full' : 'flex-1'} min-h-[52px] rounded-[20px] text-[14px] font-bold`}
             style={getConfirmStyle(theme, confirmVariant, confirmDisabled)}
           >
             {confirmLabel}

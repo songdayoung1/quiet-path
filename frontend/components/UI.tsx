@@ -1,7 +1,14 @@
 import React, { useRef, useEffect } from 'react';
 import { TreeDeciduous, TreePine, Shrub, Mountain, Cloud, Star, Sparkles, Flower, Tent } from 'lucide-react';
 import { MOOD_STICKERS } from '../constants';
+import { KPI_LABELS } from '../kpiLabels';
 import { getThemePalette, useResolvedTheme } from '../theme';
+import {
+  DEFAULT_HEATMAP_CELLS,
+  buildRecordDateMap,
+  buildRecentHeatmapDays,
+  countFilledHeatmapCells,
+} from '../utils/heatmap';
 
 // Enhanced Card with Depth, Gradient, and optional Traces
 export const Card: React.FC<{
@@ -413,67 +420,18 @@ export const ForestObject: React.FC<{ index: number; type: string; isLocked: boo
   );
 };
 
-// Streak Heatmap: 30-day record visualization (GitHub-style)
+// Streak Heatmap: recent activity grid (GitHub-inspired)
 export const StreakHeatmap: React.FC<{
   records: { timestamp: number; isHidden?: boolean; moodCode?: string }[];
   className?: string;
 }> = ({ records, className = '' }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  // Build fixed 5-week grid (Sun-Sat aligned) that always includes today
-  const days: { date: Date; hasRecord: boolean; moodCode?: string; isToday: boolean; isFuture: boolean }[] = [];
-
-  const totalCells = 35; // 5 weeks
-  const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + (6 - today.getDay())); // this week's Saturday
-  const startDate = new Date(endDate);
-  startDate.setDate(startDate.getDate() - (totalCells - 1)); // aligned Sunday
-
-  const activeRecords = records.filter(r => !r.isHidden);
-  const recordDateMap = new Map<string, string>();
-  activeRecords.forEach(r => {
-    const d = new Date(r.timestamp);
-    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    if (r.moodCode) recordDateMap.set(key, r.moodCode);
-    else recordDateMap.set(key, '__recorded__');
-  });
-
-  const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
-  for (let i = 0; i < totalCells; i++) {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + i);
-    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    days.push({
-      date: d,
-      hasRecord: recordDateMap.has(key),
-      moodCode: recordDateMap.get(key) === '__recorded__' ? undefined : recordDateMap.get(key),
-      isToday: key === todayKey,
-      isFuture: d > today,
-    });
-  }
-
-  // Calculate current streak
-  let currentStreak = 0;
-  const checkDate = new Date(today);
-  while (true) {
-    const key = `${checkDate.getFullYear()}-${checkDate.getMonth()}-${checkDate.getDate()}`;
-    if (recordDateMap.has(key)) {
-      currentStreak++;
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      break;
-    }
-  }
-
-  // Count total recorded days in last 30 days
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-  const last30Records = days.filter(d => d.hasRecord && d.date >= thirtyDaysAgo && !d.isFuture).length;
-
-  const weekLabels = ['일', '월', '화', '수', '목', '금', '토'];
+  const totalCells = DEFAULT_HEATMAP_CELLS;
+  const recordDateMap = buildRecordDateMap(records);
+  const days = buildRecentHeatmapDays(recordDateMap, totalCells);
+  const filledCells = countFilledHeatmapCells(days);
+  const recentRate = Math.round((filledCells / totalCells) * 100);
 
   // Mood to color mapping
   const getMoodColor = (moodCode?: string, hasRecord?: boolean) => {
@@ -495,26 +453,21 @@ export const StreakHeatmap: React.FC<{
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-point-500">{currentStreak}</span>
-            <span className="text-xs font-medium" style={{ color: palette.mutedText }}>일 연속</span>
+            <span className="text-2xl font-bold text-point-500">{recentRate}%</span>
+            <span className="text-xs font-medium" style={{ color: palette.mutedText }}>{KPI_LABELS.recent21Rate}</span>
           </div>
           <div className="w-px h-5" style={{ background: palette.divider }} />
           <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold" style={{ color: palette.strongText }}>{last30Records}</span>
-            <span className="text-[10px]" style={{ color: palette.faintText }}>/30일</span>
+            <span className="text-sm font-bold" style={{ color: palette.strongText }}>{filledCells}</span>
+            <span className="text-[10px]" style={{ color: palette.faintText }}>/ {totalCells}{KPI_LABELS.recent21CountUnit}</span>
           </div>
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Streak</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>{KPI_LABELS.recent21Tag}</span>
       </div>
 
-      {/* Weekday labels */}
-      <div className="grid grid-cols-7 gap-[5px] mb-1.5">
-        {weekLabels.map(label => (
-          <div key={label} className="text-center text-[9px] font-medium tracking-wide" style={{ color: palette.faintText }}>
-            {label}
-          </div>
-        ))}
-      </div>
+      <p className="text-[10px] font-medium mb-3" style={{ color: palette.faintText }}>
+        {KPI_LABELS.recent21Panel}
+      </p>
 
       {/* Heatmap grid */}
       <div className="grid grid-cols-7 gap-[5px]">
@@ -525,21 +478,14 @@ export const StreakHeatmap: React.FC<{
               key={i}
               className={`
                 aspect-square rounded-lg transition-all duration-300
-                ${day.isFuture
-                  ? 'bg-transparent'
-                  : day.hasRecord
-                    ? `${color} shadow-sm`
-                    : ''
-                }
+                ${day.hasRecord ? `${color} shadow-sm` : ''}
                 ${day.isToday ? 'ring-2 ring-point-300 ring-offset-1' : ''}
               `}
               style={{
                 backgroundColor:
-                  day.isFuture
-                    ? 'transparent'
-                    : day.hasRecord
-                      ? undefined
-                      : palette.emptyCell,
+                  day.hasRecord
+                    ? undefined
+                    : palette.emptyCell,
               }}
               title={`${day.date.getMonth() + 1}/${day.date.getDate()}`}
             >

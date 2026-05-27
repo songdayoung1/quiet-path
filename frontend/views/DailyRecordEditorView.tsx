@@ -2,19 +2,21 @@ import React, { useState, useRef } from 'react';
 import { AppState, Record as RecordType, Direction } from '../types';
 import { createLogId } from '../storage';
 import { SoftButton, AutoTextArea, MoodSticker, WaterDropOverlay } from '../components/UI';
-import { X, Check, Image as ImageIcon } from 'lucide-react';
+import { X, Check, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { MOOD_STICKERS } from '../constants';
 import { CharacterTone } from '../components/WaterDropCharacter';
 import { getThemePalette, useResolvedTheme } from '../theme';
+import { recordApi } from '../api/recordApi';
+import { AppModal } from '../components/AppModal';
 
-interface LogEditorViewProps {
+interface DailyRecordEditorViewProps {
   state: AppState;
   onSave: (record: RecordType, directionUpdate?: Partial<Direction>) => void;
   onCancel: () => void;
   onStartDirection: () => void;
 }
 
-export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onCancel, onStartDirection }) => {
+export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({ state, onSave, onCancel, onStartDirection }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const [action, setAction] = useState(''); // 오늘의 장면
@@ -24,27 +26,59 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
   const [imageUrl, setImageUrl] = useState<string>('');
   
   const [saveState, setSaveState] = useState<'idle' | 'animating' | 'leaving'>('idle');
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { currentDirection } = state;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!currentDirection || !action.trim() || saveState !== 'idle') return;
 
-    const newRecord: RecordType = {
-      id: createLogId(),
-      date: new Date().toISOString(),
-      timestamp: Date.now(),
+    const localCreatedAt = new Date().toISOString();
+    const baseRecord = (id: string, createdAt: string): RecordType => ({
+      id,
+      date: createdAt,
+      timestamp: new Date(createdAt).getTime(),
       directionQuestion: currentDirection.question,
       action: action.trim(),
       oneWordText: oneWordText.trim() || undefined,
       tomorrowText: tomorrowText.trim() || undefined,
       moodCode: moodCode || undefined,
       imageUrl: imageUrl || undefined,
-    };
+      isShared: false,
+    });
 
     // 1) 물방울 오버레이 등장
     setSaveState('animating');
+
+    let savedRecord = baseRecord(createLogId(), localCreatedAt);
+    const token = state.auth?.token;
+
+    if (state.auth?.isLoggedIn && token) {
+      try {
+        const response = await recordApi.create(token, {
+          content: action.trim(),
+          oneWordText: oneWordText.trim() || undefined,
+          tomorrowText: tomorrowText.trim() || undefined,
+          moodCode: moodCode || undefined,
+          imageUrl: imageUrl || undefined,
+          visibility: 'PRIVATE',
+        });
+        savedRecord = {
+          ...baseRecord(String(response.id), response.createdAt),
+          action: response.content,
+          oneWordText: response.oneWordText ?? undefined,
+          tomorrowText: response.tomorrowText ?? undefined,
+          moodCode: response.moodCode ?? undefined,
+          imageUrl: response.imageUrl ?? undefined,
+          isShared: response.visibility === 'PUBLIC',
+        };
+      } catch (error) {
+        setSaveState('idle');
+        setNoticeMessage(error instanceof Error ? error.message : '기록 저장에 실패했습니다.');
+        return;
+      }
+    }
 
     // 2) 1.4s 후 페이드아웃 시작
     setTimeout(() => {
@@ -53,7 +87,7 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
 
     // 3) 페이드아웃 완료(0.35s) 후 실제 저장
     setTimeout(() => {
-      onSave(newRecord);
+      onSave(savedRecord);
     }, 1750);
   };
 
@@ -104,7 +138,8 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
   }
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col animate-fade-in backdrop-blur-xl" style={{ background: theme === 'dark' ? 'rgba(15,23,42,0.95)' : 'rgba(232,237,242,0.95)' }}>
+    <>
+      <div className="absolute inset-0 z-50 flex flex-col animate-fade-in backdrop-blur-xl" style={{ background: theme === 'dark' ? 'rgba(15,23,42,0.95)' : 'rgba(232,237,242,0.95)' }}>
       {/* Header */}
       <div className="sticky top-0 bg-transparent p-4 flex justify-between items-center z-10 pt-6">
         <button onClick={onCancel} className="p-3 rounded-full transition-colors shadow-sm" style={{ background: palette.pillBg, color: palette.mutedText, border: `1px solid ${palette.pillBorder}` }}>
@@ -245,10 +280,23 @@ export const LogEditorView: React.FC<LogEditorViewProps> = ({ state, onSave, onC
         </div>
       </div>
 
-      {/* Water Drop Micro-interaction */}
-      {isSaving && (
-        <WaterDropOverlay leaving={saveState === 'leaving'} mood={mascotTone} />
-      )}
-    </div>
+        {/* Water Drop Micro-interaction */}
+        {isSaving && (
+          <WaterDropOverlay leaving={saveState === 'leaving'} mood={mascotTone} />
+        )}
+      </div>
+
+      <AppModal
+        open={noticeMessage !== null}
+        icon={<AlertCircle size={22} />}
+        title="기록을 저장하지 못했어요"
+        description={noticeMessage ?? ''}
+        confirmLabel="확인"
+        hideCancel
+        confirmVariant="danger"
+        onClose={() => setNoticeMessage(null)}
+        onConfirm={() => setNoticeMessage(null)}
+      />
+    </>
   );
 };

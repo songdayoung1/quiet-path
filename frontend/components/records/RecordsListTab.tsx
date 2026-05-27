@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { Record as RecordType } from '../../types';
 import { Card, MoodSticker } from '../UI';
-import { Globe2, Pin, EyeOff, Share2, MoreHorizontal } from 'lucide-react';
+import { Globe2, Pin, EyeOff, MoreHorizontal, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { WaterDropCharacter } from '../WaterDropCharacter';
 import { getThemePalette, useResolvedTheme } from '../../theme';
+import { recordApi } from '../../api/recordApi';
+import { AppModal } from '../AppModal';
 
 interface RecordsListTabProps {
   records: RecordType[];
   onSelectRecord: (record: RecordType) => void;
   onUpdateRecord: (record: RecordType) => void;
+  accessToken?: string | null;
+  onLoginRequired: () => void;
 }
 
 const EmptyRecords: React.FC = () => {
@@ -30,10 +34,17 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   records,
   onSelectRecord,
   onUpdateRecord,
+  accessToken,
+  onLoginRequired,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [noticeModal, setNoticeModal] = useState<{
+    title: string;
+    description: string;
+    variant: 'primary' | 'danger';
+  } | null>(null);
 
   const handleHide = (record: RecordType) => {
     onUpdateRecord({ ...record, isHidden: true });
@@ -43,21 +54,53 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
     onUpdateRecord({ ...record, isPinned: !record.isPinned });
     setActiveMenuId(null);
   };
-  const handleShare = (record: RecordType) => {
-    if (!record.isShared) {
-      onUpdateRecord({ ...record, isShared: true });
-      alert('커뮤니티에 조용히 공유되었습니다.');
+  const handleVisibilityChange = async (record: RecordType, isShared: boolean) => {
+    if (!accessToken) {
+      onLoginRequired();
+      return;
     }
-    setActiveMenuId(null);
+
+    const recordId = Number(record.id);
+    if (!Number.isInteger(recordId)) {
+      setNoticeModal({
+        title: '아직 공개할 수 없어요',
+        description: '이 기록은 아직 서버에 저장되지 않아 공개 상태를 바꿀 수 없어요.',
+        variant: 'danger',
+      });
+      setActiveMenuId(null);
+      return;
+    }
+
+    try {
+      const response = await recordApi.updateVisibility(accessToken, recordId, isShared ? 'PUBLIC' : 'PRIVATE');
+      onUpdateRecord({ ...record, isShared: response.visibility === 'PUBLIC' });
+      setNoticeModal({
+        title: response.visibility === 'PUBLIC' ? '공유 상태가 바뀌었어요' : '비공개로 전환했어요',
+        description:
+          response.visibility === 'PUBLIC'
+            ? '커뮤니티에 조용히 공유되었습니다.'
+            : '이 기록은 다시 나만 볼 수 있게 바뀌었습니다.',
+        variant: 'primary',
+      });
+    } catch (err) {
+      setNoticeModal({
+        title: '공개 상태를 바꾸지 못했어요',
+        description: err instanceof Error ? err.message : '공개 상태 변경에 실패했습니다.',
+        variant: 'danger',
+      });
+    } finally {
+      setActiveMenuId(null);
+    }
   };
 
   if (records.length === 0) return <EmptyRecords />;
 
   return (
-    <div className="px-4 flex flex-col gap-5" onClick={() => setActiveMenuId(null)}>
-      {records.map((record) => {
-        return (
-          <Card
+    <>
+      <div className="px-4 flex flex-col gap-5" onClick={() => setActiveMenuId(null)}>
+        {records.map((record) => {
+          return (
+            <Card
             key={record.id}
             className={`!p-6 !rounded-[2rem] cursor-pointer hover:shadow-lg transition-all duration-300 relative !overflow-visible ${
               activeMenuId === record.id ? 'z-50' : 'z-10'
@@ -124,7 +167,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                       {!record.isShared && (
                         <>
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleShare(record); }}
+                            onClick={(e) => { e.stopPropagation(); handleVisibilityChange(record, true); }}
                             className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors group/btn"
                           >
                             <div className="rounded-md p-1 transition-colors" style={{ background: theme === 'dark' ? 'rgba(76,29,149,0.24)' : 'rgba(243,232,255,0.8)' }}>
@@ -133,7 +176,15 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                             <span className="text-[11px] font-bold text-point-500">커뮤니티 공유</span>
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); alert('카카오톡으로 공유합니다.'); setActiveMenuId(null); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNoticeModal({
+                                title: '준비 중인 공유예요',
+                                description: '카카오톡 공유 기능은 아직 연결 전이에요.',
+                                variant: 'primary',
+                              });
+                              setActiveMenuId(null);
+                            }}
                             className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors group/btn"
                           >
                             <div className="rounded-md p-1 transition-colors" style={{ background: palette.cardBgSoft }}>
@@ -142,7 +193,15 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                             <span className="text-[11px] font-bold text-mist-600">카카오톡 공유</span>
                           </button>
                           <button
-                            onClick={(e) => { e.stopPropagation(); alert('링크가 복사되었습니다.'); setActiveMenuId(null); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNoticeModal({
+                                title: '준비 중인 공유예요',
+                                description: '링크 복사 기능은 아직 연결 전이에요.',
+                                variant: 'primary',
+                              });
+                              setActiveMenuId(null);
+                            }}
                             className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors group/btn"
                           >
                             <div className="rounded-md p-1 transition-colors" style={{ background: palette.cardBgSoft }}>
@@ -151,6 +210,17 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                             <span className="text-[11px] font-bold text-mist-600">링크 복사</span>
                           </button>
                         </>
+                      )}
+                      {record.isShared && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleVisibilityChange(record, false); }}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors group/btn"
+                        >
+                          <div className="rounded-md p-1 transition-colors" style={{ background: theme === 'dark' ? 'rgba(15,23,42,0.48)' : 'rgba(241,245,249,0.9)' }}>
+                            <EyeOff size={14} className="text-mist-400" />
+                          </div>
+                          <span className="text-[11px] font-bold" style={{ color: palette.mutedText }}>커뮤니티 비공개</span>
+                        </button>
                       )}
     
                       <div className="my-1 border-t" style={{ borderColor: palette.divider }} />
@@ -193,9 +263,26 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                 </div>
               )}
             </div>
-          </Card>
-        );
-      })}
-    </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <AppModal
+        open={noticeModal !== null}
+        icon={
+          noticeModal?.variant === 'danger'
+            ? <AlertCircle size={22} />
+            : <CheckCircle2 size={22} />
+        }
+        title={noticeModal?.title ?? ''}
+        description={noticeModal?.description ?? ''}
+        confirmLabel="확인"
+        hideCancel
+        confirmVariant={noticeModal?.variant === 'danger' ? 'danger' : 'primary'}
+        onClose={() => setNoticeModal(null)}
+        onConfirm={() => setNoticeModal(null)}
+      />
+    </>
   );
 };

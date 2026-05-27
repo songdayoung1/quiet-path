@@ -3,6 +3,7 @@ import { Direction } from '../types';
 import { Compass, Wind } from 'lucide-react';
 import { CategoryIcon, Card } from './UI';
 import { CATEGORIES } from '../constants';
+import { KPI_LABELS } from '../kpiLabels';
 import { getThemePalette, useResolvedTheme } from '../theme';
 
 interface CurrentPathStripProps {
@@ -83,7 +84,7 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
               </span>
               <span className="text-[10px] font-bold" style={{ color: palette.faintText }}>%</span>
             </div>
-            <p className="text-[8px] font-bold uppercase tracking-widest mt-0.5" style={{ color: palette.faintText }}>Rate</p>
+            <p className="text-[8px] font-bold uppercase tracking-widest mt-0.5" style={{ color: palette.faintText }}>{KPI_LABELS.pathRate}</p>
           </div>
           
           {reviewDateText && (

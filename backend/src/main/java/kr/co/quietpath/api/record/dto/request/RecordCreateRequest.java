@@ -13,7 +13,13 @@ public class RecordCreateRequest {
     @NotBlank
     private String content;
 
+    private String oneWordText;
+
+    private String tomorrowText;
+
     private String moodCode;
+
+    private String imageUrl;
 
     @NotBlank
     private String visibility;

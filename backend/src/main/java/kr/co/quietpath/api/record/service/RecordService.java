@@ -7,6 +7,8 @@ import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
 import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
+import kr.co.quietpath.api.record.dto.response.RecordListItem;
+import kr.co.quietpath.api.record.dto.response.RecordListResponse;
 import kr.co.quietpath.api.record.dto.response.RecordShareResponse;
 import kr.co.quietpath.api.record.dto.response.RecordTodayResponse;
 import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
@@ -28,6 +30,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -52,7 +55,7 @@ public class RecordService {
             .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_PATH_REQUIRED));
 
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
-        if (recordRepository.existsByUser_IdAndRecordDate(userId, today)) {
+        if (recordRepository.existsByPath_IdAndRecordDate(activePath.getId(), today)) {
             throw new ApiException(ErrorCode.RECORD_ALREADY_EXISTS);
         }
 
@@ -65,10 +68,10 @@ public class RecordService {
             .categoryCode(activePath.getCategoryCode())
             .recordDate(today)
             .sceneText(request.getContent())
-            .oneWordText(null)
-            .tomorrowText(null)
+            .oneWordText(normalizeOptionalText(request.getOneWordText()))
+            .tomorrowText(normalizeOptionalText(request.getTomorrowText()))
             .moodCode(moodCode)
-            .imageUrl(null)
+            .imageUrl(normalizeOptionalText(request.getImageUrl()))
             .build();
 
         try {
@@ -84,25 +87,50 @@ public class RecordService {
         return RecordCreateResponse.builder()
             .id(record.getId())
             .pathId(activePath.getId())
+            .categoryCode(record.getCategoryCode())
             .recordDate(formatDate(today))
             .content(resolveContent(record))
+            .oneWordText(record.getOneWordText())
+            .tomorrowText(record.getTomorrowText())
             .moodCode(record.getMoodCode())
+            .imageUrl(record.getImageUrl())
             .visibility(record.getVisibility())
+            .sharedAt(record.getSharedAt() != null ? formatDateTime(record.getSharedAt()) : null)
             .createdAt(formatDateTime(record.getCreatedAt()))
+            .build();
+    }
+
+    @Transactional(readOnly = true)
+    public RecordListResponse getRecords(Long userId) {
+        getUser(userId);
+        List<RecordListItem> items = recordRepository.findByUser_IdOrderByRecordDateDescIdDesc(userId)
+            .stream()
+            .map(this::toListItem)
+            .toList();
+        return RecordListResponse.builder()
+            .items(items)
             .build();
     }
 
     @Transactional(readOnly = true)
     public RecordTodayResponse getTodayRecord(Long userId) {
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
-        return recordRepository.findByUser_IdAndRecordDate(userId, today)
+        return pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
+            .flatMap(activePath -> recordRepository.findByPath_IdAndRecordDate(activePath.getId(), today))
             .map(record -> RecordTodayResponse.builder()
                 .id(record.getId())
                 .pathId(record.getPath().getId())
+                .directionName(record.getPath().getDirectionName())
+                .directionText(record.getPath().getDirectionText())
+                .categoryCode(record.getCategoryCode())
                 .recordDate(formatDate(record.getRecordDate()))
                 .content(resolveContent(record))
+                .oneWordText(record.getOneWordText())
+                .tomorrowText(record.getTomorrowText())
                 .moodCode(record.getMoodCode())
+                .imageUrl(record.getImageUrl())
                 .visibility(record.getVisibility())
+                .sharedAt(record.getSharedAt() != null ? formatDateTime(record.getSharedAt()) : null)
                 .createdAt(formatDateTime(record.getCreatedAt()))
                 .build())
             .orElse(null);
@@ -156,18 +184,19 @@ public class RecordService {
 
         record.updateContent(
             request.getContent(),
-            record.getOneWordText(),
-            record.getTomorrowText(),
-            moodCode
+            normalizeOptionalText(request.getOneWordText()),
+            normalizeOptionalText(request.getTomorrowText()),
+            moodCode,
+            normalizeOptionalText(request.getImageUrl())
         );
-
-        String visibility = normalizeVisibility(request.getVisibility());
-        applyVisibility(record, visibility);
 
         return RecordUpdateResponse.builder()
             .id(record.getId())
             .content(resolveContent(record))
+            .oneWordText(record.getOneWordText())
+            .tomorrowText(record.getTomorrowText())
             .moodCode(record.getMoodCode())
+            .imageUrl(record.getImageUrl())
             .visibility(record.getVisibility())
             .updatedAt(formatDateTime(record.getUpdatedAt()))
             .build();
@@ -249,6 +278,13 @@ public class RecordService {
         return moodCode;
     }
 
+    private String normalizeOptionalText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value;
+    }
+
     private void applyVisibility(Record record, String visibility) {
         if (VISIBILITY_PUBLIC.equals(visibility)) {
             if (!VISIBILITY_PUBLIC.equals(record.getVisibility())) {
@@ -266,6 +302,27 @@ public class RecordService {
             return record.getSceneText();
         }
         return record.getOneWordText();
+    }
+
+    private RecordListItem toListItem(Record record) {
+        Path path = record.getPath();
+        return RecordListItem.builder()
+            .id(record.getId())
+            .pathId(path != null ? path.getId() : null)
+            .directionName(path != null ? path.getDirectionName() : null)
+            .directionText(path != null ? path.getDirectionText() : null)
+            .categoryCode(record.getCategoryCode())
+            .recordDate(formatDate(record.getRecordDate()))
+            .content(resolveContent(record))
+            .oneWordText(record.getOneWordText())
+            .tomorrowText(record.getTomorrowText())
+            .moodCode(record.getMoodCode())
+            .imageUrl(record.getImageUrl())
+            .visibility(record.getVisibility())
+            .sharedAt(record.getSharedAt() != null ? formatDateTime(record.getSharedAt()) : null)
+            .createdAt(formatDateTime(record.getCreatedAt()))
+            .updatedAt(formatDateTime(record.getUpdatedAt()))
+            .build();
     }
 
     private String formatDate(LocalDate date) {

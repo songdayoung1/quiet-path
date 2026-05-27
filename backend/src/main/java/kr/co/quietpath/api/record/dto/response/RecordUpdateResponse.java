@@ -8,7 +8,10 @@ import lombok.Getter;
 public class RecordUpdateResponse {
     private Long id;
     private String content;
+    private String oneWordText;
+    private String tomorrowText;
     private String moodCode;
+    private String imageUrl;
     private String visibility;
     private String updatedAt;
 }

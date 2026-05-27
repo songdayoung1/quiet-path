@@ -95,7 +95,7 @@ CREATE TABLE records (
     reaction_count INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
-    UNIQUE KEY uk_user_date (user_id, record_date),
+    UNIQUE KEY uk_path_date (path_id, record_date),
     UNIQUE KEY uk_records_share_code (share_code),
     INDEX idx_path_date (path_id, record_date),
     INDEX idx_visibility_category_shared (visibility, category_code, shared_at, id),

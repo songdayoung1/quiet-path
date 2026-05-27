@@ -13,8 +13,11 @@ public class RecordUpdateRequest {
     @NotBlank
     private String content;
 
+    private String oneWordText;
+
+    private String tomorrowText;
+
     private String moodCode;
 
-    @NotBlank
-    private String visibility;
+    private String imageUrl;
 }

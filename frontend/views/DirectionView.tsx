@@ -1,17 +1,24 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Direction, Record as RecordType } from '../types';
 import { Card, PageHeader, SoftButton, MoodSticker, CategoryIcon, WaterDropOverlay } from '../components/UI';
-import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight } from 'lucide-react';
+import { Compass, CheckCircle2, History, Calendar, Play, Image as ImageIcon, ArrowRight, AlertCircle } from 'lucide-react';
 import { CATEGORIES } from '../constants';
 import { DirectionSetupForm } from '../components/DirectionSetupForm';
 import { WaterDropCharacter } from '../components/WaterDropCharacter';
 import { AppModal } from '../components/AppModal';
 import { getThemePalette, useResolvedTheme } from '../theme';
 
+const formatDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 interface DirectionViewProps {
   currentDirection: Direction | null;
   records: RecordType[];
-  onStartDirection: (newDirection: Partial<Direction>) => void;
+  onStartDirection: (newDirection: Partial<Direction>) => void | Promise<void>;
   onFinishDirection: () => void;
   onHistoryClick: () => void;
 }
@@ -29,10 +36,20 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   const [showDateInput, setShowDateInput] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[number] | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'animating' | 'leaving'>('idle');
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const submitLockedRef = useRef(false);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const minReviewDateStr = formatDateInputValue(tomorrow);
   const getReviewAt = () => {
-    if (customReviewDate) return new Date(customReviewDate + 'T00:00:00').getTime();
+    if (customReviewDate) {
+      const selected = new Date(customReviewDate + 'T00:00:00');
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      if (selected <= todayStart) return undefined;
+      return selected.getTime();
+    }
     if (durationDays) { const d = new Date(); d.setDate(d.getDate() + durationDays); return d.getTime(); }
     return undefined;
   };
@@ -60,7 +77,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
 
   const handleSubmit = () => {
     const reviewAt = getReviewAt();
-    if (!description.trim() || !reviewAt || saveState !== 'idle') return;
+    if (!description.trim() || !reviewAt || saveState !== 'idle' || submitLockedRef.current) return;
+    submitLockedRef.current = true;
 
     // Trigger Success Animation
     setSaveState('animating');
@@ -69,16 +87,22 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
       setSaveState('leaving');
     }, 1400);
 
-    setTimeout(() => {
-      onStartDirection({
-        question: question.trim() || '이 방향으로 나는 어떻게 걸어가고 있을까?',
-        description,
-        categoryId: selectedCategory?.id,
-        categoryLabel: selectedCategory?.label,
-        reviewAt,
-      });
-      setIsEditing(false);
-      setSaveState('idle');
+    setTimeout(async () => {
+      try {
+        await onStartDirection({
+          question: question.trim() || '이 방향으로 나는 어떻게 걸어가고 있을까?',
+          description,
+          categoryId: selectedCategory?.id,
+          categoryLabel: selectedCategory?.label,
+          reviewAt,
+        });
+        setIsEditing(false);
+      } catch (err) {
+        setNoticeMessage(err instanceof Error ? err.message : '방향 생성에 실패했습니다.');
+      } finally {
+        submitLockedRef.current = false;
+        setSaveState('idle');
+      }
     }, 1750);
   };
 
@@ -168,11 +192,11 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
               durationDays={durationDays}
               customReviewDate={customReviewDate}
               showDateInput={showDateInput}
-              todayStr={todayStr}
+              todayStr={minReviewDateStr}
               reviewDateDisplay={reviewDateDisplay}
               isNameMissing={isTitleMissing}
               hasReviewAt={!!getReviewAt()}
-              submitDisabled={!canSubmit}
+              submitDisabled={!canSubmit || saveState !== 'idle'}
               onDirectionNameChange={setDescription}
               onDirectionTextChange={setQuestion}
               onSelectDuration={(days) => {
@@ -181,11 +205,17 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                 setShowDateInput(false);
               }}
               onToggleDateInput={() => {
-                setShowDateInput(!showDateInput);
+                setShowDateInput((prev) => {
+                  const willOpen = !prev;
+                  if (willOpen && (!customReviewDate || customReviewDate < minReviewDateStr)) {
+                    setCustomReviewDate(minReviewDateStr);
+                  }
+                  return willOpen;
+                });
                 setDurationDays(null);
               }}
               onReviewDateChange={(value) => {
-                setCustomReviewDate(value);
+                setCustomReviewDate(value < minReviewDateStr ? minReviewDateStr : value);
                 setDurationDays(null);
               }}
               onSubmit={handleSubmit}
@@ -265,7 +295,7 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                   {/* Stats Row */}
                   <div className="flex items-center justify-between mb-4 border-b pb-4" style={{ borderColor: palette.divider }}>
                     <div className="flex flex-col items-center flex-1">
-                      <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Rate</p>
+                      <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Path Rate</p>
                       <p className="text-[17px] font-bold text-point-500 mt-1 leading-none">{pathConsistency}%</p>
                     </div>
                     <div className="w-px h-6" style={{ background: palette.divider }}></div>
@@ -364,6 +394,18 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
         confirmLabel="마무리하기"
         onClose={() => setFinishModalOpen(false)}
         onConfirm={confirmFinishDirection}
+      />
+
+      <AppModal
+        open={noticeMessage !== null}
+        icon={<AlertCircle size={22} />}
+        title="방향을 시작하지 못했어요"
+        description={noticeMessage ?? ''}
+        confirmLabel="확인"
+        hideCancel
+        confirmVariant="danger"
+        onClose={() => setNoticeMessage(null)}
+        onConfirm={() => setNoticeMessage(null)}
       />
     </div>
   );
