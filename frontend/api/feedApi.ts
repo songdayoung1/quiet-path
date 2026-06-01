@@ -55,6 +55,8 @@ const resolveApiBaseUrl = () => {
 
 const apiBaseUrl = resolveApiBaseUrl();
 const apiUrl = (path: string) => `${apiBaseUrl}${path}`;
+const FEED_CACHE_TTL_MS = 20_000;
+const responseCache = new Map<string, { expiresAt: number; value: unknown }>();
 
 const parseErrorMessage = async (response: Response) => {
   try {
@@ -65,6 +67,12 @@ const parseErrorMessage = async (response: Response) => {
   }
 };
 
+const buildApiError = async (response: Response) => {
+  const error = new Error(await parseErrorMessage(response)) as Error & { status?: number };
+  error.status = response.status;
+  return error;
+};
+
 const createAuthHeaders = (token?: string | null) => {
   if (!token) {
     return undefined;
@@ -73,6 +81,25 @@ const createAuthHeaders = (token?: string | null) => {
   return {
     Authorization: `Bearer ${token}`,
   };
+};
+
+const readCache = <T,>(key: string): T | null => {
+  const cached = responseCache.get(key);
+  if (!cached) {
+    return null;
+  }
+  if (cached.expiresAt <= Date.now()) {
+    responseCache.delete(key);
+    return null;
+  }
+  return cached.value as T;
+};
+
+const writeCache = <T,>(key: string, value: T) => {
+  responseCache.set(key, {
+    expiresAt: Date.now() + FEED_CACHE_TTL_MS,
+    value,
+  });
 };
 
 export const feedApi = {
@@ -91,28 +118,44 @@ export const feedApi = {
       query.set('cursor', params.cursor);
     }
 
+    const cacheKey = `feed:${params.token ?? 'guest'}:${query.toString()}`;
+    const cached = readCache<FeedResponse>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const response = await fetch(apiUrl(`/api/v1/feed?${query.toString()}`), {
       method: 'GET',
       headers: createAuthHeaders(params.token),
     });
 
     if (!response.ok) {
-      throw new Error(await parseErrorMessage(response));
+      throw await buildApiError(response);
     }
 
-    return response.json();
+    const data = await response.json();
+    writeCache(cacheKey, data);
+    return data;
   },
 
   async getWeeklyTop3(token?: string | null): Promise<WeeklyTop3Response> {
+    const cacheKey = `weekly-top3:${token ?? 'guest'}`;
+    const cached = readCache<WeeklyTop3Response>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const response = await fetch(apiUrl('/api/v1/feed/weekly-top3'), {
       method: 'GET',
       headers: createAuthHeaders(token),
     });
 
     if (!response.ok) {
-      throw new Error(await parseErrorMessage(response));
+      throw await buildApiError(response);
     }
 
-    return response.json();
+    const data = await response.json();
+    writeCache(cacheKey, data);
+    return data;
   },
 };

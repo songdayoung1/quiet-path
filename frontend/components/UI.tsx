@@ -27,7 +27,9 @@ export const Card: React.FC<{
       onClick={onClick}
       style={{
         background: palette.cardBg,
-        border: `1px solid ${palette.border}`,
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: palette.border,
         boxShadow: palette.shadow,
         ...style,
       }}
@@ -113,7 +115,9 @@ export const SoftInput: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = 
       className={`w-full rounded-2xl p-4 outline-none transition-all ${props.className}`}
       style={{
         background: palette.cardBgSoft,
-        border: `1px solid ${palette.border}`,
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: palette.border,
         color: palette.strongText,
         ...(props.style ?? {}),
       }}
@@ -151,7 +155,9 @@ export const AutoTextArea: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaEle
       className={`w-full rounded-2xl p-4 outline-none transition-all resize-none overflow-hidden min-h-[80px] leading-relaxed ${props.className}`}
       style={{
         background: palette.cardBgSoft,
-        border: `1px solid ${palette.border}`,
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: palette.border,
         color: palette.strongText,
         ...(props.style ?? {}),
       }}
@@ -569,49 +575,51 @@ export const WaterDropOverlay: React.FC<{
 
   return (
     <div
-      className={`water-drop-overlay${leaving ? ' leaving' : ''} absolute inset-0 z-50 flex flex-col items-center justify-center`}
+      className={`water-drop-overlay${leaving ? ' leaving' : ''} absolute inset-0 z-[80]`}
       style={{
         background: theme === 'dark' ? 'rgba(15,23,42,0.90)' : 'rgba(245,243,255,0.92)',
         backdropFilter: 'blur(18px)',
         WebkitBackdropFilter: 'blur(18px)',
       }}
     >
-      {/* Character + ripples */}
-      <div className="relative flex items-center justify-center">
-        {[0, 1, 2].map(i => (
-          <span
-            key={i}
-            className="ripple-ring absolute rounded-full border border-point-300/50"
-            style={{ width: '80px', height: '80px', animationDelay: `${i * 0.18}s` }}
-          />
-        ))}
+      <div className="h-full w-full flex flex-col items-center justify-center px-6">
+        {/* Character + ripples */}
+        <div className="relative flex items-center justify-center">
+          {[0, 1, 2].map(i => (
+            <span
+              key={i}
+              className="ripple-ring absolute rounded-full border border-point-300/50"
+              style={{ width: '80px', height: '80px', animationDelay: `${i * 0.18}s` }}
+            />
+          ))}
 
-        {/* Mascot dynamic mood */}
-        <div className="drop-icon relative z-10">
-          <WaterDropCharacter size={86} mood={mood} animate={false} />
+          {/* Mascot dynamic mood */}
+          <div className="drop-icon relative z-10">
+            <WaterDropCharacter size={86} mood={mood} animate={false} />
+          </div>
+
+          {droplets.map((d, i) => (
+            <span
+              key={i}
+              className="droplet absolute rounded-full bg-point-300"
+              style={{
+                '--dx': d.dx,
+                '--dy': d.dy,
+                animationDelay: d.delay,
+                width: `${d.size}px`,
+                height: `${d.size}px`,
+              } as React.CSSProperties}
+            />
+          ))}
         </div>
 
-        {droplets.map((d, i) => (
-          <span
-            key={i}
-            className="droplet absolute rounded-full bg-point-300"
-            style={{
-              '--dx': d.dx,
-              '--dy': d.dy,
-              animationDelay: d.delay,
-              width: `${d.size}px`,
-              height: `${d.size}px`,
-            } as React.CSSProperties}
-          />
-        ))}
+        <p className="success-text mt-8 text-base font-semibold tracking-wide text-center" style={{ color: theme === 'dark' ? '#C4B5FD' : '#7C3AED' }}>
+          {title}
+        </p>
+        <p className="success-text mt-1 text-xs text-center" style={{ animationDelay: '0.65s', color: palette.mutedText }}>
+          {subtitle}
+        </p>
       </div>
-
-      <p className="success-text mt-8 text-base font-semibold tracking-wide" style={{ color: theme === 'dark' ? '#C4B5FD' : '#7C3AED' }}>
-        {title}
-      </p>
-      <p className="success-text mt-1 text-xs" style={{ animationDelay: '0.65s', color: palette.mutedText }}>
-        {subtitle}
-      </p>
     </div>
   );
 };

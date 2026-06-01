@@ -23,6 +23,12 @@ export interface PathActiveResponse {
   reviewAt?: string;
 }
 
+export interface PathFinishResponse {
+  pathId: number;
+  status: string;
+  completedAt: string;
+}
+
 const resolveApiBaseUrl = () => {
   const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
   if (!configured) return '';
@@ -65,6 +71,21 @@ export const pathApi = {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
+
+    return response.json();
+  },
+
+  async finish(token: string, pathId: number): Promise<PathFinishResponse> {
+    const response = await fetch(apiUrl(`/api/v1/paths/${pathId}/finish`), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     });
 
     if (!response.ok) {

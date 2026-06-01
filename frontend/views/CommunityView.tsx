@@ -1,13 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, Lock, MessageCircle, RefreshCcw, Sparkles } from 'lucide-react';
+import { AlertCircle, Heart, Lock, MessageCircle, RefreshCcw, Sparkles } from 'lucide-react';
+import { reactionApi } from '../api/reactionApi';
 import { feedApi, FeedCategory, FeedItemResponse, WeeklyTop3ItemResponse } from '../api/feedApi';
 import { getThemePalette, useResolvedTheme } from '../theme';
+import { AppModal } from '../components/AppModal';
+import { CommunityCommentsSheet } from '../components/CommunityCommentsSheet';
 
 interface CommunityViewProps {
   accessToken?: string | null;
+  onRefreshAuth?: () => Promise<string | null>;
+  currentUserId?: string | null;
   isGuest?: boolean;
   onLoginClick?: () => void;
 }
+
+type ApiErrorWithStatus = Error & { status?: number };
+
+const isUnauthorizedError = (error: unknown): error is ApiErrorWithStatus =>
+  error instanceof Error && (error as ApiErrorWithStatus).status === 401;
 
 const CATEGORIES: { id: FeedCategory; label: string }[] = [
   { id: 'all', label: '전체' },
@@ -25,6 +35,11 @@ const CATEGORY_LABEL_MAP: Record<string, string> = {
   cert: '자격증',
   DEFAULT: '기록',
 };
+
+const GUEST_VISIBLE_POST_COUNT = 1;
+const GUEST_BLUR_POST_COUNT = 4;
+const activeFeedRequests = new Set<string>();
+const activeWeeklyTopRequests = new Set<string>();
 
 const formatRelativeTime = (value?: string | null) => {
   if (!value) return '방금';
@@ -84,9 +99,17 @@ interface FeedCardProps {
   item: FeedItemResponse;
   onLike: () => void;
   onComment: () => void;
+  likeDisabled?: boolean;
+  commentDisabled?: boolean;
 }
 
-const FeedCard: React.FC<FeedCardProps> = ({ item, onLike, onComment }) => {
+const FeedCard: React.FC<FeedCardProps> = ({
+  item,
+  onLike,
+  onComment,
+  likeDisabled = false,
+  commentDisabled = false,
+}) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const nickname = item.owner?.nickname ?? '익명의 기록자';
@@ -123,7 +146,8 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, onLike, onComment }) => {
         <div className="flex items-center gap-4">
           <button
             onClick={onComment}
-            className="flex items-center gap-1 text-[12px] transition"
+            disabled={commentDisabled}
+            className="flex items-center gap-1 text-[12px] transition disabled:opacity-50"
             style={{ color: palette.faintText }}
           >
             <MessageCircle size={14} strokeWidth={1.8} />
@@ -131,7 +155,8 @@ const FeedCard: React.FC<FeedCardProps> = ({ item, onLike, onComment }) => {
           </button>
           <button
             onClick={onLike}
-            className="flex items-center gap-1 text-[12px] transition"
+            disabled={likeDisabled}
+            className="flex items-center gap-1 text-[12px] transition disabled:opacity-50"
             style={{ color: item.isReacted ? '#F43F5E' : palette.faintText }}
           >
             <Heart size={14} strokeWidth={1.8} className={item.isReacted ? 'fill-rose-500' : ''} />
@@ -156,8 +181,57 @@ const CommunitySkeleton: React.FC = () => {
   );
 };
 
+const GuestLockCard: React.FC<{ onLoginClick?: () => void }> = ({ onLoginClick }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
+
+  return (
+    <div
+      className="rounded-[1.75rem] border px-5 py-6 text-center"
+      style={{
+        background: palette.cardBgStrong,
+        borderColor: palette.border,
+        boxShadow:
+          theme === 'dark'
+            ? '0 18px 40px rgba(2,6,23,0.38)'
+            : '0 18px 40px rgba(15,23,42,0.08)',
+      }}
+    >
+      <div
+        className="inline-flex p-2.5 rounded-xl mb-3"
+        style={{
+          background: theme === 'dark' ? 'rgba(76,29,149,0.24)' : 'rgba(243,232,255,0.82)',
+          color: '#8B5CF6',
+        }}
+      >
+        <Lock size={18} strokeWidth={1.8} />
+      </div>
+      <h3 className="text-[15px] font-bold mb-1.5" style={{ color: palette.strongText }}>
+        더 많은 조용한 궤적들이 있어요
+      </h3>
+      <p className="text-[12px] leading-relaxed mb-4" style={{ color: palette.mutedText }}>
+        로그인하면 전체 피드를 읽고
+        <br />
+        공감과 댓글을 남길 수 있어요.
+      </p>
+      <button
+        onClick={() => onLoginClick?.()}
+        className="w-full min-h-[48px] rounded-xl text-[14px] font-bold text-white transition active:scale-[0.985]"
+        style={{
+          background: theme === 'dark' ? '#64748B' : '#52606D',
+          boxShadow: theme === 'dark' ? '0 8px 20px rgba(2,6,23,0.28)' : '0 8px 20px rgba(82,96,109,0.22)',
+        }}
+      >
+        로그인하고 계속 보기
+      </button>
+    </div>
+  );
+};
+
 export const CommunityView: React.FC<CommunityViewProps> = ({
   accessToken,
+  onRefreshAuth,
+  currentUserId,
   isGuest = false,
   onLoginClick,
 }) => {
@@ -171,44 +245,123 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [pendingReactionIds, setPendingReactionIds] = useState<Record<number, boolean>>({});
+  const [commentTarget, setCommentTarget] = useState<FeedItemResponse | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const hasNextRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+
+  const handleRestrictedAction = useCallback(() => {
+    if (isGuest || !accessToken) {
+      onLoginClick?.();
+    }
+  }, [accessToken, isGuest, onLoginClick]);
+
+  const runWithAuthRetry = useCallback(async <T,>(request: (token: string) => Promise<T>): Promise<T> => {
+    if (!accessToken) {
+      throw new Error('로그인이 필요합니다.');
+    }
+
+    try {
+      return await request(accessToken);
+    } catch (error) {
+      if (!isUnauthorizedError(error)) {
+        throw error;
+      }
+
+      const refreshedToken = await onRefreshAuth?.();
+      if (!refreshedToken) {
+        throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.');
+      }
+
+      return request(refreshedToken);
+    }
+  }, [accessToken, onRefreshAuth]);
+
+  const refreshWeeklyTop3 = useCallback(async () => {
+    if (selectedCategory !== 'all') {
+      setWeeklyTopItems([]);
+      return;
+    }
+
+    const requestKey = `${selectedCategory}:${accessToken ?? 'guest'}`;
+    if (activeWeeklyTopRequests.has(requestKey)) {
+      return;
+    }
+    activeWeeklyTopRequests.add(requestKey);
+
+    try {
+      const response = isGuest
+        ? await feedApi.getWeeklyTop3(null)
+        : await runWithAuthRetry((token) => feedApi.getWeeklyTop3(token));
+      setWeeklyTopItems(response.items ?? []);
+    } catch {
+      setWeeklyTopItems([]);
+    } finally {
+      activeWeeklyTopRequests.delete(requestKey);
+    }
+  }, [accessToken, isGuest, runWithAuthRetry, selectedCategory]);
 
   const loadFeedPage = useCallback(
     async (cursor: string | null, append: boolean) => {
       if (append) {
-        if (isLoadingMore || !hasNext || !cursor) {
+        if (loadingMoreRef.current || !hasNextRef.current || !cursor) {
           return;
         }
+        loadingMoreRef.current = true;
         setIsLoadingMore(true);
       } else {
+        const requestKey = `${selectedCategory}:${accessToken ?? 'guest'}:${cursor ?? 'first'}:${isGuest ? 'guest' : 'member'}`;
+        if (activeFeedRequests.has(requestKey)) {
+          return;
+        }
+        activeFeedRequests.add(requestKey);
+        hasNextRef.current = false;
+        loadingMoreRef.current = false;
+        setIsLoadingMore(false);
         setIsInitialLoading(true);
         setError(null);
       }
 
       try {
-        const response = await feedApi.getFeed({
-          token: isGuest ? null : accessToken,
-          category: selectedCategory,
-          cursor: isGuest ? null : cursor,
-          size: 20,
-        });
+        const response = isGuest
+          ? await feedApi.getFeed({
+              token: null,
+              category: selectedCategory,
+              cursor: null,
+              size: 20,
+            })
+          : await runWithAuthRetry((token) =>
+              feedApi.getFeed({
+                token,
+                category: selectedCategory,
+                cursor,
+                size: 20,
+              })
+            );
 
         setFeedItems((prev) => (append ? [...prev, ...response.items] : response.items));
-        setHasNext(isGuest ? false : response.hasNext);
-        setNextCursor(isGuest ? null : response.nextCursor);
+        const nextHasNext = isGuest ? false : response.hasNext;
+        const resolvedCursor = isGuest ? null : response.nextCursor;
+        hasNextRef.current = nextHasNext;
+        setHasNext(nextHasNext);
+        setNextCursor(resolvedCursor);
       } catch (err) {
         if (!append) {
           setError(err instanceof Error ? err.message : '피드를 불러오지 못했습니다.');
         }
       } finally {
         if (append) {
+          loadingMoreRef.current = false;
           setIsLoadingMore(false);
         } else {
+          activeFeedRequests.delete(`${selectedCategory}:${accessToken ?? 'guest'}:${cursor ?? 'first'}:${isGuest ? 'guest' : 'member'}`);
           setIsInitialLoading(false);
         }
       }
     },
-    [accessToken, hasNext, isGuest, isLoadingMore, selectedCategory]
+    [accessToken, isGuest, runWithAuthRetry, selectedCategory]
   );
 
   useEffect(() => {
@@ -216,32 +369,14 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   }, [loadFeedPage]);
 
   useEffect(() => {
-    let cancelled = false;
-
     if (selectedCategory !== 'all') {
       setWeeklyTopItems([]);
       return undefined;
     }
 
-    const loadWeeklyTop3 = async () => {
-      try {
-        const response = await feedApi.getWeeklyTop3(accessToken);
-        if (!cancelled) {
-          setWeeklyTopItems(response.items ?? []);
-        }
-      } catch {
-        if (!cancelled) {
-          setWeeklyTopItems([]);
-        }
-      }
-    };
-
-    void loadWeeklyTop3();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, selectedCategory]);
+    void refreshWeeklyTop3();
+    return undefined;
+  }, [refreshWeeklyTop3, selectedCategory]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -263,19 +398,98 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   }, [hasNext, isGuest, loadFeedPage, nextCursor]);
 
   const visiblePosts = useMemo(
-    () => (isGuest ? feedItems.slice(0, 1) : feedItems),
+    () => (isGuest ? feedItems.slice(0, GUEST_VISIBLE_POST_COUNT) : feedItems),
     [feedItems, isGuest]
   );
   const hiddenBlurPosts = useMemo(
-    () => (isGuest ? feedItems.slice(1, 3) : []),
+    () => (
+      isGuest
+        ? feedItems.slice(
+            GUEST_VISIBLE_POST_COUNT,
+            GUEST_VISIBLE_POST_COUNT + GUEST_BLUR_POST_COUNT
+          )
+        : []
+    ),
     [feedItems, isGuest]
   );
 
-  const handleRestrictedAction = () => {
-    if (isGuest) {
-      onLoginClick?.();
+  const updateFeedItem = useCallback((recordId: number, updater: (item: FeedItemResponse) => FeedItemResponse) => {
+    setFeedItems((prev) => prev.map((item) => (item.recordId === recordId ? updater(item) : item)));
+  }, []);
+
+  const handleCommentCountChange = useCallback((recordId: number, nextCount: number) => {
+    updateFeedItem(recordId, (item) => ({
+      ...item,
+      commentCount: nextCount,
+    }));
+  }, [updateFeedItem]);
+
+  const handleOpenComments = (item: FeedItemResponse) => {
+    if (isGuest || !accessToken) {
+      handleRestrictedAction();
+      return;
     }
+    setCommentTarget(item);
   };
+
+  const handleToggleReaction = useCallback(async (item: FeedItemResponse) => {
+    if (isGuest || !accessToken) {
+      handleRestrictedAction();
+      return;
+    }
+
+    if (pendingReactionIds[item.recordId]) {
+      return;
+    }
+
+    const previousReacted = item.isReacted;
+    const previousCount = item.reactionCount;
+    const optimisticCount = previousReacted
+      ? Math.max(0, previousCount - 1)
+      : previousCount + 1;
+
+    setPendingReactionIds((prev) => ({
+      ...prev,
+      [item.recordId]: true,
+    }));
+
+    updateFeedItem(item.recordId, (current) => ({
+      ...current,
+      isReacted: !previousReacted,
+      reactionCount: optimisticCount,
+    }));
+
+    try {
+      const response = await runWithAuthRetry((token) =>
+        previousReacted
+          ? reactionApi.deleteReaction(token, item.recordId)
+          : reactionApi.createReaction(token, item.recordId)
+      );
+
+      updateFeedItem(item.recordId, (current) => ({
+        ...current,
+        isReacted: response.reacted,
+        reactionCount: response.reactionCount,
+      }));
+
+      if (selectedCategory === 'all') {
+        void refreshWeeklyTop3();
+      }
+    } catch (err) {
+      updateFeedItem(item.recordId, (current) => ({
+        ...current,
+        isReacted: previousReacted,
+        reactionCount: previousCount,
+      }));
+      setNoticeMessage(err instanceof Error ? err.message : '공감 처리에 실패했습니다.');
+    } finally {
+      setPendingReactionIds((prev) => {
+        const next = { ...prev };
+        delete next[item.recordId];
+        return next;
+      });
+    }
+  }, [accessToken, handleRestrictedAction, isGuest, pendingReactionIds, refreshWeeklyTop3, runWithAuthRetry, selectedCategory, updateFeedItem]);
 
   return (
     <div className="pb-28 animate-slide-up pt-2">
@@ -324,21 +538,38 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className={`relative px-4 space-y-3 ${isGuest ? 'pb-[240px]' : 'pb-8'}`}>
+        <div className={`relative px-4 space-y-3 ${isGuest ? 'pb-10' : 'pb-8'}`}>
           {visiblePosts.map((item) => (
             <FeedCard
               key={item.recordId}
               item={item}
-              onLike={handleRestrictedAction}
-              onComment={handleRestrictedAction}
+              onLike={() => void handleToggleReaction(item)}
+              onComment={() => handleOpenComments(item)}
+              likeDisabled={!!pendingReactionIds[item.recordId]}
             />
           ))}
 
-          {hiddenBlurPosts.map((item) => (
-            <div key={`blur-${item.recordId}`} aria-hidden className="opacity-55 blur-[2.5px] pointer-events-none select-none">
-              <FeedCard item={item} onLike={() => {}} onComment={() => {}} />
+          {isGuest && hiddenBlurPosts.length > 0 ? (
+            <div className="relative min-h-[280px]">
+              <div aria-hidden className="space-y-3 opacity-40 blur-[3px] pointer-events-none select-none">
+                {hiddenBlurPosts.map((item) => (
+                  <FeedCard key={`blur-${item.recordId}`} item={item} onLike={() => {}} onComment={() => {}} />
+                ))}
+              </div>
+
+              <div className="absolute inset-x-0 top-8 bottom-0 flex items-start px-2 pointer-events-none">
+                <div className="relative mx-auto w-full max-w-[360px] pointer-events-auto">
+                  <GuestLockCard onLoginClick={onLoginClick} />
+                </div>
+              </div>
             </div>
-          ))}
+          ) : (
+            hiddenBlurPosts.map((item) => (
+              <div key={`blur-${item.recordId}`} aria-hidden className="opacity-55 blur-[2.5px] pointer-events-none select-none">
+                <FeedCard item={item} onLike={() => {}} onComment={() => {}} />
+              </div>
+            ))
+          )}
 
           {!isGuest && hasNext && (
             <div ref={loadMoreRef} className="h-12 flex items-center justify-center text-[12px] text-mist-400">
@@ -352,35 +583,9 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
             </div>
           )}
 
-          {isGuest && (
-            <div className="absolute inset-x-0 bottom-0 z-10 pointer-events-none">
-              <div
-                aria-hidden
-                className="h-[240px]"
-                style={{
-                  background:
-                    'linear-gradient(to top, #F8FAFC 30%, rgba(248,250,252,0.94) 55%, rgba(248,250,252,0.0) 100%)',
-                }}
-              />
-              <div className="px-5 pb-8 -mt-[170px] pointer-events-auto">
-                <div className="p-5 rounded-3xl bg-white/80 backdrop-blur-xl border border-white text-center shadow-[0_8px_32px_rgba(31,38,135,0.08)]">
-                  <div className="inline-flex p-2.5 rounded-xl bg-point-50 text-point-500 mb-3">
-                    <Lock size={18} strokeWidth={1.8} />
-                  </div>
-                  <h3 className="text-[15px] font-bold text-mist-600 mb-1.5">더 많은 조용한 궤적들이 있어요</h3>
-                  <p className="text-[12px] text-mist-400 leading-relaxed mb-4">
-                    로그인하면 전체 피드를 읽고
-                    <br />
-                    공감과 댓글을 남길 수 있어요.
-                  </p>
-                  <button
-                    onClick={() => onLoginClick?.()}
-                    className="w-full min-h-[48px] rounded-xl text-[14px] font-bold text-white bg-mist-600 hover:bg-mist-700 active:scale-[0.985] transition shadow-[0_4px_12px_rgba(82,96,109,0.25)]"
-                  >
-                    로그인하고 계속 보기
-                  </button>
-                </div>
-              </div>
+          {isGuest && hiddenBlurPosts.length === 0 && (
+            <div className="pt-2">
+              <GuestLockCard onLoginClick={onLoginClick} />
             </div>
           )}
         </div>
@@ -395,6 +600,29 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
           </p>
         </div>
       )}
+
+      <CommunityCommentsSheet
+        open={commentTarget !== null}
+        accessToken={accessToken}
+        onRefreshAuth={onRefreshAuth}
+        currentUserId={currentUserId}
+        recordId={commentTarget?.recordId ?? null}
+        recordTitle={commentTarget?.title ?? null}
+        onClose={() => setCommentTarget(null)}
+        onCommentCountChange={handleCommentCountChange}
+      />
+
+      <AppModal
+        open={noticeMessage !== null}
+        icon={<AlertCircle size={22} />}
+        title="커뮤니티 작업을 완료하지 못했어요"
+        description={noticeMessage ?? ''}
+        confirmLabel="확인"
+        hideCancel
+        confirmVariant="danger"
+        onClose={() => setNoticeMessage(null)}
+        onConfirm={() => setNoticeMessage(null)}
+      />
     </div>
   );
 };

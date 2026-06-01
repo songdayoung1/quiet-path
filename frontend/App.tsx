@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, ViewState, Record, Direction } from './types';
 import { loadState, saveState, createDirectionId } from './storage';
 import { HomeView } from './views/HomeView';
@@ -18,6 +18,7 @@ import { recordApi, RecordResponse } from './api/recordApi';
 import { Settings, Compass, AlertCircle } from 'lucide-react';
 import { AppModal } from './components/AppModal';
 import { CATEGORIES } from './constants';
+import { getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from './utils/recordScope';
 
 const OAUTH_PENDING_CODE_KEY = 'qp.oauth.pending.code';
 const OAUTH_PENDING_ERROR_KEY = 'qp.oauth.pending.error';
@@ -116,6 +117,16 @@ const toLocalDateString = (timestamp?: number) => {
   return `${year}-${month}-${day}`;
 };
 
+const MIN_DIRECTION_LOADING_MS = 900;
+
+const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
+  const elapsed = Date.now() - startedAt;
+  if (elapsed >= minimumMs) {
+    return;
+  }
+  await new Promise((resolve) => window.setTimeout(resolve, minimumMs - elapsed));
+};
+
 const parseLocalDateString = (value?: string) => {
   if (!value) return undefined;
   return new Date(`${value}T00:00:00`).getTime();
@@ -159,6 +170,7 @@ const buildRecordFromResponse = (
   const createdAt = record.createdAt || `${record.recordDate}T00:00:00`;
   return {
     id: String(record.id),
+    pathId: String(record.pathId),
     date: createdAt,
     timestamp: new Date(createdAt).getTime(),
     directionQuestion:
@@ -174,10 +186,22 @@ const buildRecordFromResponse = (
   };
 };
 
-const hasLoggedTodayFromRecords = (records: Record[]) => {
-  const today = new Date().toDateString();
-  return records.some((record) => new Date(record.timestamp).toDateString() === today);
+const upsertRecord = (records: Record[], nextRecord: Record) => {
+  const exists = records.some((record) => record.id === nextRecord.id);
+  if (!exists) {
+    return [nextRecord, ...records];
+  }
+  return records.map((record) => (record.id === nextRecord.id ? nextRecord : record));
 };
+
+const clearServerDrivenState = (prev: AppState): AppState => ({
+  ...prev,
+  currentDirection: null,
+  pastDirections: [],
+  records: [],
+  hasLoggedToday: false,
+  userLevel: 'Beginning',
+});
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -187,7 +211,7 @@ const App: React.FC = () => {
     hasLoggedToday: false,
     hasSeenOnboarding: false,
     userLevel: 'Beginning',
-    auth: { isLoggedIn: false, token: null, refreshToken: null }
+    auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null }
   });
 
   const [currentView, setCurrentView] = useState<ViewState | 'INITIALIZING'>('INITIALIZING');
@@ -202,6 +226,7 @@ const App: React.FC = () => {
   } | null>(null);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
+  const refreshAuthRequestRef = useRef<Promise<string | null> | null>(null);
   const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
   const shellFrameStyle = useMemo<React.CSSProperties>(
     () => ({
@@ -262,9 +287,12 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
         const loaded = loadState();
-        if (!loaded.auth) loaded.auth = { isLoggedIn: false, token: null, refreshToken: null };
+        if (!loaded.auth) loaded.auth = { isLoggedIn: false, token: null, refreshToken: null, userId: null };
         if (loaded.auth && typeof loaded.auth.refreshToken === 'undefined') {
           loaded.auth.refreshToken = null;
+        }
+        if (loaded.auth && typeof loaded.auth.userId === 'undefined') {
+          loaded.auth.userId = null;
         }
         setState(loaded);
 
@@ -335,11 +363,12 @@ const App: React.FC = () => {
                     ...prev,
                     currentDirection: activeDirection,
                     records: restoredRecords,
-                    hasLoggedToday: hasLoggedTodayFromRecords(restoredRecords),
+                    hasLoggedToday: hasLoggedTodayForCurrentPath(restoredRecords, activeDirection),
                     auth: {
                       isLoggedIn: true,
                       token: restored.accessToken,
                       refreshToken: restored.refreshToken,
+                      userId: restored.me.id,
                       onboardingStatus: restored.me.onboardingStatus
                     }
                 }));
@@ -349,7 +378,10 @@ const App: React.FC = () => {
                    setCurrentView('NOW');
                 }
             } catch (err) {
-                setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null, refreshToken: null } }));
+                setState(prev => ({
+                  ...clearServerDrivenState(prev),
+                  auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null }
+                }));
                 setCurrentView('ONBOARDING');
             }
         } else {
@@ -376,12 +408,6 @@ const App: React.FC = () => {
 
       if (state.auth?.isLoggedIn && token) {
         try {
-          const activeDirection = await syncRemotePathAndRecords(token, state.currentDirection, false);
-          if (activeDirection) {
-            setCurrentView('NOW');
-            return;
-          }
-
           const createdPath = await pathApi.create(token, {
             directionName: initialDirection.description,
             categoryCode: initialDirection.categoryId || 'job',
@@ -406,6 +432,7 @@ const App: React.FC = () => {
       setState(prev => ({ 
           ...prev, 
           currentDirection: nextDirection,
+          hasLoggedToday: hasLoggedTodayForCurrentPath(prev.records, nextDirection),
           hasSeenOnboarding: true 
       }));
       setCurrentView('NOW');
@@ -418,21 +445,27 @@ const App: React.FC = () => {
             currentDirection = { ...currentDirection, ...directionUpdate };
         }
 
+        const records = upsertRecord(prev.records, record);
+
         return {
             ...prev,
-            records: [record, ...prev.records],
+            records,
             currentDirection,
-            hasLoggedToday: true
+            hasLoggedToday: hasLoggedTodayForCurrentPath(records, currentDirection)
         };
     });
     setCurrentView('NOW');
   };
 
   const handleUpdateLog = (updatedRecord: Record) => {
-    setState(prev => ({
+    setState(prev => {
+      const records = prev.records.map(r => r.id === updatedRecord.id ? updatedRecord : r);
+      return {
         ...prev,
-        records: prev.records.map(r => r.id === updatedRecord.id ? updatedRecord : r)
-    }));
+        records,
+        hasLoggedToday: hasLoggedTodayForCurrentPath(records, prev.currentDirection),
+      };
+    });
   };
 
   const syncRemotePathAndRecords = async (
@@ -456,7 +489,7 @@ const App: React.FC = () => {
         ...prev,
         currentDirection: activeDirection,
         records,
-        hasLoggedToday: hasLoggedTodayFromRecords(records),
+        hasLoggedToday: hasLoggedTodayForCurrentPath(records, activeDirection),
         hasSeenOnboarding: true,
       }));
     }
@@ -464,8 +497,61 @@ const App: React.FC = () => {
     return activeDirection;
   };
 
+  const refreshCommunityAccessToken = useCallback(async (): Promise<string | null> => {
+    const refreshToken = state.auth.refreshToken;
+    if (!refreshToken) {
+      setState(prev => ({
+        ...clearServerDrivenState(prev),
+        auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+      }));
+      return null;
+    }
+
+    if (refreshAuthRequestRef.current) {
+      return refreshAuthRequestRef.current;
+    }
+
+    refreshAuthRequestRef.current = (async () => {
+      try {
+        const refreshed = await authApi.refresh(refreshToken);
+        let nextUserId = state.auth.userId ?? null;
+
+        try {
+          const me = await authApi.getMe(refreshed.token);
+          nextUserId = me.id;
+        } catch {
+          nextUserId = state.auth.userId ?? null;
+        }
+
+        setState(prev => ({
+          ...prev,
+          auth: {
+            ...prev.auth,
+            isLoggedIn: true,
+            token: refreshed.token,
+            refreshToken: refreshed.refreshToken,
+            userId: nextUserId ?? prev.auth.userId ?? null,
+          },
+        }));
+
+        return refreshed.token;
+      } catch {
+        setState(prev => ({
+          ...clearServerDrivenState(prev),
+          auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+        }));
+        return null;
+      } finally {
+        refreshAuthRequestRef.current = null;
+      }
+    })();
+
+    return refreshAuthRequestRef.current;
+  }, [state.auth.refreshToken, state.auth.userId]);
+
   const handleStartDirection = async (updates: Partial<Direction>) => {
     if (state.currentDirection) return;
+    const startedAt = Date.now();
 
     let newDir: Direction = {
       id: createDirectionId(),
@@ -480,12 +566,6 @@ const App: React.FC = () => {
 
     const token = state.auth?.token;
     if (state.auth?.isLoggedIn && token) {
-      const activeDirection = await syncRemotePathAndRecords(token, state.currentDirection, false);
-      if (activeDirection) {
-        setCurrentView('NOW');
-        return;
-      }
-
       try {
         const createdPath = await pathApi.create(token, {
           directionName: newDir.description,
@@ -494,9 +574,6 @@ const App: React.FC = () => {
           reviewAt: toLocalDateString(newDir.reviewAt),
         });
         newDir = buildDirectionFromCreatedPath(createdPath, newDir);
-        await syncRemotePathAndRecords(token, newDir);
-        setCurrentView('NOW');
-        return;
       } catch (err) {
         if (err instanceof Error && err.message.includes('이미 진행 중인 방향')) {
           await syncRemotePathAndRecords(token, state.currentDirection);
@@ -507,17 +584,62 @@ const App: React.FC = () => {
       }
     }
 
-    setState(prev => {
-      if (prev.currentDirection) return prev;
-      return {
-        ...prev,
-        currentDirection: newDir
-      };
-    });
+    setState(prev => ({
+      ...prev,
+      currentDirection: newDir,
+      hasLoggedToday: hasLoggedTodayForCurrentPath(prev.records, newDir),
+      hasSeenOnboarding: true,
+    }));
+    await waitForMinimumDuration(startedAt, MIN_DIRECTION_LOADING_MS);
     setCurrentView('NOW');
   };
 
-  const handleFinishDirection = () => {
+  const handleFinishDirection = async () => {
+    const currentDirection = state.currentDirection;
+    if (!currentDirection) return;
+
+    const token = state.auth?.token;
+    if (state.auth?.isLoggedIn && token) {
+      const pathId = Number(currentDirection.id);
+      if (!Number.isInteger(pathId)) {
+        setNoticeModal({
+          title: '방향을 마무리하지 못했어요',
+          description: '현재 방향 정보를 다시 불러온 뒤 시도해 주세요.',
+        });
+        return;
+      }
+
+      try {
+        const response = await pathApi.finish(token, pathId);
+        const completedAt = response.completedAt ? new Date(response.completedAt).getTime() : Date.now();
+        setState(prev => {
+          if (!prev.currentDirection || prev.currentDirection.id !== currentDirection.id) {
+            return prev;
+          }
+
+          const archivedDirection = {
+            ...prev.currentDirection,
+            endedAt: completedAt,
+            isActive: false,
+          };
+
+          return {
+            ...prev,
+            pastDirections: [archivedDirection, ...prev.pastDirections],
+            currentDirection: null,
+            hasLoggedToday: false,
+          };
+        });
+        return;
+      } catch (err) {
+        setNoticeModal({
+          title: '방향을 마무리하지 못했어요',
+          description: err instanceof Error ? err.message : '방향 종료에 실패했습니다.',
+        });
+        return;
+      }
+    }
+
     setState(prev => {
       if (!prev.currentDirection) return prev;
 
@@ -526,7 +648,8 @@ const App: React.FC = () => {
       return {
         ...prev,
         pastDirections: [archivedDirection, ...prev.pastDirections],
-        currentDirection: null
+        currentDirection: null,
+        hasLoggedToday: false,
       };
     });
   };
@@ -539,12 +662,26 @@ const App: React.FC = () => {
     setCurrentView('WRITE_LOG');
   };
 
-  const handleLoginSuccess = (status: 'NEW' | 'EXISTING', token: string, refreshToken: string) => {
+  const handleLoginSuccess = async (status: 'NEW' | 'EXISTING', token: string, refreshToken: string) => {
       window.sessionStorage.removeItem(OAUTH_PENDING_CODE_KEY);
       window.sessionStorage.removeItem(OAUTH_PENDING_ERROR_KEY);
-      setState(prev => ({ 
-         ...prev, 
-         auth: { isLoggedIn: true, token, refreshToken, onboardingStatus: status }
+
+      let me: Awaited<ReturnType<typeof authApi.getMe>> | null = null;
+      try {
+        me = await authApi.getMe(token);
+      } catch {
+        me = null;
+      }
+
+      setState(prev => ({
+         ...prev,
+         auth: {
+           isLoggedIn: true,
+           token,
+           refreshToken,
+           userId: me?.id ?? null,
+           onboardingStatus: status,
+         }
       }));
       
       if (status === 'NEW') {
@@ -565,12 +702,31 @@ const App: React.FC = () => {
                 ...prev,
                 currentDirection: activeDirection,
                 records,
-                hasLoggedToday: hasLoggedTodayFromRecords(records),
-                hasSeenOnboarding: true
+                hasLoggedToday: hasLoggedTodayForCurrentPath(records, activeDirection),
+                hasSeenOnboarding: true,
+                auth: {
+                  ...prev.auth,
+                  isLoggedIn: true,
+                  token,
+                  refreshToken,
+                  userId: me?.id ?? prev.auth.userId ?? null,
+                  onboardingStatus: status,
+                }
               }));
             })
             .catch(() => {
-              setState(prev => ({ ...prev, currentDirection: null, hasSeenOnboarding: true }));
+              setState(prev => ({
+                ...clearServerDrivenState(prev),
+                auth: {
+                  ...prev.auth,
+                  isLoggedIn: true,
+                  token,
+                  refreshToken,
+                  userId: me?.id ?? prev.auth.userId ?? null,
+                  onboardingStatus: status,
+                },
+                hasSeenOnboarding: true,
+              }));
             });
           setCurrentView('NOW');
       }
@@ -596,9 +752,14 @@ const App: React.FC = () => {
         }
       }
     }
-    setState(prev => ({ ...prev, auth: { isLoggedIn: false, token: null, refreshToken: null } }));
+    setState(prev => ({
+      ...clearServerDrivenState(prev),
+      auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+    }));
     setCurrentView('NOW');
   };
+
+  const currentPathTodayRecord = getCurrentPathTodayRecord(state.records, state.currentDirection);
 
   const NavItem = ({ view, label }: { view: ViewState | 'INITIALIZING'; label: string }) => {
     const isActive = currentView === view;
@@ -688,6 +849,7 @@ const App: React.FC = () => {
                           ...prev,
                           auth: {
                             ...prev.auth,
+                            userId: me.id,
                             onboardingStatus: me.onboardingStatus
                           },
                           hasSeenOnboarding: true
@@ -870,6 +1032,8 @@ const App: React.FC = () => {
         {currentView === 'COMMUNITY' && (
            <CommunityView 
               accessToken={state.auth?.token}
+              onRefreshAuth={refreshCommunityAccessToken}
+              currentUserId={state.auth?.userId}
               isGuest={!state.auth?.isLoggedIn}
               onLoginClick={() => setCurrentView('ACCOUNT_CONNECT')}
            />
@@ -899,6 +1063,7 @@ const App: React.FC = () => {
       {currentView === 'WRITE_LOG' && (
         <DailyRecordEditorView 
           state={state} 
+          initialRecord={currentPathTodayRecord}
           onSave={handleSaveLog} 
           onStartDirection={() => setCurrentView('DIRECTION')}
           onCancel={() => setCurrentView('NOW')} 

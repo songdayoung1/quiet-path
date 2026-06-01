@@ -10,6 +10,7 @@ import { CurrentPathStrip } from '../components/CurrentPathStrip';
 import { ProgressBand } from '../components/ProgressBand';
 import { MemoryPreviewStrip } from '../components/MemoryPreviewStrip';
 import { ExpandedHeatmapSheet } from '../components/ExpandedHeatmapSheet';
+import { getCurrentPathRecords, getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from '../utils/recordScope';
 
 interface HomeViewProps {
   state: AppState;
@@ -23,16 +24,11 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const [isHeatmapSheetOpen, setIsHeatmapSheetOpen] = useState(false);
-  const { currentDirection, records, hasLoggedToday } = state;
+  const { currentDirection, records } = state;
   const hasActiveDirection = !!currentDirection;
   const sortedRecords = [...records].filter(r => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp);
-  const effectiveHasLoggedToday = hasActiveDirection && hasLoggedToday;
-  
-  // Find today's record accurately matching local date
-  const todayDateStr = new Date().toLocaleDateString('ko-KR');
-  const todayRecord = sortedRecords.find(r => 
-    new Date(r.timestamp).toLocaleDateString('ko-KR') === todayDateStr
-  ) || null;
+  const effectiveHasLoggedToday = hasActiveDirection && hasLoggedTodayForCurrentPath(records, currentDirection);
+  const todayRecord = hasActiveDirection ? getCurrentPathTodayRecord(records, currentDirection) : null;
   const visibleTodayRecord = hasActiveDirection ? todayRecord : null;
   
   const lastRecord = sortedRecords[0]; // Kept for top right mood indicator
@@ -45,7 +41,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
   });
   
   const currentPathRecords = currentDirection
-    ? sortedRecords.filter(r => r.directionQuestion === currentDirection.question)
+    ? getCurrentPathRecords(sortedRecords, currentDirection)
     : [];
   const currentPathRecordCount = currentPathRecords.length;
   const currentPathStartDate = currentDirection ? new Date(currentDirection.createdAt) : null;
