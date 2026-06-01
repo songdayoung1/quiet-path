@@ -9,8 +9,15 @@ interface AccountConnectViewProps {
 }
 
 export const AccountConnectView: React.FC<AccountConnectViewProps> = ({ onBack, onStartKakao, onNavigateToMockKakao }) => {
-  const handleRealKakaoLogin = () => {
-    onStartKakao();
+  const [startError, setStartError] = React.useState<string | null>(null);
+
+  const handleRealKakaoLogin = async () => {
+    setStartError(null);
+    try {
+      await onStartKakao();
+    } catch (error) {
+      setStartError(error instanceof Error ? error.message : '카카오 로그인을 시작하지 못했어요.');
+    }
   };
 
   const [devOpen, setDevOpen] = React.useState(false);
@@ -54,6 +61,18 @@ export const AccountConnectView: React.FC<AccountConnectViewProps> = ({ onBack, 
             </svg>
             <span>카카오로 시작하기</span>
           </button>
+
+          {startError && (
+            <div className="w-full rounded-2xl border border-rose-100 bg-rose-50/90 px-4 py-3 text-left">
+              <p className="text-[12px] font-bold text-rose-500 mb-1">로그인을 시작하지 못했어요</p>
+              <p className="text-[12px] leading-relaxed text-rose-400">{startError}</p>
+              {import.meta.env.DEV && (
+                <p className="text-[11px] leading-relaxed text-rose-400 mt-2">
+                  로컬 개발 중이면 아래 `DEV MOCK`으로 흐름을 먼저 확인할 수 있어요.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="pt-8">
             <button

@@ -32,8 +32,27 @@ const parseErrorMessage = async (response: Response) => {
 };
 
 export const authApi = {
-  startKakaoLogin: () => {
-    window.location.href = apiUrl('/api/v1/auth/kakao/start');
+  startKakaoLogin: async (): Promise<void> => {
+    const response = await fetch(apiUrl('/api/v1/auth/kakao/start-url'), {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const message = await parseErrorMessage(response);
+      if (import.meta.env.DEV && message.includes('인증 설정값이 누락되었습니다')) {
+        throw new Error(
+          '카카오 로그인 설정이 비어 있어요. 루트 `.env.local` 또는 `backend/.env.local`에 `KAKAO_REST_API_KEY`를 넣어주세요.'
+        );
+      }
+      throw new Error(message);
+    }
+
+    const data = await response.json();
+    if (!data?.redirectUrl) {
+      throw new Error('카카오 로그인 시작 주소를 만들지 못했습니다.');
+    }
+
+    window.location.href = data.redirectUrl;
   },
 
   loginWithKakao: async (
