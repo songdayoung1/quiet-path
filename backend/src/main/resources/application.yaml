@@ -1,3 +1,11 @@
 spring:
   application:
     name: quiet-path
+  mandatory-file-encoding: UTF-8
+
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
