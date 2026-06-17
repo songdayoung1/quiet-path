@@ -6,7 +6,6 @@ import { AppModal } from './AppModal';
 import { AutoTextArea } from './UI';
 
 const PAGE_SIZE = 10;
-const activeCommentRequests = new Set<string>();
 
 interface InlineCommentSectionProps {
   open: boolean;
@@ -59,29 +58,36 @@ export const CommunityCommentsSheet: React.FC<InlineCommentSectionProps> = ({
 
   const countChangeRef = useRef(onCommentCountChange);
   const previousRecordIdRef = useRef<number | null>(null);
+  const listRequestSeqRef = useRef(0);
 
   useEffect(() => { countChangeRef.current = onCommentCountChange; }, [onCommentCountChange]);
 
   // 첫 페이지 로드
   const loadFirstPage = useCallback(async () => {
     if (!open || !accessToken || !recordId) return;
-    const requestKey = String(recordId);
-    if (activeCommentRequests.has(requestKey)) return;
-    activeCommentRequests.add(requestKey);
+    const requestSeq = ++listRequestSeqRef.current;
+    const targetRecordId = recordId;
     setIsLoading(true);
     setLoadError(null);
     try {
-      const response = await commentApi.getComments(accessToken, recordId, PAGE_SIZE);
+      const response = await commentApi.getComments(accessToken, targetRecordId, PAGE_SIZE);
+      if (listRequestSeqRef.current !== requestSeq || !open || recordId !== targetRecordId) {
+        return;
+      }
       setComments(response.items ?? []);
       setTotalCount(response.totalElements ?? response.items.length);
       setTotalPages(response.totalPages ?? 1);
       setCurrentPage(0);
-      countChangeRef.current(recordId, response.totalElements ?? response.items.length);
+      countChangeRef.current(targetRecordId, response.totalElements ?? response.items.length);
     } catch (err) {
+      if (listRequestSeqRef.current !== requestSeq || !open || recordId !== targetRecordId) {
+        return;
+      }
       setLoadError(err instanceof Error ? err.message : '댓글을 불러오지 못했습니다.');
     } finally {
-      activeCommentRequests.delete(requestKey);
-      setIsLoading(false);
+      if (listRequestSeqRef.current === requestSeq && recordId === targetRecordId) {
+        setIsLoading(false);
+      }
     }
   }, [accessToken, open, recordId]);
 
@@ -90,22 +96,33 @@ export const CommunityCommentsSheet: React.FC<InlineCommentSectionProps> = ({
     if (!accessToken || !recordId || isLoadingMore) return;
     const nextPage = currentPage + 1;
     if (nextPage >= totalPages) return;
+    const requestSeq = ++listRequestSeqRef.current;
+    const targetRecordId = recordId;
     setIsLoadingMore(true);
     try {
-      const response = await commentApi.getComments(accessToken, recordId, PAGE_SIZE, nextPage);
+      const response = await commentApi.getComments(accessToken, targetRecordId, PAGE_SIZE, nextPage);
+      if (listRequestSeqRef.current !== requestSeq || recordId !== targetRecordId) {
+        return;
+      }
       setComments((prev) => [...prev, ...(response.items ?? [])]);
       setCurrentPage(nextPage);
       setTotalPages(response.totalPages ?? 1);
     } catch (err) {
+      if (listRequestSeqRef.current !== requestSeq || recordId !== targetRecordId) {
+        return;
+      }
       setActionError(err instanceof Error ? err.message : '댓글을 더 불러오지 못했습니다.');
     } finally {
-      setIsLoadingMore(false);
+      if (listRequestSeqRef.current === requestSeq && recordId === targetRecordId) {
+        setIsLoadingMore(false);
+      }
     }
   };
 
   // open / recordId 변경 시 초기화 + 첫 페이지 로드
   useEffect(() => {
     if (!open) {
+      listRequestSeqRef.current += 1;
       setComments([]);
       setTotalCount(0);
       setTotalPages(1);
@@ -120,6 +137,7 @@ export const CommunityCommentsSheet: React.FC<InlineCommentSectionProps> = ({
       return;
     }
     if (previousRecordIdRef.current !== recordId) {
+      listRequestSeqRef.current += 1;
       setComments([]);
       setTotalCount(0);
       setTotalPages(1);
@@ -141,8 +159,9 @@ export const CommunityCommentsSheet: React.FC<InlineCommentSectionProps> = ({
     setIsSubmitting(true);
     setActionError(null);
     try {
-      await commentApi.createComment(accessToken, recordId, content);
+      const response = await commentApi.createComment(accessToken, recordId, content);
       setDraft('');
+      countChangeRef.current(response.recordId, response.commentCount);
       await loadFirstPage();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : '댓글을 남기지 못했습니다.');
@@ -157,9 +176,10 @@ export const CommunityCommentsSheet: React.FC<InlineCommentSectionProps> = ({
     setIsSubmitting(true);
     setActionError(null);
     try {
-      await commentApi.updateComment(accessToken, editingCommentId, content);
+      const response = await commentApi.updateComment(accessToken, editingCommentId, content);
       setEditingCommentId(null);
       setEditingText('');
+      countChangeRef.current(response.recordId, response.commentCount);
       await loadFirstPage();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : '댓글을 수정하지 못했습니다.');
@@ -173,12 +193,13 @@ export const CommunityCommentsSheet: React.FC<InlineCommentSectionProps> = ({
     setIsSubmitting(true);
     setActionError(null);
     try {
-      await commentApi.deleteComment(accessToken, deleteTarget.commentId);
+      const response = await commentApi.deleteComment(accessToken, deleteTarget.commentId);
       if (editingCommentId === deleteTarget.commentId) {
         setEditingCommentId(null);
         setEditingText('');
       }
       setDeleteTarget(null);
+      countChangeRef.current(response.recordId, response.commentCount);
       await loadFirstPage();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : '댓글을 삭제하지 못했습니다.');
