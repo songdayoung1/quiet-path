@@ -8,6 +8,7 @@ import kr.co.quietpath.api.auth.dto.response.AuthCallbackResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthLogoutResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthMeResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthRefreshResponse;
+import kr.co.quietpath.api.auth.dto.response.AuthStartResponse;
 import kr.co.quietpath.api.auth.service.AuthService;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
@@ -37,6 +38,13 @@ public class AuthController {
         String redirectUrl = authService.buildKakaoAuthorizeUrl();
         return ResponseEntity.status(HttpStatus.FOUND)
             .location(URI.create(redirectUrl))
+            .build();
+    }
+
+    @GetMapping("/kakao/start-url")
+    public AuthStartResponse getKakaoStartUrl() {
+        return AuthStartResponse.builder()
+            .redirectUrl(authService.buildKakaoAuthorizeUrl())
             .build();
     }
 

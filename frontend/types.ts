@@ -1,5 +1,6 @@
 export interface Record {
   id: string;
+  pathId?: string;
   date: string; // ISO String
   timestamp: number;
   directionQuestion: string; // The question active at the time
@@ -82,6 +83,7 @@ export interface AuthState {
   isLoggedIn: boolean;
   token: string | null;
   refreshToken: string | null;
+  userId?: string | null;
   onboardingStatus?: OnboardingStatus;
 }
 

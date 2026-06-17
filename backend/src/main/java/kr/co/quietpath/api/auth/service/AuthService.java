@@ -18,6 +18,7 @@ import kr.co.quietpath.domain.user.entity.ProviderType;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.nio.charset.StandardCharsets;
@@ -40,6 +42,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class AuthService {
@@ -219,8 +222,15 @@ public class AuthService {
                 throw new ApiException(ErrorCode.KAKAO_AUTH_FAILED);
             }
             return response;
+        } catch (RestClientResponseException ex) {
+            log.warn("Kakao token exchange failed. status={}, body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new ApiException(ErrorCode.KAKAO_AUTH_FAILED, resolveKakaoTokenErrorMessage(ex));
         } catch (RestClientException ex) {
-            throw new ApiException(ErrorCode.KAKAO_AUTH_FAILED);
+            log.warn("Kakao token exchange failed without response body", ex);
+            throw new ApiException(
+                ErrorCode.KAKAO_AUTH_FAILED,
+                "카카오 토큰 교환에 실패했습니다. REST API 키, Redirect URI, Client Secret 설정을 확인해 주세요."
+            );
         }
     }
 
@@ -239,9 +249,38 @@ public class AuthService {
                 throw new ApiException(ErrorCode.KAKAO_AUTH_FAILED);
             }
             return response;
+        } catch (RestClientResponseException ex) {
+            log.warn("Kakao user info request failed. status={}, body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
+            throw new ApiException(
+                ErrorCode.KAKAO_AUTH_FAILED,
+                "카카오 사용자 정보 조회에 실패했습니다. REST API 키와 카카오 앱 상태를 확인해 주세요."
+            );
         } catch (RestClientException ex) {
-            throw new ApiException(ErrorCode.KAKAO_AUTH_FAILED);
+            log.warn("Kakao user info request failed without response body", ex);
+            throw new ApiException(
+                ErrorCode.KAKAO_AUTH_FAILED,
+                "카카오 사용자 정보 조회에 실패했습니다. 잠시 후 다시 시도해 주세요."
+            );
         }
+    }
+
+    private String resolveKakaoTokenErrorMessage(RestClientResponseException ex) {
+        String body = ex.getResponseBodyAsString();
+        String normalizedBody = body == null ? "" : body.toLowerCase();
+
+        if (normalizedBody.contains("redirect_uri")) {
+            return "카카오 토큰 교환에 실패했습니다. Kakao 콘솔의 Redirect URI와 KAKAO_REDIRECT_URI가 완전히 같은지 확인해 주세요.";
+        }
+        if (normalizedBody.contains("invalid_client")
+            || normalizedBody.contains("client_secret")
+            || normalizedBody.contains("unauthorized")) {
+            return "카카오 토큰 교환에 실패했습니다. REST API 키 또는 Client Secret 설정을 확인해 주세요.";
+        }
+        if (normalizedBody.contains("invalid_grant")
+            || normalizedBody.contains("authorization code")) {
+            return "카카오 토큰 교환에 실패했습니다. 로그인 과정을 다시 시작해 새로운 인가 코드로 시도해 주세요.";
+        }
+        return "카카오 토큰 교환에 실패했습니다. REST API 키, Redirect URI, Client Secret 설정을 확인해 주세요.";
     }
 
     private String generateUniqueNickname() {

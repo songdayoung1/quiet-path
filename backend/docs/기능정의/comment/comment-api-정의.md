@@ -12,27 +12,22 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
 
 ## 2. 도메인 불변식 (Invariants)
 
-### 2.1 대상 타입 제한
-
-* v1 기준 댓글 대상은 `RECORD`만 허용
-* 그 외 타입 요청 시 **400 INVALID_TARGET_TYPE**
-
-### 2.2 공개 대상 제약
+### 2.1 공개 대상 제약
 
 * v1: **공개(PUBLIC) Record에만 댓글 허용**
 * PRIVATE Record는 댓글 작성/조회 불가(403 TARGET_NOT_PUBLIC)
 
-### 2.3 작성자 권한
+### 2.2 작성자 권한
 
 * 댓글 수정/삭제는 **작성자 본인만 가능**
 * 본인이 아닌 경우 403 NOT_OWNER
 
-### 2.4 삭제 정책
+### 2.3 삭제 정책
 
 * v1: **soft delete** 적용
 
     * 삭제 시 레코드는 유지하고, `deleted=true`로 상태만 변경
-    * 삭제된 댓글은 목록에서 노출될 수 있으나, `content`는 마스킹 처리(예: "삭제된 댓글입니다")
+    * 삭제된 댓글은 목록 조회 결과에서 제외한다
 
 ---
 
@@ -43,8 +38,7 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
 | 필드         | 타입            | 설명                   |
 | ---------- | ------------- | -------------------- |
 | commentId  | Long          | Comment 식별자          |
-| targetType | String        | 대상 타입 (v1: `RECORD`) |
-| targetId   | Long          | 대상 ID (Record ID)    |
+| recordId   | Long          | 대상 Record ID         |
 | userId     | Long          | 작성자 ID               |
 | content    | String        | 댓글 내용                |
 | deleted    | boolean       | 삭제 여부                |
@@ -80,8 +74,7 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
 
 ```json
 {
-  "targetType": "RECORD",
-  "targetId": 1203,
+  "recordId": 1203,
   "content": "좋은 기록이네요"
 }
 ```
@@ -91,8 +84,7 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
 ```json
 {
   "commentId": 9001,
-  "targetType": "RECORD",
-  "targetId": 1203,
+  "recordId": 1203,
   "userId": 12,
   "content": "좋은 기록이네요",
   "deleted": false,
@@ -114,14 +106,13 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
 
 | 파라미터       | 타입     | 필수       | 설명           |
 | ---------- | ------ | -------- | ------------ |
-| targetType | String | required | v1: `RECORD` |
-| targetId   | Long   | required | Record ID    |
+| recordId   | Long   | required | Record ID    |
 | page       | int    | 선택       | 기본 0         |
 | size       | int    | 선택       | 기본 20, 최대 50 |
 
 예시:
 
-* `/api/v1/comments?targetType=RECORD&targetId=1203&page=0&size=20`
+* `/api/v1/comments?recordId=1203&page=0&size=20`
 
 #### Response (200)
 
@@ -138,20 +129,10 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
       "createdAt": "2026-02-08T10:12:31",
       "updatedAt": "2026-02-08T10:12:31"
     },
-    {
-      "commentId": 9002,
-      "userId": 33,
-      "nickname": "mori",
-      "profileImageUrl": "https://...",
-      "content": "삭제된 댓글입니다",
-      "deleted": true,
-      "createdAt": "2026-02-08T10:15:10",
-      "updatedAt": "2026-02-08T10:15:10"
-    }
   ],
   "page": 0,
   "size": 20,
-  "totalElements": 2,
+  "totalElements": 1,
   "totalPages": 1
 }
 ```
@@ -238,8 +219,7 @@ kr.co.quietpath.domain.record
 * `@Valid` 사용
 * RequestBody 필수값 검증
 
-    * targetType (required)
-    * targetId (required)
+    * recordId (required)
     * content (required, 공백 불가, 길이 제한은 정책 확정 시 추가)
 * QueryParams
 
@@ -249,7 +229,6 @@ kr.co.quietpath.domain.record
 
 ## 7. 예외 처리
 
-* 400: INVALID_TARGET_TYPE
 * 403: TARGET_NOT_PUBLIC, NOT_OWNER
 * 404: TARGET_NOT_FOUND, COMMENT_NOT_FOUND
 

@@ -70,8 +70,7 @@ public class RecordController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @PutMapping("/{recordId}")
-    @PatchMapping("/{recordId}")
+    @RequestMapping(path = "/{recordId}", method = {RequestMethod.PUT, RequestMethod.PATCH})
     public RecordUpdateResponse updateRecord(
         @AuthenticationPrincipal UserPrincipal principal,
         @PathVariable Long recordId,

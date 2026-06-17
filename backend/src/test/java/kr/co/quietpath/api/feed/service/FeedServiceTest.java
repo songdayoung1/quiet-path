@@ -4,12 +4,10 @@ import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Response;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
-import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.user.entity.User;
-import kr.co.quietpath.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,12 +38,6 @@ class FeedServiceTest {
     @Mock
     private RecordRepository recordRepository;
 
-    @Mock
-    private PathRepository pathRepository;
-
-    @Mock
-    private UserRepository userRepository;
-
     @InjectMocks
     private FeedService feedService;
 
@@ -58,24 +50,34 @@ class FeedServiceTest {
         when(reactionRepository.findWeeklyTop3Candidates(any(), any()))
             .thenReturn(List.of(p1, p2, p3));
 
-        Path path10 = buildPath(10L, 1L, LocalDateTime.of(2026, 2, 7, 10, 0));
-        Path path11 = buildPath(11L, 2L, LocalDateTime.of(2026, 2, 7, 10, 0));
-        Path path12 = buildPath(12L, 3L, LocalDateTime.of(2026, 2, 6, 9, 0));
-        when(pathRepository.findByIdIn(List.of(11L, 10L, 12L)))
-            .thenReturn(List.of(path10, path11, path12));
+        Record record10 = buildRecord(10L, 110L, 1L, "study", LocalDateTime.of(2026, 2, 6, 8, 0), LocalDateTime.of(2026, 2, 6, 8, 10));
+        Record record11 = buildRecord(11L, 111L, 2L, "workout", LocalDateTime.of(2026, 2, 7, 8, 0), LocalDateTime.of(2026, 2, 7, 8, 10));
+        Record record12 = buildRecord(12L, 112L, 3L, "hobby", LocalDateTime.of(2026, 2, 5, 8, 0), LocalDateTime.of(2026, 2, 5, 8, 10));
+        when(recordRepository.findAllById(List.of(11L, 10L, 12L)))
+            .thenReturn(List.of(record10, record11, record12));
 
-        when(userRepository.findByIdIn(any()))
-            .thenReturn(List.of(buildUser(1L), buildUser(2L), buildUser(3L)));
+        when(reactionRepository.countByRecordIds(List.of(11L, 10L, 12L)))
+            .thenReturn(List.of(
+                reactionCount(10L, 5L),
+                reactionCount(11L, 7L),
+                reactionCount(12L, 3L)
+            ));
+        when(commentRepository.countByRecordIds(List.of(11L, 10L, 12L)))
+            .thenReturn(List.of(
+                commentCount(10L, 1L),
+                commentCount(11L, 2L),
+                commentCount(12L, 0L)
+            ));
 
-        when(reactionRepository.findReactedPathIds(any(), any()))
+        when(reactionRepository.findReactedRecordIds(any(), any()))
             .thenReturn(List.of());
 
         WeeklyTop3Response response = feedService.getWeeklyTop3(99L);
 
         assertEquals(3, response.getItems().size());
-        assertEquals(11L, response.getItems().get(0).getPathId());
-        assertEquals(10L, response.getItems().get(1).getPathId());
-        assertEquals(12L, response.getItems().get(2).getPathId());
+        assertEquals(11L, response.getItems().get(0).getRecordId());
+        assertEquals(10L, response.getItems().get(1).getRecordId());
+        assertEquals(12L, response.getItems().get(2).getRecordId());
     }
 
     @Test
@@ -86,15 +88,22 @@ class FeedServiceTest {
         when(reactionRepository.findWeeklyTop3Candidates(any(), any()))
             .thenReturn(List.of(p1, p2));
 
-        Path path10 = buildPath(10L, 1L, LocalDateTime.of(2026, 2, 7, 10, 0));
-        Path path11 = buildPath(11L, 2L, LocalDateTime.of(2026, 2, 7, 9, 0));
-        when(pathRepository.findByIdIn(List.of(10L, 11L)))
-            .thenReturn(List.of(path10, path11));
+        Record record10 = buildRecord(10L, 210L, 1L, "study", LocalDateTime.of(2026, 2, 7, 8, 0), LocalDateTime.of(2026, 2, 7, 8, 10));
+        Record record11 = buildRecord(11L, 211L, 2L, "workout", LocalDateTime.of(2026, 2, 7, 9, 0), LocalDateTime.of(2026, 2, 7, 9, 10));
+        when(recordRepository.findAllById(List.of(10L, 11L)))
+            .thenReturn(List.of(record10, record11));
+        when(reactionRepository.countByRecordIds(List.of(10L, 11L)))
+            .thenReturn(List.of(
+                reactionCount(10L, 4L),
+                reactionCount(11L, 2L)
+            ));
+        when(commentRepository.countByRecordIds(List.of(10L, 11L)))
+            .thenReturn(List.of(
+                commentCount(10L, 1L),
+                commentCount(11L, 0L)
+            ));
 
-        when(userRepository.findByIdIn(any()))
-            .thenReturn(List.of(buildUser(1L), buildUser(2L)));
-
-        when(reactionRepository.findReactedPathIds(99L, List.of(10L, 11L)))
+        when(reactionRepository.findReactedRecordIds(99L, List.of(10L, 11L)))
             .thenReturn(List.of(11L));
 
         WeeklyTop3Response response = feedService.getWeeklyTop3(99L);
@@ -105,9 +114,9 @@ class FeedServiceTest {
 
     @Test
     void feed_cursorPaginationAndOrderingUsesSharedAt() {
-        Record r1 = buildRecord(101L, "study", LocalDateTime.of(2026, 2, 8, 8, 40), LocalDateTime.of(2026, 2, 8, 9, 12));
-        Record r2 = buildRecord(102L, "study", LocalDateTime.of(2026, 2, 8, 7, 10), LocalDateTime.of(2026, 2, 8, 8, 0));
-        Record r3 = buildRecord(103L, "study", LocalDateTime.of(2026, 2, 7, 21, 5), LocalDateTime.of(2026, 2, 7, 22, 0));
+        Record r1 = buildRecord(101L, 301L, 1L, "study", LocalDateTime.of(2026, 2, 8, 8, 40), LocalDateTime.of(2026, 2, 8, 9, 12));
+        Record r2 = buildRecord(102L, 302L, 1L, "study", LocalDateTime.of(2026, 2, 8, 7, 10), LocalDateTime.of(2026, 2, 8, 8, 0));
+        Record r3 = buildRecord(103L, 303L, 1L, "study", LocalDateTime.of(2026, 2, 7, 21, 5), LocalDateTime.of(2026, 2, 7, 22, 0));
 
         when(recordRepository.findPublicFeedRecords(eq("PUBLIC"), eq(null), any(), any(), any()))
             .thenReturn(List.of(r1, r2, r3));
@@ -151,7 +160,7 @@ class FeedServiceTest {
 
     @Test
     void feedReadWithoutUserDoesNotLookupReactionState() {
-        Record record = buildRecord(201L, "hobby", LocalDateTime.of(2026, 2, 8, 8, 40), LocalDateTime.of(2026, 2, 8, 9, 12));
+        Record record = buildRecord(201L, 401L, 1L, "hobby", LocalDateTime.of(2026, 2, 8, 8, 40), LocalDateTime.of(2026, 2, 8, 9, 12));
 
         when(recordRepository.findPublicFeedRecords(eq("PUBLIC"), eq("hobby"), any(), any(), any()))
             .thenReturn(List.of(record));
@@ -182,11 +191,11 @@ class FeedServiceTest {
         assertThrows(ApiException.class, () -> feedService.getFeed(99L, "invalid", 20, null));
     }
 
-    private ReactionRepository.WeeklyTop3Projection projection(Long pathId, Long reactionCount, LocalDateTime updatedAt) {
+    private ReactionRepository.WeeklyTop3Projection projection(Long recordId, Long reactionCount, LocalDateTime reactedAt) {
         return new ReactionRepository.WeeklyTop3Projection() {
             @Override
-            public Long getPathId() {
-                return pathId;
+            public Long getRecordId() {
+                return recordId;
             }
 
             @Override
@@ -195,8 +204,8 @@ class FeedServiceTest {
             }
 
             @Override
-            public LocalDateTime getUpdatedAt() {
-                return updatedAt;
+            public LocalDateTime getReactedAt() {
+                return reactedAt;
             }
         };
     }
@@ -215,9 +224,9 @@ class FeedServiceTest {
         return path;
     }
 
-    private Record buildRecord(Long recordId, String categoryCode, LocalDateTime createdAt, LocalDateTime sharedAt) {
-        User user = buildUser(1L);
-        Path path = buildPath(201L, 1L, createdAt);
+    private Record buildRecord(Long recordId, Long pathId, Long ownerId, String categoryCode, LocalDateTime createdAt, LocalDateTime sharedAt) {
+        User user = buildUser(ownerId);
+        Path path = buildPath(pathId, ownerId, createdAt);
         Record record = Record.builder()
             .user(user)
             .path(path)
@@ -231,6 +240,7 @@ class FeedServiceTest {
         setField(record, "id", recordId);
         setField(record, "createdAt", createdAt);
         setField(record, "sharedAt", sharedAt);
+        setField(record, "visibility", "PUBLIC");
         return record;
     }
 

@@ -1,4 +1,6 @@
-export type FeedCategory = 'all' | 'job' | 'study' | 'workout' | 'hobby';
+import { apiFetch, buildApiError } from './apiClient';
+
+export type FeedCategory = 'all' | 'job' | 'study' | 'workout' | 'hobby' | 'cert';
 
 export interface FeedOwnerSummary {
   userId: number | null;
@@ -28,15 +30,18 @@ export interface FeedResponse {
 }
 
 export interface WeeklyTop3ItemResponse {
-  rank: number;
-  pathId: number;
-  title: string;
+  pathId: number | null;
+  recordId: number;
+  title: string | null;
+  content: string | null;
   status: string | null;
   owner: FeedOwnerSummary;
+  categoryCode: string | null;
   reactionCount: number;
+  commentCount: number;
   isReacted: boolean;
+  sharedAt: string | null;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface WeeklyTop3Response {
@@ -47,32 +52,34 @@ export interface WeeklyTop3Response {
   };
 }
 
-const resolveApiBaseUrl = () => {
-  const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  if (!configured) return '';
-  return configured.endsWith('/') ? configured.slice(0, -1) : configured;
+const FEED_CACHE_TTL_MS = 20_000;
+const responseCache = new Map<string, { expiresAt: number; value: unknown }>();
+
+const readCache = <T,>(key: string): T | null => {
+  const cached = responseCache.get(key);
+  if (!cached) {
+    return null;
+  }
+  if (cached.expiresAt <= Date.now()) {
+    responseCache.delete(key);
+    return null;
+  }
+  return cached.value as T;
 };
 
-const apiBaseUrl = resolveApiBaseUrl();
-const apiUrl = (path: string) => `${apiBaseUrl}${path}`;
-
-const parseErrorMessage = async (response: Response) => {
-  try {
-    const body = await response.json();
-    return body?.message || '요청 처리에 실패했습니다.';
-  } catch {
-    return '요청 처리에 실패했습니다.';
-  }
+const writeCache = <T,>(key: string, value: T) => {
+  responseCache.set(key, {
+    expiresAt: Date.now() + FEED_CACHE_TTL_MS,
+    value,
+  });
 };
 
-const createAuthHeaders = (token?: string | null) => {
-  if (!token) {
-    return undefined;
+const invalidateCacheByPrefix = (prefix: string) => {
+  for (const key of responseCache.keys()) {
+    if (key.startsWith(prefix)) {
+      responseCache.delete(key);
+    }
   }
-
-  return {
-    Authorization: `Bearer ${token}`,
-  };
 };
 
 export const feedApi = {
@@ -81,6 +88,7 @@ export const feedApi = {
     category?: FeedCategory;
     cursor?: string | null;
     size?: number;
+    bypassCache?: boolean;
   }): Promise<FeedResponse> {
     const query = new URLSearchParams();
     query.set('size', String(params.size ?? 20));
@@ -91,28 +99,59 @@ export const feedApi = {
       query.set('cursor', params.cursor);
     }
 
-    const response = await fetch(apiUrl(`/api/v1/feed?${query.toString()}`), {
+    const cacheKey = `feed:${params.token ?? 'guest'}:${query.toString()}`;
+    const cached = params.bypassCache ? null : readCache<FeedResponse>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await apiFetch(`/api/v1/feed?${query.toString()}`, {
       method: 'GET',
-      headers: createAuthHeaders(params.token),
+    }, {
+      accessToken: params.token,
     });
 
     if (!response.ok) {
-      throw new Error(await parseErrorMessage(response));
+      throw await buildApiError(response);
     }
 
-    return response.json();
+    const data = await response.json();
+    writeCache(cacheKey, data);
+    return data;
   },
 
-  async getWeeklyTop3(token?: string | null): Promise<WeeklyTop3Response> {
-    const response = await fetch(apiUrl('/api/v1/feed/weekly-top3'), {
+  async getWeeklyTop3(token?: string | null, options?: { bypassCache?: boolean }): Promise<WeeklyTop3Response> {
+    const cacheKey = `weekly-top3:${token ?? 'guest'}`;
+    const cached = options?.bypassCache ? null : readCache<WeeklyTop3Response>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const response = await apiFetch('/api/v1/feed/weekly-top3', {
       method: 'GET',
-      headers: createAuthHeaders(token),
+    }, {
+      accessToken: token,
     });
 
     if (!response.ok) {
-      throw new Error(await parseErrorMessage(response));
+      throw await buildApiError(response);
     }
 
-    return response.json();
+    const data = await response.json();
+    writeCache(cacheKey, data);
+    return data;
+  },
+
+  invalidateFeedCache() {
+    invalidateCacheByPrefix('feed:');
+  },
+
+  invalidateWeeklyTop3Cache() {
+    invalidateCacheByPrefix('weekly-top3:');
+  },
+
+  invalidateCommunityCache() {
+    invalidateCacheByPrefix('feed:');
+    invalidateCacheByPrefix('weekly-top3:');
   },
 };

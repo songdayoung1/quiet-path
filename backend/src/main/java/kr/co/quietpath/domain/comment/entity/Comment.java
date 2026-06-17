@@ -17,8 +17,6 @@ import java.time.LocalDateTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Comment {
 
-    private static final String TARGET_TYPE_RECORD = "RECORD";
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -65,13 +63,5 @@ public class Comment {
             this.deletedAt = LocalDateTime.now();
             this.updatedAt = LocalDateTime.now();
         }
-    }
-
-    public String getTargetType() {
-        return TARGET_TYPE_RECORD;
-    }
-
-    public Long getTargetId() {
-        return recordId;
     }
 }

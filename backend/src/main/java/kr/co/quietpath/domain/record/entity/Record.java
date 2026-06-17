@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
         @UniqueConstraint(name = "uk_records_share_code", columnNames = {"share_code"})
     },
     indexes = {
+        @Index(name = "idx_user_record_date_id", columnList = "user_id, record_date, id"),
         @Index(name = "idx_path_date", columnList = "path_id, record_date"),
         @Index(name = "idx_visibility_category_shared", columnList = "visibility, category_code, shared_at, id"),
         @Index(name = "idx_mood_date", columnList = "mood_code, record_date")

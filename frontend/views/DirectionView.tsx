@@ -7,6 +7,7 @@ import { DirectionSetupForm } from '../components/DirectionSetupForm';
 import { WaterDropCharacter } from '../components/WaterDropCharacter';
 import { AppModal } from '../components/AppModal';
 import { getThemePalette, useResolvedTheme } from '../theme';
+import { getCurrentPathRecords } from '../utils/recordScope';
 
 const formatDateInputValue = (date: Date) => {
   const year = date.getFullYear();
@@ -19,7 +20,7 @@ interface DirectionViewProps {
   currentDirection: Direction | null;
   records: RecordType[];
   onStartDirection: (newDirection: Partial<Direction>) => void | Promise<void>;
-  onFinishDirection: () => void;
+  onFinishDirection: () => void | Promise<void>;
   onHistoryClick: () => void;
 }
 
@@ -35,7 +36,7 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   const [customReviewDate, setCustomReviewDate] = useState('');
   const [showDateInput, setShowDateInput] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[number] | null>(null);
-  const [saveState, setSaveState] = useState<'idle' | 'animating' | 'leaving'>('idle');
+  const [saveState, setSaveState] = useState<'idle' | 'submitting'>('idle');
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const submitLockedRef = useRef(false);
 
@@ -72,38 +73,31 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   };
 
   const handleCancel = () => {
+    if (saveState !== 'idle') return;
     setIsEditing(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const reviewAt = getReviewAt();
     if (!description.trim() || !reviewAt || saveState !== 'idle' || submitLockedRef.current) return;
     submitLockedRef.current = true;
 
-    // Trigger Success Animation
-    setSaveState('animating');
+    setSaveState('submitting');
 
-    setTimeout(() => {
-      setSaveState('leaving');
-    }, 1400);
-
-    setTimeout(async () => {
-      try {
-        await onStartDirection({
-          question: question.trim() || '이 방향으로 나는 어떻게 걸어가고 있을까?',
-          description,
-          categoryId: selectedCategory?.id,
-          categoryLabel: selectedCategory?.label,
-          reviewAt,
-        });
-        setIsEditing(false);
-      } catch (err) {
-        setNoticeMessage(err instanceof Error ? err.message : '방향 생성에 실패했습니다.');
-      } finally {
-        submitLockedRef.current = false;
-        setSaveState('idle');
-      }
-    }, 1750);
+    try {
+      await onStartDirection({
+        question: question.trim() || '이 방향으로 나는 어떻게 걸어가고 있을까?',
+        description,
+        categoryId: selectedCategory?.id,
+        categoryLabel: selectedCategory?.label,
+        reviewAt,
+      });
+    } catch (err) {
+      setNoticeMessage(err instanceof Error ? err.message : '방향 생성에 실패했습니다.');
+      setSaveState('idle');
+    } finally {
+      submitLockedRef.current = false;
+    }
   };
 
   const handleFinishDirection = () => {
@@ -117,8 +111,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
 
   const currentPathRecords = useMemo(() => {
     if (!currentDirection) return [];
-    return records
-      .filter((record) => !record.isHidden && record.directionQuestion === currentDirection.question)
+    return getCurrentPathRecords(records, currentDirection)
+      .filter((record) => !record.isHidden)
       .sort((a, b) => b.timestamp - a.timestamp);
   }, [currentDirection, records]);
 
@@ -152,85 +146,87 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   if (isEditing) {
     return (
       <div className="animate-fade-in pb-24 pt-2">
-        <PageHeader title="새로운 방향 설정" subtitle="집중하고 싶은 방향을 차분히 정해볼까요?" />
+        <div className={saveState === 'idle' ? '' : 'opacity-0 pointer-events-none'}>
+          <PageHeader title="새로운 방향 설정" subtitle="집중하고 싶은 방향을 차분히 정해볼까요?" />
 
-        {showCategorySelect ? (
-          <div className="flex flex-col gap-3 px-1 mt-2">
-            <p className="text-[11px] font-bold text-mist-400 uppercase tracking-widest mb-2 ml-1">관심사 선택</p>
-            {CATEGORIES.map((cat) => (
-              <Card
-                key={cat.id}
-                onClick={() => {
-                  setSelectedCategory(cat);
-                  setQuestion('');
-                  setDescription('');
-                  setShowCategorySelect(false);
-                }}
-                className="!p-5 cursor-pointer hover:bg-white active:scale-[0.98] border border-white transition-all shadow-sm hover:shadow-md"
-                style={{ background: `linear-gradient(135deg, ${cat.accentBg}CC, white)` } as React.CSSProperties}
-              >
-                <div className="flex items-center gap-4">
-                  <CategoryIcon categoryId={cat.id} size="md" />
-                  <div className="flex-1">
-                    <h3 className="font-bold text-base mb-0.5" style={{ color: cat.accent }}>{cat.label}</h3>
-                    <p className="text-mist-400 text-xs">{cat.desc}</p>
+          {showCategorySelect ? (
+            <div className="flex flex-col gap-3 px-1 mt-2">
+              <p className="text-[11px] font-bold text-mist-400 uppercase tracking-widest mb-2 ml-1">관심사 선택</p>
+              {CATEGORIES.map((cat) => (
+                <Card
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedCategory(cat);
+                    setQuestion('');
+                    setDescription('');
+                    setShowCategorySelect(false);
+                  }}
+                  className="!p-5 cursor-pointer hover:bg-white active:scale-[0.98] border border-white transition-all shadow-sm hover:shadow-md"
+                  style={{ background: `linear-gradient(135deg, ${cat.accentBg}CC, white)` } as React.CSSProperties}
+                >
+                  <div className="flex items-center gap-4">
+                    <CategoryIcon categoryId={cat.id} size="md" />
+                    <div className="flex-1">
+                      <h3 className="font-bold text-base mb-0.5" style={{ color: cat.accent }}>{cat.label}</h3>
+                      <p className="text-mist-400 text-xs">{cat.desc}</p>
+                    </div>
+                    <ArrowRight size={16} className="text-mist-300 shrink-0" />
                   </div>
-                  <ArrowRight size={16} className="text-mist-300 shrink-0" />
-                </div>
-              </Card>
-            ))}
-            <SoftButton variant="secondary" onClick={handleCancel} className="mt-6 bg-white/50">
-              돌아가기
-            </SoftButton>
-          </div>
-        ) : (
-          selectedCategory && (
-            <DirectionSetupForm
-              selectedCategory={selectedCategory}
-              directionName={description}
-              directionText={question}
-              durationDays={durationDays}
-              customReviewDate={customReviewDate}
-              showDateInput={showDateInput}
-              todayStr={minReviewDateStr}
-              reviewDateDisplay={reviewDateDisplay}
-              isNameMissing={isTitleMissing}
-              hasReviewAt={!!getReviewAt()}
-              submitDisabled={!canSubmit || saveState !== 'idle'}
-              onDirectionNameChange={setDescription}
-              onDirectionTextChange={setQuestion}
-              onSelectDuration={(days) => {
-                setDurationDays(days);
-                setCustomReviewDate('');
-                setShowDateInput(false);
-              }}
-              onToggleDateInput={() => {
-                setShowDateInput((prev) => {
-                  const willOpen = !prev;
-                  if (willOpen && (!customReviewDate || customReviewDate < minReviewDateStr)) {
-                    setCustomReviewDate(minReviewDateStr);
-                  }
-                  return willOpen;
-                });
-                setDurationDays(null);
-              }}
-              onReviewDateChange={(value) => {
-                setCustomReviewDate(value < minReviewDateStr ? minReviewDateStr : value);
-                setDurationDays(null);
-              }}
-              onSubmit={handleSubmit}
-              onCancel={handleCancel}
-            />
-          )
-        )}
+                </Card>
+              ))}
+              <SoftButton variant="secondary" onClick={handleCancel} className="mt-6 bg-white/50">
+                돌아가기
+              </SoftButton>
+            </div>
+          ) : (
+            selectedCategory && (
+              <DirectionSetupForm
+                selectedCategory={selectedCategory}
+                directionName={description}
+                directionText={question}
+                durationDays={durationDays}
+                customReviewDate={customReviewDate}
+                showDateInput={showDateInput}
+                todayStr={minReviewDateStr}
+                reviewDateDisplay={reviewDateDisplay}
+                isNameMissing={isTitleMissing}
+                hasReviewAt={!!getReviewAt()}
+                submitDisabled={!canSubmit || saveState !== 'idle'}
+                onDirectionNameChange={setDescription}
+                onDirectionTextChange={setQuestion}
+                onSelectDuration={(days) => {
+                  setDurationDays(days);
+                  setCustomReviewDate('');
+                  setShowDateInput(false);
+                }}
+                onToggleDateInput={() => {
+                  setShowDateInput((prev) => {
+                    const willOpen = !prev;
+                    if (willOpen && (!customReviewDate || customReviewDate < minReviewDateStr)) {
+                      setCustomReviewDate(minReviewDateStr);
+                    }
+                    return willOpen;
+                  });
+                  setDurationDays(null);
+                }}
+                onReviewDateChange={(value) => {
+                  setCustomReviewDate(value < minReviewDateStr ? minReviewDateStr : value);
+                  setDurationDays(null);
+                }}
+                onSubmit={() => {
+                  void handleSubmit();
+                }}
+                onCancel={handleCancel}
+              />
+            )
+          )}
+        </div>
 
-        {/* Water Drop Micro-interaction Overlay */}
         {saveState !== 'idle' && (
-          <WaterDropOverlay 
-            leaving={saveState === 'leaving'} 
-            mood="반짝" 
-            title="새로운 방향이 시작되었어요"
-            subtitle="함께 차분히 걸어가봐요 ✨"
+          <WaterDropOverlay
+            mood="반짝"
+            title="새로운 방향을 시작하는 중이에요"
+            subtitle="잠시만 기다려주세요."
           />
         )}
       </div>

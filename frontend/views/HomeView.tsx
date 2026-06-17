@@ -10,6 +10,14 @@ import { CurrentPathStrip } from '../components/CurrentPathStrip';
 import { ProgressBand } from '../components/ProgressBand';
 import { MemoryPreviewStrip } from '../components/MemoryPreviewStrip';
 import { ExpandedHeatmapSheet } from '../components/ExpandedHeatmapSheet';
+import { getCurrentPathRecords, getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from '../utils/recordScope';
+import {
+  HeroSkeleton,
+  TodaysCardSkeleton,
+  CurrentPathStripSkeleton,
+  ProgressBandSkeleton,
+  MemoryPreviewStripSkeleton,
+} from '../components/HomeSkeleton';
 
 interface HomeViewProps {
   state: AppState;
@@ -17,22 +25,18 @@ interface HomeViewProps {
   onStartDirectionClick: () => void;
   onHistoryClick: () => void;
   onRecordsClick: () => void;
+  isHomeDataLoading?: boolean;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDirectionClick, onHistoryClick, onRecordsClick }) => {
+export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDirectionClick, onHistoryClick, onRecordsClick, isHomeDataLoading = false }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const [isHeatmapSheetOpen, setIsHeatmapSheetOpen] = useState(false);
-  const { currentDirection, records, hasLoggedToday } = state;
+  const { currentDirection, records } = state;
   const hasActiveDirection = !!currentDirection;
   const sortedRecords = [...records].filter(r => !r.isHidden).sort((a, b) => b.timestamp - a.timestamp);
-  const effectiveHasLoggedToday = hasActiveDirection && hasLoggedToday;
-  
-  // Find today's record accurately matching local date
-  const todayDateStr = new Date().toLocaleDateString('ko-KR');
-  const todayRecord = sortedRecords.find(r => 
-    new Date(r.timestamp).toLocaleDateString('ko-KR') === todayDateStr
-  ) || null;
+  const effectiveHasLoggedToday = hasActiveDirection && hasLoggedTodayForCurrentPath(records, currentDirection);
+  const todayRecord = hasActiveDirection ? getCurrentPathTodayRecord(records, currentDirection) : null;
   const visibleTodayRecord = hasActiveDirection ? todayRecord : null;
   
   const lastRecord = sortedRecords[0]; // Kept for top right mood indicator
@@ -45,7 +49,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
   });
   
   const currentPathRecords = currentDirection
-    ? sortedRecords.filter(r => r.directionQuestion === currentDirection.question)
+    ? getCurrentPathRecords(sortedRecords, currentDirection)
     : [];
   const currentPathRecordCount = currentPathRecords.length;
   const currentPathStartDate = currentDirection ? new Date(currentDirection.createdAt) : null;
@@ -92,9 +96,23 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
       ? '기록이 안전하게 쌓이고 있어요.'
       : '하루를 돌아보며 방향을 만들어가요.';
 
+  if (isHomeDataLoading) {
+    return (
+      <div className="flex flex-col gap-6 animate-fade-in pb-32 pt-2 relative z-10">
+        <HeroSkeleton />
+        <TodaysCardSkeleton />
+        <div className="flex flex-col gap-4">
+          <CurrentPathStripSkeleton />
+          <ProgressBandSkeleton />
+        </div>
+        <MemoryPreviewStripSkeleton />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6 animate-slide-up pb-32 pt-2 relative z-10">
-      
+
       {/* 0. Hero Header */}
       <div className="px-2 mt-2 flex justify-between items-start">
         <div>

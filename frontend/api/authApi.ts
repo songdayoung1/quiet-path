@@ -1,4 +1,5 @@
 import { OnboardingStatus, MeResponse } from '../types';
+import { apiUrl, parseErrorMessage } from './apiClient';
 
 /**
  * Auth API
@@ -13,27 +14,28 @@ const isMockAccessToken = (token: string) =>
 const mockStatusByToken = (token: string): OnboardingStatus =>
   token.includes('new') ? 'NEW' : 'EXISTING';
 
-const resolveApiBaseUrl = () => {
-  const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  if (!configured) return '';
-  return configured.endsWith('/') ? configured.slice(0, -1) : configured;
-};
-
-const apiBaseUrl = resolveApiBaseUrl();
-const apiUrl = (path: string) => `${apiBaseUrl}${path}`;
-
-const parseErrorMessage = async (response: Response) => {
-  try {
-    const body = await response.json();
-    return body?.message || '요청 처리에 실패했습니다.';
-  } catch {
-    return '요청 처리에 실패했습니다.';
-  }
-};
-
 export const authApi = {
-  startKakaoLogin: () => {
-    window.location.href = apiUrl('/api/v1/auth/kakao/start');
+  startKakaoLogin: async (): Promise<void> => {
+    const response = await fetch(apiUrl('/api/v1/auth/kakao/start-url'), {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const message = await parseErrorMessage(response);
+      if (import.meta.env.DEV && message.includes('인증 설정값이 누락되었습니다')) {
+        throw new Error(
+          '카카오 로그인 설정이 비어 있어요. 루트 `.env.local` 또는 `backend/.env.local`에 `KAKAO_REST_API_KEY`를 넣어주세요.'
+        );
+      }
+      throw new Error(message);
+    }
+
+    const data = await response.json();
+    if (!data?.redirectUrl) {
+      throw new Error('카카오 로그인 시작 주소를 만들지 못했습니다.');
+    }
+
+    window.location.href = data.redirectUrl;
   },
 
   loginWithKakao: async (

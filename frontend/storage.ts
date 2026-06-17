@@ -1,4 +1,5 @@
 import { AppState, Direction, Record, UserLevel, DailyTone, ToneType } from './types';
+import { hasLoggedTodayForCurrentPath } from './utils/recordScope';
 
 const STORAGE_KEY = 'quiet_path_data_v1';
 
@@ -9,7 +10,7 @@ const INITIAL_STATE: AppState = {
   hasLoggedToday: false,
   hasSeenOnboarding: false,
   userLevel: 'Beginning',
-  auth: { isLoggedIn: false, token: null, refreshToken: null },
+  auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
 };
 
 // TONE DATA DEFINITION
@@ -94,10 +95,10 @@ export const loadState = (): AppState => {
     }
     
     // Check if logged today
-    const lastRecord = sanitized.records && sanitized.records.length > 0 ? sanitized.records[0] : null;
-    const isToday = lastRecord 
-      ? new Date(lastRecord.timestamp).toDateString() === new Date().toDateString()
-      : false;
+    const isToday = hasLoggedTodayForCurrentPath(
+      sanitized.records || [],
+      sanitized.currentDirection
+    );
 
     // Recalculate level ensuring it exists
     const level = calculateLevel(sanitized.records?.length || 0);
@@ -109,6 +110,7 @@ export const loadState = (): AppState => {
         ...INITIAL_STATE.auth,
         ...(sanitized.auth || {}),
         refreshToken: sanitized.auth?.refreshToken ?? null,
+        userId: sanitized.auth?.userId ?? null,
       },
       hasLoggedToday: isToday,
       userLevel: level

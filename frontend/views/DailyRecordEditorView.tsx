@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Record as RecordType, Direction } from '../types';
 import { createLogId } from '../storage';
 import { SoftButton, AutoTextArea, MoodSticker, WaterDropOverlay } from '../components/UI';
@@ -11,15 +11,22 @@ import { AppModal } from '../components/AppModal';
 
 interface DailyRecordEditorViewProps {
   state: AppState;
+  initialRecord?: RecordType | null;
   onSave: (record: RecordType, directionUpdate?: Partial<Direction>) => void;
   onCancel: () => void;
   onStartDirection: () => void;
 }
 
-export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({ state, onSave, onCancel, onStartDirection }) => {
+export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
+  state,
+  initialRecord = null,
+  onSave,
+  onCancel,
+  onStartDirection,
+}) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
-  const [action, setAction] = useState(''); // 오늘의 장면
+  const [action, setAction] = useState('');
   const [oneWordText, setOneWordText] = useState('');
   const [tomorrowText, setTomorrowText] = useState('');
   const [moodCode, setMoodCode] = useState<string>('');
@@ -30,49 +37,98 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({ st
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { currentDirection } = state;
+  const isEditing = initialRecord !== null;
+
+  useEffect(() => {
+    setAction(initialRecord?.action ?? '');
+    setOneWordText(initialRecord?.oneWordText ?? '');
+    setTomorrowText(initialRecord?.tomorrowText ?? '');
+    setMoodCode(initialRecord?.moodCode ?? '');
+    setImageUrl(initialRecord?.imageUrl ?? '');
+  }, [initialRecord]);
 
   const handleSubmit = async () => {
     if (!currentDirection || !action.trim() || saveState !== 'idle') return;
 
-    const localCreatedAt = new Date().toISOString();
-    const baseRecord = (id: string, createdAt: string): RecordType => ({
-      id,
-      date: createdAt,
-      timestamp: new Date(createdAt).getTime(),
-      directionQuestion: currentDirection.question,
-      action: action.trim(),
+    const payload = {
+      content: action.trim(),
       oneWordText: oneWordText.trim() || undefined,
       tomorrowText: tomorrowText.trim() || undefined,
       moodCode: moodCode || undefined,
       imageUrl: imageUrl || undefined,
-      isShared: false,
-    });
+    };
+
+    const localCreatedAt = initialRecord?.date ?? new Date().toISOString();
+    const savedPathId = initialRecord?.pathId ?? currentDirection.id;
 
     // 1) 물방울 오버레이 등장
     setSaveState('animating');
 
-    let savedRecord = baseRecord(createLogId(), localCreatedAt);
+    let savedRecord: RecordType = initialRecord
+      ? {
+          ...initialRecord,
+          pathId: savedPathId,
+          directionQuestion: currentDirection.question,
+          action: payload.content,
+          oneWordText: payload.oneWordText,
+          tomorrowText: payload.tomorrowText,
+          moodCode: payload.moodCode,
+          imageUrl: payload.imageUrl,
+        }
+      : {
+          id: createLogId(),
+          pathId: savedPathId,
+          date: localCreatedAt,
+          timestamp: new Date(localCreatedAt).getTime(),
+          directionQuestion: currentDirection.question,
+          action: payload.content,
+          oneWordText: payload.oneWordText,
+          tomorrowText: payload.tomorrowText,
+          moodCode: payload.moodCode,
+          imageUrl: payload.imageUrl,
+          isShared: false,
+        };
     const token = state.auth?.token;
 
     if (state.auth?.isLoggedIn && token) {
       try {
-        const response = await recordApi.create(token, {
-          content: action.trim(),
-          oneWordText: oneWordText.trim() || undefined,
-          tomorrowText: tomorrowText.trim() || undefined,
-          moodCode: moodCode || undefined,
-          imageUrl: imageUrl || undefined,
-          visibility: 'PRIVATE',
-        });
-        savedRecord = {
-          ...baseRecord(String(response.id), response.createdAt),
-          action: response.content,
-          oneWordText: response.oneWordText ?? undefined,
-          tomorrowText: response.tomorrowText ?? undefined,
-          moodCode: response.moodCode ?? undefined,
-          imageUrl: response.imageUrl ?? undefined,
-          isShared: response.visibility === 'PUBLIC',
-        };
+        if (isEditing && initialRecord) {
+          const recordId = Number(initialRecord.id);
+          if (!Number.isInteger(recordId)) {
+            throw new Error('수정할 기록 정보를 찾지 못했습니다.');
+          }
+
+          const response = await recordApi.update(token, recordId, payload);
+          savedRecord = {
+            ...initialRecord,
+            pathId: savedPathId,
+            directionQuestion: currentDirection.question,
+            action: response.content,
+            oneWordText: response.oneWordText ?? undefined,
+            tomorrowText: response.tomorrowText ?? undefined,
+            moodCode: response.moodCode ?? undefined,
+            imageUrl: response.imageUrl ?? undefined,
+            isShared: response.visibility === 'PUBLIC',
+          };
+        } else {
+          const response = await recordApi.create(token, {
+            ...payload,
+            visibility: 'PRIVATE',
+          });
+          savedRecord = {
+            id: String(response.id),
+            pathId: String(response.pathId),
+            date: response.createdAt,
+            timestamp: new Date(response.createdAt).getTime(),
+            directionQuestion: response.directionText || currentDirection.question,
+            action: response.content,
+            oneWordText: response.oneWordText ?? undefined,
+            tomorrowText: response.tomorrowText ?? undefined,
+            moodCode: response.moodCode ?? undefined,
+            imageUrl: response.imageUrl ?? undefined,
+            isShared: response.visibility === 'PUBLIC',
+          };
+        }
       } catch (error) {
         setSaveState('idle');
         setNoticeMessage(error instanceof Error ? error.message : '기록 저장에 실패했습니다.');
@@ -147,7 +203,7 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({ st
         </button>
         <div className="flex flex-col items-center">
              <span className="text-point-500 text-[10px] font-bold tracking-[0.2em] uppercase">Today's Log</span>
-             <span className="text-[10px]" style={{ color: palette.faintText }}>새로운 기록</span>
+             <span className="text-[10px]" style={{ color: palette.faintText }}>{isEditing ? '오늘 기록 수정' : '새로운 기록'}</span>
         </div>
         <div className="w-10"></div>
       </div>
@@ -180,7 +236,7 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({ st
         {/* 2. Scene (Action) */}
         <div className="animate-slide-up rounded-3xl p-6 shadow-sm border" style={{ animationDelay: '0.2s', background: palette.cardBgStrong, borderColor: palette.border }}>
           <label className="block text-sm text-point-600 mb-4 ml-1 font-bold leading-relaxed">
-            오늘의 장면을 남겨볼까요?
+            {isEditing ? '오늘의 장면을 다듬어볼까요?' : '오늘의 장면을 남겨볼까요?'}
           </label>
           <AutoTextArea 
             rows={3}
@@ -275,7 +331,7 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({ st
               className={`shadow-xl transition-all duration-300 shadow-point-200/50 py-4 text-base font-bold`}
             >
               <Check size={20} />
-              <span>흔적 남기기</span>
+              <span>{isEditing ? '수정 저장하기' : '흔적 남기기'}</span>
             </SoftButton>
         </div>
       </div>

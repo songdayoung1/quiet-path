@@ -15,7 +15,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
         Long getCommentCount();
     }
 
-    Page<Comment> findByRecordIdOrderByCreatedAtAsc(Long recordId, Pageable pageable);
+    Page<Comment> findByRecordIdAndDeletedFalseOrderByCreatedAtAsc(Long recordId, Pageable pageable);
 
     long countByRecordId(Long recordId);
 
@@ -24,6 +24,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
                count(c.id) as commentCount
         from Comment c
         where c.recordId in :recordIds
+          and c.deleted = false
         group by c.recordId
         """)
     List<RecordCommentCountProjection> countByRecordIds(

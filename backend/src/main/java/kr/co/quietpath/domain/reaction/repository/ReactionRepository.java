@@ -13,9 +13,9 @@ import java.util.Optional;
 public interface ReactionRepository extends JpaRepository<Reaction, Long> {
 
     interface WeeklyTop3Projection {
-        Long getPathId();
+        Long getRecordId();
         Long getReactionCount();
-        LocalDateTime getUpdatedAt();
+        LocalDateTime getReactedAt();
     }
 
     interface RecordReactionCountProjection {
@@ -42,13 +42,15 @@ public interface ReactionRepository extends JpaRepository<Reaction, Long> {
     long countByRecord_Id(Long recordId);
 
     @Query("""
-        select r.record.path.id as pathId,
+        select r.record.id as recordId,
                count(r.id) as reactionCount,
-               max(r.record.path.updatedAt) as updatedAt
+               max(r.createdAt) as reactedAt
         from Reaction r
         where r.createdAt >= :from
           and r.createdAt <= :to
-        group by r.record.path.id
+          and r.record.visibility = 'PUBLIC'
+          and r.record.sharedAt is not null
+        group by r.record.id
         """)
     List<WeeklyTop3Projection> findWeeklyTop3Candidates(
         @Param("from") LocalDateTime from,

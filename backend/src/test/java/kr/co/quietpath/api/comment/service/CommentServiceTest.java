@@ -47,8 +47,7 @@ class CommentServiceTest {
     @Test
     void createComment_privateRecord_returns403() {
         CommentCreateRequest request = new CommentCreateRequest();
-        request.setTargetType("RECORD");
-        request.setTargetId(10L);
+        request.setRecordId(10L);
         request.setContent("좋은 기록이네요");
 
         Record record = buildRecord("PRIVATE");
@@ -59,7 +58,7 @@ class CommentServiceTest {
     }
 
     @Test
-    void deleteComment_softDelete_masksContentInList() {
+    void deleteComment_softDelete_hidesCommentFromList() {
         Record record = buildRecord("PUBLIC");
         when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
 
@@ -71,25 +70,20 @@ class CommentServiceTest {
         setField(comment, "id", 100L);
         comment.softDelete();
 
-        when(commentRepository.findByRecordIdOrderByCreatedAtAsc(
+        when(commentRepository.findByRecordIdAndDeletedFalseOrderByCreatedAtAsc(
             10L,
             PageRequest.of(0, 20))
-        ).thenReturn(new PageImpl<>(List.of(comment), PageRequest.of(0, 20), 1));
-
-        User user = buildUser(1L);
-        when(userRepository.findByIdIn(List.of(1L))).thenReturn(List.of(user));
+        ).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         CommentListQuery query = new CommentListQuery();
-        query.setTargetType("RECORD");
-        query.setTargetId(10L);
+        query.setRecordId(10L);
         query.setPage(0);
         query.setSize(20);
 
         var response = commentService.getComments(query);
 
-        assertEquals(1, response.getItems().size());
-        assertEquals(true, response.getItems().get(0).isDeleted());
-        assertEquals("삭제된 댓글입니다", response.getItems().get(0).getContent());
+        assertEquals(0, response.getItems().size());
+        assertEquals(0, response.getTotalElements());
     }
 
     private Record buildRecord(String visibility) {
