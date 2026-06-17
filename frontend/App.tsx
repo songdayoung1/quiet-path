@@ -12,6 +12,7 @@ import { SettingsView } from './views/SettingsView';
 import { OAuthCallbackView } from './views/OAuthCallbackView';
 import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
+import { configureApiClient } from './api/apiClient';
 import { authApi } from './api/authApi';
 import { pathApi, PathActiveResponse, PathCreateResponse } from './api/pathApi';
 import { recordApi, RecordResponse } from './api/recordApi';
@@ -219,6 +220,7 @@ const App: React.FC = () => {
   const [authCodeParam, setAuthCodeParam] = useState<string | null>(null);
   const [settingsButtonHovered, setSettingsButtonHovered] = useState(false);
   const [settingsButtonPressed, setSettingsButtonPressed] = useState(false);
+  const [isHomeDataLoading, setIsHomeDataLoading] = useState(false);
   const [recordGuardModalOpen, setRecordGuardModalOpen] = useState(false);
   const [noticeModal, setNoticeModal] = useState<{
     title: string;
@@ -549,6 +551,14 @@ const App: React.FC = () => {
     return refreshAuthRequestRef.current;
   }, [state.auth.refreshToken, state.auth.userId]);
 
+  useEffect(() => {
+    configureApiClient({ refreshAccessToken: refreshCommunityAccessToken });
+
+    return () => {
+      configureApiClient({ refreshAccessToken: null });
+    };
+  }, [refreshCommunityAccessToken]);
+
   const handleStartDirection = async (updates: Partial<Direction>) => {
     if (state.currentDirection) return;
     const startedAt = Date.now();
@@ -687,7 +697,9 @@ const App: React.FC = () => {
       if (status === 'NEW') {
           setCurrentView('NICKNAME_SETUP');
       } else {
-          // Existing Users go to HOME. If they've never seen Onboarding, we assume they somehow bypassed it and it is now true.
+          // Existing Users go to HOME. Show skeleton while fetching path + records.
+          setIsHomeDataLoading(true);
+          setCurrentView('NOW');
           pathApi.getActive(token)
             .then(async (activePath) => {
               const activeDirection = buildDirectionFromActivePath(activePath, state.currentDirection);
@@ -727,8 +739,10 @@ const App: React.FC = () => {
                 },
                 hasSeenOnboarding: true,
               }));
+            })
+            .finally(() => {
+              setIsHomeDataLoading(false);
             });
-          setCurrentView('NOW');
       }
   };
 
@@ -1000,12 +1014,13 @@ const App: React.FC = () => {
       {/* Main Content Area */}
       <main className={currentView === 'SETTINGS' ? 'flex-1 px-0 pt-0 pb-0' : 'flex-1 px-6 pt-2 pb-32'}>
         {currentView === 'NOW' && (
-          <HomeView 
-            state={state} 
+          <HomeView
+            state={state}
             onLogClick={handleOpenLogEditor}
             onStartDirectionClick={() => setCurrentView('DIRECTION')}
             onHistoryClick={() => setCurrentView('PAST_DIRECTIONS')}
             onRecordsClick={() => setCurrentView('RECORDS')}
+            isHomeDataLoading={isHomeDataLoading}
           />
         )}
         {currentView === 'RECORDS' && (
@@ -1030,9 +1045,8 @@ const App: React.FC = () => {
           />
         )}
         {currentView === 'COMMUNITY' && (
-           <CommunityView 
+           <CommunityView
               accessToken={state.auth?.token}
-              onRefreshAuth={refreshCommunityAccessToken}
               currentUserId={state.auth?.userId}
               isGuest={!state.auth?.isLoggedIn}
               onLoginClick={() => setCurrentView('ACCOUNT_CONNECT')}

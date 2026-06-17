@@ -34,25 +34,21 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CommentService {
 
-    private static final String TARGET_RECORD = "RECORD";
     private static final String VISIBILITY_PUBLIC = "PUBLIC";
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 50;
-    private static final String DELETED_CONTENT = "삭제된 댓글입니다";
-
     private final CommentRepository commentRepository;
     private final RecordRepository recordRepository;
     private final UserRepository userRepository;
 
     @Transactional
     public CommentCreateResponse createComment(Long userId, CommentCreateRequest request) {
-        validateTargetType(request.getTargetType());
-        Record record = getRecord(request.getTargetId());
+        Record record = getRecord(request.getRecordId());
         validatePublic(record);
         getUser(userId);
 
         Comment comment = Comment.builder()
-            .recordId(request.getTargetId())
+            .recordId(request.getRecordId())
             .userId(userId)
             .content(request.getContent())
             .build();
@@ -61,8 +57,7 @@ public class CommentService {
 
         return CommentCreateResponse.builder()
             .commentId(comment.getId())
-            .targetType(comment.getTargetType())
-            .targetId(comment.getTargetId())
+            .recordId(comment.getRecordId())
             .userId(comment.getUserId())
             .content(comment.getContent())
             .deleted(comment.isDeleted())
@@ -72,15 +67,14 @@ public class CommentService {
 
     @Transactional(readOnly = true)
     public CommentListResponse getComments(CommentListQuery query) {
-        validateTargetType(query.getTargetType());
-        Record record = getRecord(query.getTargetId());
+        Record record = getRecord(query.getRecordId());
         validatePublic(record);
 
         int page = query.getPage() != null && query.getPage() >= 0 ? query.getPage() : 0;
         int size = normalizeSize(query.getSize());
 
-        Page<Comment> commentPage = commentRepository.findByRecordIdOrderByCreatedAtAsc(
-            query.getTargetId(),
+        Page<Comment> commentPage = commentRepository.findByRecordIdAndDeletedFalseOrderByCreatedAtAsc(
+            query.getRecordId(),
             PageRequest.of(page, size)
         );
 
@@ -100,7 +94,7 @@ public class CommentService {
                     .userId(comment.getUserId())
                     .nickname(user != null ? user.getNickname() : null)
                     .profileImageUrl(null)
-                    .content(comment.isDeleted() ? DELETED_CONTENT : comment.getContent())
+                    .content(comment.getContent())
                     .deleted(comment.isDeleted())
                     .createdAt(formatDateTime(comment.getCreatedAt()))
                     .updatedAt(formatDateTime(comment.getUpdatedAt()))
@@ -141,12 +135,6 @@ public class CommentService {
             .deleted(comment.isDeleted())
             .deletedAt(comment.getDeletedAt() != null ? formatDateTime(comment.getDeletedAt()) : null)
             .build();
-    }
-
-    private void validateTargetType(String targetType) {
-        if (!TARGET_RECORD.equals(targetType)) {
-            throw new ApiException(ErrorCode.INVALID_TARGET_TYPE);
-        }
     }
 
     private Record getRecord(Long recordId) {

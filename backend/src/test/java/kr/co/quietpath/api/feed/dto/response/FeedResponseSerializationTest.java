@@ -26,8 +26,7 @@ class FeedResponseSerializationTest {
     @Test
     void weeklyTop3ItemSerializesBooleanFieldAsIsReacted() throws Exception {
         WeeklyTop3Item item = WeeklyTop3Item.builder()
-            .rank(1)
-            .pathId(1L)
+            .recordId(1L)
             .reactionCount(5L)
             .isReacted(false)
             .build();

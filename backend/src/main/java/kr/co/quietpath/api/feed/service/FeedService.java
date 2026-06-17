@@ -10,12 +10,10 @@ import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Response;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Window;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
-import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.user.entity.User;
-import kr.co.quietpath.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,8 +43,6 @@ public class FeedService {
 
     private final ReactionRepository reactionRepository;
     private final CommentRepository commentRepository;
-    private final PathRepository pathRepository;
-    private final UserRepository userRepository;
     private final RecordRepository recordRepository;
 
     public FeedResponse getFeed(Long userId, String category, int size, String cursor) {
@@ -154,17 +150,17 @@ public class FeedService {
         List<ReactionRepository.WeeklyTop3Projection> sorted = candidates.stream()
             .sorted(Comparator
                 .comparing(ReactionRepository.WeeklyTop3Projection::getReactionCount).reversed()
-                .thenComparing(ReactionRepository.WeeklyTop3Projection::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(ReactionRepository.WeeklyTop3Projection::getPathId, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(ReactionRepository.WeeklyTop3Projection::getReactedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(ReactionRepository.WeeklyTop3Projection::getRecordId, Comparator.nullsLast(Comparator.reverseOrder()))
             )
             .limit(TOP_LIMIT)
             .toList();
 
-        List<Long> pathIds = sorted.stream()
-            .map(ReactionRepository.WeeklyTop3Projection::getPathId)
+        List<Long> recordIds = sorted.stream()
+            .map(ReactionRepository.WeeklyTop3Projection::getRecordId)
             .toList();
 
-        if (pathIds.isEmpty()) {
+        if (recordIds.isEmpty()) {
             WeeklyTop3Window window = WeeklyTop3Window.builder()
                 .from(from.toLocalDate().toString())
                 .to(now.toLocalDate().toString())
@@ -175,32 +171,30 @@ public class FeedService {
                 .build();
         }
 
-        Map<Long, Path> pathMap = pathRepository.findByIdIn(pathIds).stream()
-            .collect(Collectors.toMap(Path::getId, path -> path));
+        Map<Long, Record> recordMap = recordRepository.findAllById(recordIds).stream()
+            .collect(Collectors.toMap(Record::getId, record -> record));
 
-        List<Long> ownerIds = pathMap.values().stream()
-            .map(Path::getUserId)
-            .distinct()
-            .toList();
+        Map<Long, Long> reactionCountMap = new HashMap<>();
+        reactionRepository.countByRecordIds(recordIds)
+            .forEach(row -> reactionCountMap.put(row.getRecordId(), row.getReactionCount()));
 
-        Map<Long, User> userMap = ownerIds.isEmpty()
-            ? Map.of()
-            : userRepository.findByIdIn(ownerIds).stream()
-                .collect(Collectors.toMap(User::getId, user -> user));
+        Map<Long, Long> commentCountMap = new HashMap<>();
+        commentRepository.countByRecordIds(recordIds)
+            .forEach(row -> commentCountMap.put(row.getRecordId(), row.getCommentCount()));
 
-        Set<Long> reactedPathIds = pathIds.isEmpty() || userId == null
+        Set<Long> reactedRecordIds = recordIds.isEmpty() || userId == null
             ? Set.of()
-            : reactionRepository.findReactedPathIds(userId, pathIds).stream()
+            : reactionRepository.findReactedRecordIds(userId, recordIds).stream()
                 .collect(Collectors.toSet());
 
         List<WeeklyTop3Item> items = new ArrayList<>();
-        int rank = 1;
         for (ReactionRepository.WeeklyTop3Projection projection : sorted) {
-            Path path = pathMap.get(projection.getPathId());
-            if (path == null) {
+            Record record = recordMap.get(projection.getRecordId());
+            if (record == null) {
                 continue;
             }
-            User owner = userMap.get(path.getUserId());
+            kr.co.quietpath.domain.path.entity.Path path = record.getPath();
+            User owner = record.getUser();
             OwnerSummary ownerSummary = OwnerSummary.builder()
                 .userId(owner != null ? owner.getId() : null)
                 .nickname(owner != null ? owner.getNickname() : null)
@@ -208,18 +202,20 @@ public class FeedService {
                 .build();
 
             WeeklyTop3Item item = WeeklyTop3Item.builder()
-                .rank(rank)
-                .pathId(path.getId())
-                .title(path.getDirectionName())
-                .status(mapStatus(path.getStatus()))
+                .pathId(path != null ? path.getId() : null)
+                .recordId(record.getId())
+                .title(path != null ? path.getDirectionName() : null)
+                .content(resolveContent(record))
+                .status(path != null ? mapStatus(path.getStatus()) : null)
                 .owner(ownerSummary)
-                .reactionCount(projection.getReactionCount())
-                .isReacted(reactedPathIds.contains(path.getId()))
-                .createdAt(formatDateTime(path.getCreatedAt()))
-                .updatedAt(formatDateTime(path.getUpdatedAt()))
+                .categoryCode(record.getCategoryCode())
+                .reactionCount(reactionCountMap.getOrDefault(record.getId(), 0L))
+                .commentCount(commentCountMap.getOrDefault(record.getId(), 0L))
+                .isReacted(reactedRecordIds.contains(record.getId()))
+                .sharedAt(formatDateTime(record.getSharedAt()))
+                .createdAt(formatDateTime(record.getCreatedAt()))
                 .build();
             items.add(item);
-            rank++;
         }
 
         WeeklyTop3Window window = WeeklyTop3Window.builder()

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Heart, Lock, MessageCircle, RefreshCcw, Sparkles } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Heart, Lock, MessageCircle, RefreshCcw, Sparkles } from 'lucide-react';
 import { reactionApi } from '../api/reactionApi';
 import { feedApi, FeedCategory, FeedItemResponse, WeeklyTop3ItemResponse } from '../api/feedApi';
 import { getThemePalette, useResolvedTheme } from '../theme';
@@ -14,23 +14,24 @@ interface CommunityViewProps {
   onLoginClick?: () => void;
 }
 
-type ApiErrorWithStatus = Error & { status?: number };
-
-const isUnauthorizedError = (error: unknown): error is ApiErrorWithStatus =>
-  error instanceof Error && (error as ApiErrorWithStatus).status === 401;
+type CommunityRecordItem = Pick<
+  FeedItemResponse,
+  'pathId' | 'recordId' | 'title' | 'content' | 'status' | 'owner' | 'categoryCode' | 'reactionCount' | 'commentCount' | 'isReacted' | 'sharedAt' | 'createdAt'
+>;
 
 const CATEGORIES: { id: FeedCategory; label: string }[] = [
   { id: 'all', label: '전체' },
   { id: 'job', label: '취업' },
   { id: 'study', label: '공부' },
-  { id: 'workout', label: '운동' },
+  { id: 'workout', label: '운동/건강' },
   { id: 'hobby', label: '취미' },
+  { id: 'cert', label: '자격증' },
 ];
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
   job: '취업',
   study: '공부',
-  workout: '운동',
+  workout: '운동/건강',
   hobby: '취미',
   cert: '자격증',
   DEFAULT: '기록',
@@ -63,44 +64,13 @@ const formatRelativeTime = (value?: string | null) => {
   return target.toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' });
 };
 
-const WeeklyTopCard: React.FC<{ items: WeeklyTop3ItemResponse[] }> = ({ items }) => {
-  const theme = useResolvedTheme();
-  const palette = getThemePalette(theme);
-
-  if (items.length === 0) {
-    return null;
-  }
-
-  return (
-    <section className="mx-4 mb-4 p-4 rounded-3xl border" style={{ background: palette.cardBg, borderColor: palette.border, boxShadow: palette.shadow }}>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="w-5 h-5 rounded-md text-point-600 grid place-items-center" style={{ background: theme === 'dark' ? 'rgba(76,29,149,0.24)' : 'rgba(243,232,255,0.9)' }}>
-          <Sparkles size={12} strokeWidth={1.8} />
-        </span>
-        <h2 className="text-[12px] font-bold tracking-tight" style={{ color: palette.strongText }}>이번 주 가장 공감받은 질문</h2>
-      </div>
-      <ol className="space-y-2.5">
-        {items.map((item) => (
-          <li key={`${item.rank}-${item.pathId}`} className="flex items-center gap-3">
-            <span className="w-5 text-[12px] font-bold text-point-500 tabular-nums">{item.rank}</span>
-            <p className="flex-1 text-[13px] leading-snug truncate" style={{ color: palette.strongText }}>{item.title}</p>
-            <span className="flex items-center gap-1 text-[11px] font-medium" style={{ color: palette.faintText }}>
-              <Heart size={12} strokeWidth={1.8} />
-              {item.reactionCount}
-            </span>
-          </li>
-        ))}
-      </ol>
-    </section>
-  );
-};
-
 interface FeedCardProps {
-  item: FeedItemResponse;
+  item: CommunityRecordItem;
   onLike: () => void;
   onComment: () => void;
   likeDisabled?: boolean;
   commentDisabled?: boolean;
+  commentOpen?: boolean;
 }
 
 const FeedCard: React.FC<FeedCardProps> = ({
@@ -109,6 +79,7 @@ const FeedCard: React.FC<FeedCardProps> = ({
   onComment,
   likeDisabled = false,
   commentDisabled = false,
+  commentOpen = false,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
@@ -118,7 +89,14 @@ const FeedCard: React.FC<FeedCardProps> = ({
   const sharedText = formatRelativeTime(item.sharedAt ?? item.createdAt);
 
   return (
-    <article className="p-4 rounded-3xl border" style={{ background: palette.cardBg, borderColor: palette.border, boxShadow: palette.shadow }}>
+    <article
+      className="p-4 border transition-[border-radius] duration-200"
+      style={{
+        background: palette.cardBg,
+        borderColor: palette.border,
+        borderRadius: commentOpen ? '24px 24px 0 0' : '24px',
+      }}
+    >
       <header className="flex items-center gap-2.5 mb-3">
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-point-200 to-point-400 grid place-items-center text-white text-[11px] font-bold">
           {badge}
@@ -132,19 +110,31 @@ const FeedCard: React.FC<FeedCardProps> = ({
       </header>
 
       {item.title && (
-        <div className="inline-block px-2.5 py-1 rounded-md text-[10px] font-bold tracking-tight mb-2.5 border" style={{ background: palette.pillBg, borderColor: palette.pillBorder, color: palette.mutedText }}>
+        <div
+          className="inline-block px-2.5 py-1 rounded-md text-[10px] font-bold tracking-tight mb-2.5 border"
+          style={{ background: palette.pillBg, borderColor: palette.pillBorder, color: palette.mutedText }}
+        >
           Q. {item.title}
         </div>
       )}
 
-      <p className="text-[13.5px] leading-[1.75] mb-3" style={{ color: palette.strongText }}>{item.content ?? ''}</p>
+      <p className="text-[13.5px] leading-[1.75] mb-3 whitespace-pre-line" style={{ color: palette.strongText }}>
+        {item.content ?? ''}
+      </p>
 
       <footer className="flex items-center justify-between pt-2.5 border-t" style={{ borderColor: palette.divider }}>
-        <span className="px-2.5 py-1 rounded-md text-[10px] font-bold text-point-600 border" style={{ background: theme === 'dark' ? 'rgba(76,29,149,0.20)' : 'rgba(245,243,255,0.92)', borderColor: theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'rgba(221,214,254,0.9)' }}>
+        <span
+          className="px-2.5 py-1 rounded-md text-[10px] font-bold text-point-600 border"
+          style={{
+            background: theme === 'dark' ? 'rgba(76,29,149,0.20)' : 'rgba(245,243,255,0.92)',
+            borderColor: theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'rgba(221,214,254,0.9)',
+          }}
+        >
           #{categoryLabel}
         </span>
         <div className="flex items-center gap-4">
           <button
+            type="button"
             onClick={onComment}
             disabled={commentDisabled}
             className="flex items-center gap-1 text-[12px] transition disabled:opacity-50"
@@ -154,6 +144,7 @@ const FeedCard: React.FC<FeedCardProps> = ({
             {item.commentCount}
           </button>
           <button
+            type="button"
             onClick={onLike}
             disabled={likeDisabled}
             className="flex items-center gap-1 text-[12px] transition disabled:opacity-50"
@@ -165,6 +156,164 @@ const FeedCard: React.FC<FeedCardProps> = ({
         </div>
       </footer>
     </article>
+  );
+};
+
+interface WeeklyTopCarouselProps {
+  items: WeeklyTop3ItemResponse[];
+  commentTarget: CommunityRecordItem | null;
+  pendingReactionIds: Record<number, boolean>;
+  accessToken?: string | null;
+  onRefreshAuth?: () => Promise<string | null>;
+  currentUserId?: string | null;
+  onLike: (item: CommunityRecordItem) => void;
+  onComment: (item: CommunityRecordItem) => void;
+  onCloseComments: () => void;
+  onCommentCountChange: (recordId: number, nextCount: number) => void;
+}
+
+const WeeklyTopCarousel: React.FC<WeeklyTopCarouselProps> = ({
+  items,
+  commentTarget,
+  pendingReactionIds,
+  accessToken,
+  onRefreshAuth,
+  currentUserId,
+  onLike,
+  onComment,
+  onCloseComments,
+  onCommentCountChange,
+}) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const activeRecordIdRef = useRef<number | null>(null);
+  const topRecordIds = useMemo(() => new Set(items.map((item) => item.recordId)), [items]);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      activeRecordIdRef.current = null;
+      setActiveIndex(0);
+      return;
+    }
+
+    setActiveIndex((prev) => {
+      const fallbackRecordId = items[Math.min(prev, items.length - 1)]?.recordId ?? items[0].recordId;
+      const preferredRecordId = activeRecordIdRef.current ?? fallbackRecordId;
+      const nextIndex = items.findIndex((item) => item.recordId === preferredRecordId);
+      return nextIndex >= 0 ? nextIndex : 0;
+    });
+  }, [items]);
+
+  useEffect(() => {
+    activeRecordIdRef.current = items[activeIndex]?.recordId ?? null;
+  }, [activeIndex, items]);
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  const activeItem = items[Math.min(activeIndex, items.length - 1)];
+
+  const moveToIndex = (nextIndex: number) => {
+    const normalized = (nextIndex + items.length) % items.length;
+    const nextItem = items[normalized];
+    if (commentTarget && topRecordIds.has(commentTarget.recordId) && commentTarget.recordId !== nextItem.recordId) {
+      onCloseComments();
+    }
+    activeRecordIdRef.current = nextItem.recordId;
+    setActiveIndex(normalized);
+  };
+
+  return (
+    <section className="mx-4 mb-4 p-4 rounded-3xl border" style={{ background: palette.cardBg, borderColor: palette.border }}>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 rounded-md text-point-600 grid place-items-center" style={{ background: theme === 'dark' ? 'rgba(76,29,149,0.24)' : 'rgba(243,232,255,0.9)' }}>
+            <Sparkles size={12} strokeWidth={1.8} />
+          </span>
+          <h2 className="text-[12px] font-bold tracking-tight" style={{ color: palette.strongText }}>
+            이번 주 공감이 머문 기록
+          </h2>
+        </div>
+
+        {items.length > 1 && (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold tabular-nums" style={{ color: palette.faintText }}>
+              {activeIndex + 1} / {items.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => moveToIndex(activeIndex - 1)}
+                className="w-7 h-7 rounded-full border grid place-items-center transition"
+                style={{ borderColor: palette.border, color: palette.mutedText, background: palette.cardBgSoft }}
+                aria-label="이전 기록"
+              >
+                <ChevronLeft size={14} strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                onClick={() => moveToIndex(activeIndex + 1)}
+                className="w-7 h-7 rounded-full border grid place-items-center transition"
+                style={{ borderColor: palette.border, color: palette.mutedText, background: palette.cardBgSoft }}
+                aria-label="다음 기록"
+              >
+                <ChevronRight size={14} strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="overflow-hidden">
+        <div
+          className="flex transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(-${activeIndex * 100}%)` }}
+        >
+          {items.map((item) => (
+            <div key={item.recordId} className="min-w-full">
+              <FeedCard
+                item={item}
+                onLike={() => onLike(item)}
+                onComment={() => onComment(item)}
+                likeDisabled={!!pendingReactionIds[item.recordId]}
+                commentOpen={commentTarget?.recordId === item.recordId}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {items.length > 1 && (
+        <div className="flex items-center justify-center gap-1.5 mt-3">
+          {items.map((item, index) => (
+            <button
+              key={item.recordId}
+              type="button"
+              onClick={() => moveToIndex(index)}
+              className="h-2 rounded-full transition-all"
+              style={{
+                width: activeIndex === index ? 18 : 8,
+                background: activeIndex === index ? '#8B5CF6' : theme === 'dark' ? 'rgba(148,163,184,0.36)' : 'rgba(148,163,184,0.5)',
+              }}
+              aria-label={`${index + 1}번째 기록 보기`}
+            />
+          ))}
+        </div>
+      )}
+
+      {commentTarget?.recordId === activeItem.recordId && (
+        <CommunityCommentsSheet
+          open
+          accessToken={accessToken}
+          onRefreshAuth={onRefreshAuth}
+          currentUserId={currentUserId}
+          recordId={activeItem.recordId}
+          onCommentCountChange={onCommentCountChange}
+        />
+      )}
+    </section>
   );
 };
 
@@ -247,7 +396,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [pendingReactionIds, setPendingReactionIds] = useState<Record<number, boolean>>({});
-  const [commentTarget, setCommentTarget] = useState<FeedItemResponse | null>(null);
+  const [commentTarget, setCommentTarget] = useState<CommunityRecordItem | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const hasNextRef = useRef(false);
   const loadingMoreRef = useRef(false);
@@ -258,28 +407,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
     }
   }, [accessToken, isGuest, onLoginClick]);
 
-  const runWithAuthRetry = useCallback(async <T,>(request: (token: string) => Promise<T>): Promise<T> => {
-    if (!accessToken) {
-      throw new Error('로그인이 필요합니다.');
-    }
-
-    try {
-      return await request(accessToken);
-    } catch (error) {
-      if (!isUnauthorizedError(error)) {
-        throw error;
-      }
-
-      const refreshedToken = await onRefreshAuth?.();
-      if (!refreshedToken) {
-        throw new Error('세션이 만료되었습니다. 다시 로그인해 주세요.');
-      }
-
-      return request(refreshedToken);
-    }
-  }, [accessToken, onRefreshAuth]);
-
-  const refreshWeeklyTop3 = useCallback(async () => {
+  const refreshWeeklyTop3 = useCallback(async (options?: { bypassCache?: boolean }) => {
     if (selectedCategory !== 'all') {
       setWeeklyTopItems([]);
       return;
@@ -293,15 +421,15 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
     try {
       const response = isGuest
-        ? await feedApi.getWeeklyTop3(null)
-        : await runWithAuthRetry((token) => feedApi.getWeeklyTop3(token));
+        ? await feedApi.getWeeklyTop3(null, options)
+        : await feedApi.getWeeklyTop3(accessToken, options);
       setWeeklyTopItems(response.items ?? []);
     } catch {
       setWeeklyTopItems([]);
     } finally {
       activeWeeklyTopRequests.delete(requestKey);
     }
-  }, [accessToken, isGuest, runWithAuthRetry, selectedCategory]);
+  }, [accessToken, isGuest, selectedCategory]);
 
   const loadFeedPage = useCallback(
     async (cursor: string | null, append: boolean) => {
@@ -332,14 +460,12 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               cursor: null,
               size: 20,
             })
-          : await runWithAuthRetry((token) =>
-              feedApi.getFeed({
-                token,
-                category: selectedCategory,
-                cursor,
-                size: 20,
-              })
-            );
+          : await feedApi.getFeed({
+              token: accessToken,
+              category: selectedCategory,
+              cursor,
+              size: 20,
+            });
 
         setFeedItems((prev) => (append ? [...prev, ...response.items] : response.items));
         const nextHasNext = isGuest ? false : response.hasNext;
@@ -361,7 +487,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         }
       }
     },
-    [accessToken, isGuest, runWithAuthRetry, selectedCategory]
+    [accessToken, isGuest, selectedCategory]
   );
 
   useEffect(() => {
@@ -377,6 +503,10 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
     void refreshWeeklyTop3();
     return undefined;
   }, [refreshWeeklyTop3, selectedCategory]);
+
+  useEffect(() => {
+    setCommentTarget(null);
+  }, [selectedCategory]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -413,26 +543,29 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
     [feedItems, isGuest]
   );
 
-  const updateFeedItem = useCallback((recordId: number, updater: (item: FeedItemResponse) => FeedItemResponse) => {
-    setFeedItems((prev) => prev.map((item) => (item.recordId === recordId ? updater(item) : item)));
+  const updateCommunityItem = useCallback((recordId: number, updater: (item: CommunityRecordItem) => CommunityRecordItem) => {
+    setFeedItems((prev) => prev.map((item) => (item.recordId === recordId ? updater(item) as FeedItemResponse : item)));
+    setWeeklyTopItems((prev) => prev.map((item) => (item.recordId === recordId ? updater(item) as WeeklyTop3ItemResponse : item)));
+    setCommentTarget((prev) => (prev && prev.recordId === recordId ? updater(prev) : prev));
   }, []);
 
   const handleCommentCountChange = useCallback((recordId: number, nextCount: number) => {
-    updateFeedItem(recordId, (item) => ({
+    updateCommunityItem(recordId, (item) => ({
       ...item,
       commentCount: nextCount,
     }));
-  }, [updateFeedItem]);
+    feedApi.invalidateCommunityCache();
+  }, [updateCommunityItem]);
 
-  const handleOpenComments = (item: FeedItemResponse) => {
+  const handleOpenComments = (item: CommunityRecordItem) => {
     if (isGuest || !accessToken) {
       handleRestrictedAction();
       return;
     }
-    setCommentTarget(item);
+    setCommentTarget((prev) => (prev?.recordId === item.recordId ? null : item));
   };
 
-  const handleToggleReaction = useCallback(async (item: FeedItemResponse) => {
+  const handleToggleReaction = useCallback(async (item: CommunityRecordItem) => {
     if (isGuest || !accessToken) {
       handleRestrictedAction();
       return;
@@ -453,30 +586,29 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       [item.recordId]: true,
     }));
 
-    updateFeedItem(item.recordId, (current) => ({
+    updateCommunityItem(item.recordId, (current) => ({
       ...current,
       isReacted: !previousReacted,
       reactionCount: optimisticCount,
     }));
 
     try {
-      const response = await runWithAuthRetry((token) =>
-        previousReacted
-          ? reactionApi.deleteReaction(token, item.recordId)
-          : reactionApi.createReaction(token, item.recordId)
-      );
+      const response = previousReacted
+        ? await reactionApi.deleteReaction(accessToken, item.recordId)
+        : await reactionApi.createReaction(accessToken, item.recordId);
 
-      updateFeedItem(item.recordId, (current) => ({
+      updateCommunityItem(item.recordId, (current) => ({
         ...current,
         isReacted: response.reacted,
         reactionCount: response.reactionCount,
       }));
 
+      feedApi.invalidateCommunityCache();
       if (selectedCategory === 'all') {
-        void refreshWeeklyTop3();
+        void refreshWeeklyTop3({ bypassCache: true });
       }
     } catch (err) {
-      updateFeedItem(item.recordId, (current) => ({
+      updateCommunityItem(item.recordId, (current) => ({
         ...current,
         isReacted: previousReacted,
         reactionCount: previousCount,
@@ -489,7 +621,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         return next;
       });
     }
-  }, [accessToken, handleRestrictedAction, isGuest, pendingReactionIds, refreshWeeklyTop3, runWithAuthRetry, selectedCategory, updateFeedItem]);
+  }, [accessToken, handleRestrictedAction, isGuest, pendingReactionIds, refreshWeeklyTop3, selectedCategory, updateCommunityItem]);
 
   return (
     <div className="pb-28 animate-slide-up pt-2">
@@ -518,7 +650,30 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         ))}
       </nav>
 
-      {selectedCategory === 'all' && <WeeklyTopCard items={weeklyTopItems} />}
+      {selectedCategory === 'all' && (
+        <WeeklyTopCarousel
+          items={weeklyTopItems}
+          commentTarget={commentTarget}
+          pendingReactionIds={pendingReactionIds}
+          accessToken={accessToken}
+          onRefreshAuth={onRefreshAuth}
+          currentUserId={currentUserId}
+          onLike={(item) => void handleToggleReaction(item)}
+          onComment={handleOpenComments}
+          onCloseComments={() => setCommentTarget(null)}
+          onCommentCountChange={handleCommentCountChange}
+        />
+      )}
+
+      {!isInitialLoading && !error && (
+        <div className="flex items-center gap-3 px-6 mb-1">
+          <div className="flex-1 h-px" style={{ background: palette.divider }} />
+          <span className="text-[11px] font-semibold tracking-wide" style={{ color: palette.faintText }}>
+            오늘의 기록
+          </span>
+          <div className="flex-1 h-px" style={{ background: palette.divider }} />
+        </div>
+      )}
 
       {isInitialLoading ? (
         <CommunitySkeleton />
@@ -540,13 +695,23 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       ) : (
         <div className={`relative px-4 space-y-3 ${isGuest ? 'pb-10' : 'pb-8'}`}>
           {visiblePosts.map((item) => (
-            <FeedCard
-              key={item.recordId}
-              item={item}
-              onLike={() => void handleToggleReaction(item)}
-              onComment={() => handleOpenComments(item)}
-              likeDisabled={!!pendingReactionIds[item.recordId]}
-            />
+            <div key={item.recordId}>
+              <FeedCard
+                item={item}
+                onLike={() => void handleToggleReaction(item)}
+                onComment={() => handleOpenComments(item)}
+                likeDisabled={!!pendingReactionIds[item.recordId]}
+                commentOpen={commentTarget?.recordId === item.recordId}
+              />
+              <CommunityCommentsSheet
+                open={commentTarget?.recordId === item.recordId}
+                accessToken={accessToken}
+                onRefreshAuth={onRefreshAuth}
+                currentUserId={currentUserId}
+                recordId={item.recordId}
+                onCommentCountChange={handleCommentCountChange}
+              />
+            </div>
           ))}
 
           {isGuest && hiddenBlurPosts.length > 0 ? (
@@ -600,17 +765,6 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
           </p>
         </div>
       )}
-
-      <CommunityCommentsSheet
-        open={commentTarget !== null}
-        accessToken={accessToken}
-        onRefreshAuth={onRefreshAuth}
-        currentUserId={currentUserId}
-        recordId={commentTarget?.recordId ?? null}
-        recordTitle={commentTarget?.title ?? null}
-        onClose={() => setCommentTarget(null)}
-        onCommentCountChange={handleCommentCountChange}
-      />
 
       <AppModal
         open={noticeMessage !== null}

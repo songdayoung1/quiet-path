@@ -11,11 +11,8 @@ import lombok.Setter;
 @NoArgsConstructor
 public class CommentCreateRequest {
 
-    @NotBlank
-    private String targetType;
-
     @NotNull
-    private Long targetId;
+    private Long recordId;
 
     @NotBlank
     private String content;

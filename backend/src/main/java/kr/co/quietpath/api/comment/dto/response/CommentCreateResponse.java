@@ -7,8 +7,7 @@ import lombok.Getter;
 @Builder
 public class CommentCreateResponse {
     private Long commentId;
-    private String targetType;
-    private Long targetId;
+    private Long recordId;
     private Long userId;
     private String content;
     private boolean deleted;

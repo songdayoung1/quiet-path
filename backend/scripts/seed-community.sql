@@ -73,17 +73,18 @@ INSERT INTO users (
 WITH RECURSIVE user_seq AS (
     SELECT 1 AS n
     UNION ALL
-    SELECT n + 1 FROM user_seq WHERE n < 32
+    SELECT n + 1 FROM user_seq WHERE n < 30
 )
 SELECT
     'KAKAO',
     CONCAT('seed-community-', LPAD(n, 2, '0')),
     CONCAT('seed-community-', LPAD(n, 2, '0'), '@quietpath.local'),
-    CASE MOD(n - 1, 4)
+    CASE MOD(n - 1, 5)
         WHEN 0 THEN CONCAT('고요한취업', LPAD(n, 2, '0'))
         WHEN 1 THEN CONCAT('잔잔한공부', LPAD(n, 2, '0'))
-        WHEN 2 THEN CONCAT('꾸준한운동', LPAD(n, 2, '0'))
-        ELSE CONCAT('느린취미', LPAD(n, 2, '0'))
+        WHEN 2 THEN CONCAT('꾸준한건강', LPAD(n, 2, '0'))
+        WHEN 3 THEN CONCAT('느린취미', LPAD(n, 2, '0'))
+        ELSE CONCAT('차분한자격증', LPAD(n, 2, '0'))
     END,
     NULL,
     1,
@@ -96,12 +97,7 @@ FROM user_seq;
 
 INSERT INTO paths (
     user_id,
-    anchor_at,
     category_code,
-    description,
-    key_question,
-    name,
-    start_at,
     direction_name,
     direction_text,
     review_at,
@@ -114,47 +110,37 @@ INSERT INTO paths (
 WITH RECURSIVE user_seq AS (
     SELECT 1 AS n
     UNION ALL
-    SELECT n + 1 FROM user_seq WHERE n < 32
+    SELECT n + 1 FROM user_seq WHERE n < 30
 )
 SELECT
     u.id,
-    NOW() - INTERVAL (2 + MOD(s.n, 6)) DAY,
-    CASE MOD(s.n - 1, 4)
+    CASE MOD(s.n - 1, 5)
         WHEN 0 THEN 'job'
         WHEN 1 THEN 'study'
         WHEN 2 THEN 'workout'
-        ELSE 'hobby'
+        WHEN 3 THEN 'hobby'
+        ELSE 'cert'
     END,
-    CASE MOD(s.n - 1, 4)
-        WHEN 0 THEN '취업 준비의 리듬을 지키기'
-        WHEN 1 THEN '배움의 페이스를 조용히 유지하기'
-        WHEN 2 THEN '무리하지 않고 컨디션 돌보기'
-        ELSE '일상 안에서 취미 시간을 지키기'
-    END,
-    CASE MOD(s.n - 1, 4)
+    CASE MOD(s.n - 1, 5)
         WHEN 0 THEN '오늘도 한 걸음 가고 있는가?'
         WHEN 1 THEN '나만의 속도로 배우고 있는가?'
-        WHEN 2 THEN '몸의 소리를 듣고 있는가?'
-        ELSE '충분히 쉬며 좋아하는 것을 하고 있는가?'
+        WHEN 2 THEN '몸과 컨디션을 살피고 있는가?'
+        WHEN 3 THEN '충분히 쉬며 좋아하는 것을 하고 있는가?'
+        ELSE '합격까지의 리듬을 지키고 있는가?'
     END,
-    CASE MOD(s.n - 1, 4)
-        WHEN 0 THEN '취업 준비'
-        WHEN 1 THEN '공부 루틴'
-        WHEN 2 THEN '운동 루틴'
-        ELSE '취미 생활'
-    END,
-    NOW() - INTERVAL (40 + s.n) DAY,
-    CASE MOD(s.n - 1, 4)
+    CASE MOD(s.n - 1, 5)
         WHEN 0 THEN '오늘도 한 걸음 가고 있는가?'
         WHEN 1 THEN '나만의 속도로 배우고 있는가?'
-        WHEN 2 THEN '몸의 소리를 듣고 있는가?'
-        ELSE '충분히 쉬며 좋아하는 것을 하고 있는가?'
+        WHEN 2 THEN '몸과 컨디션을 살피고 있는가?'
+        WHEN 3 THEN '충분히 쉬며 좋아하는 것을 하고 있는가?'
+        ELSE '합격까지의 리듬을 지키고 있는가?'
     END,
-    CASE MOD(s.n - 1, 4)
+    CASE MOD(s.n - 1, 5)
         WHEN 0 THEN '취업 준비의 리듬을 지키기'
         WHEN 1 THEN '배움의 페이스를 조용히 유지하기'
-        WHEN 2 THEN '무리하지 않고 컨디션 돌보기'
-        ELSE '일상 안에서 취미 시간을 지키기'
+        WHEN 2 THEN '무리하지 않고 몸과 컨디션 돌보기'
+        WHEN 3 THEN '일상 안에서 취미 시간을 지키기'
+        ELSE '시험 준비의 호흡을 꾸준히 이어가기'
     END,
     TIMESTAMP(CURDATE() + INTERVAL 7 DAY, '21:00:00'),
     NULL,
@@ -189,7 +175,7 @@ INSERT INTO records (
 WITH RECURSIVE user_seq AS (
     SELECT 1 AS n
     UNION ALL
-    SELECT n + 1 FROM user_seq WHERE n < 32
+    SELECT n + 1 FROM user_seq WHERE n < 30
 ),
 day_seq AS (
     SELECT 1 AS d
@@ -205,7 +191,8 @@ SELECT
         WHEN 'job' THEN CONCAT('지원서 문장을 다듬고 면접 질문을 정리했다. 서두르지 않고 ', ds.d, '번째 체크포인트만 마무리했다.')
         WHEN 'study' THEN CONCAT('공부 시간을 길게 늘리기보다 핵심 개념을 다시 정리했다. 오늘은 ', ds.d, '개의 메모를 남겼다.')
         WHEN 'workout' THEN CONCAT('운동 강도를 무리하게 올리지 않고 호흡과 자세에 집중했다. 몸의 상태를 확인하며 ', ds.d, '세트만 채웠다.')
-        ELSE CONCAT('좋아하는 일을 잠깐이라도 붙잡았다. 결과보다 몰입감을 챙기며 ', ds.d, '번째 작은 즐거움을 기록했다.')
+        WHEN 'hobby' THEN CONCAT('좋아하는 일을 잠깐이라도 붙잡았다. 결과보다 몰입감을 챙기며 ', ds.d, '번째 작은 즐거움을 기록했다.')
+        ELSE CONCAT('시험 범위를 잘게 나누고 오답을 다시 확인했다. 오늘은 ', ds.d, '개의 개념을 점검했다.')
     END,
     NULL,
     NULL,
@@ -254,6 +241,41 @@ JOIN users actor
  AND actor.id <> owner.id
 WHERE MOD(r.id + actor.id, 11) IN (0, 1, 2);
 
+INSERT INTO reactions (
+    record_id,
+    user_id,
+    created_at
+)
+WITH boost_targets AS (
+    SELECT 'seed-share-01-01' AS share_code, 18 AS actor_limit, 36 AS base_minutes
+    UNION ALL
+    SELECT 'seed-share-02-01', 15, 84
+    UNION ALL
+    SELECT 'seed-share-05-01', 12, 132
+),
+actors AS (
+    SELECT
+        id,
+        provider_user_id,
+        ROW_NUMBER() OVER (ORDER BY provider_user_id) AS rn
+    FROM users
+    WHERE provider_user_id LIKE 'seed-community-%'
+)
+SELECT
+    r.id,
+    actor.id,
+    NOW() - INTERVAL (bt.base_minutes - actor.rn) MINUTE
+FROM boost_targets bt
+JOIN records r
+  ON r.share_code = bt.share_code
+JOIN actors actor
+  ON actor.rn <= bt.actor_limit + 1
+LEFT JOIN reactions existing
+  ON existing.record_id = r.id
+ AND existing.user_id = actor.id
+WHERE existing.id IS NULL
+  AND actor.id <> r.user_id;
+
 INSERT INTO comments (
     record_id,
     user_id,
@@ -261,9 +283,7 @@ INSERT INTO comments (
     deleted,
     created_at,
     updated_at,
-    deleted_at,
-    target_id,
-    target_type
+    deleted_at
 )
 SELECT
     r.id,
@@ -272,14 +292,13 @@ SELECT
         WHEN 'job' THEN '조급해지지 않으려는 태도가 좋네요. 저도 같은 고민을 하고 있어요.'
         WHEN 'study' THEN '나만의 속도를 지키려는 기록이 인상적이에요.'
         WHEN 'workout' THEN '무리하지 않는 루틴이 오래 가더라고요. 공감해요.'
-        ELSE '좋아하는 시간을 챙기려는 마음이 잘 느껴져요.'
+        WHEN 'hobby' THEN '좋아하는 시간을 챙기려는 마음이 잘 느껴져요.'
+        ELSE '작게 나눠서 준비하는 방식이 오래 가는 힘이 되는 것 같아요.'
     END,
     0,
     r.shared_at + INTERVAL (MOD(actor.id + r.id, 140) + 5) MINUTE,
     r.shared_at + INTERVAL (MOD(actor.id + r.id, 140) + 5) MINUTE,
-    NULL,
-    r.id,
-    'RECORD'
+    NULL
 FROM records r
 JOIN users owner
   ON owner.id = r.user_id
@@ -288,6 +307,50 @@ JOIN users actor
   ON actor.provider_user_id LIKE 'seed-community-%'
  AND actor.id <> owner.id
 WHERE MOD(r.id + actor.id, 23) = 0;
+
+INSERT INTO comments (
+    record_id,
+    user_id,
+    content,
+    deleted,
+    created_at,
+    updated_at,
+    deleted_at
+)
+WITH highlighted_comments AS (
+    SELECT 'seed-share-01-01' AS share_code, 1 AS actor_rn, '조용하지만 단단한 흐름이 느껴져요.' AS content, 90 AS minute_offset
+    UNION ALL
+    SELECT 'seed-share-01-01', 2, '오늘의 한 칸에 집중한 방식이 좋네요.', 82
+    UNION ALL
+    SELECT 'seed-share-02-01', 3, '페이스를 지키는 기록이라 더 오래 남아요.', 74
+    UNION ALL
+    SELECT 'seed-share-02-01', 4, '조용하게 쌓이는 공부가 보이네요.', 66
+    UNION ALL
+    SELECT 'seed-share-05-01', 5, '리듬을 놓치지 않는 준비가 인상적이에요.', 58
+    UNION ALL
+    SELECT 'seed-share-05-01', 6, '시험 준비를 이렇게 잘게 나누는 방식이 좋네요.', 50
+),
+actors AS (
+    SELECT
+        id,
+        ROW_NUMBER() OVER (ORDER BY provider_user_id DESC) AS rn
+    FROM users
+    WHERE provider_user_id LIKE 'seed-community-%'
+)
+SELECT
+    r.id,
+    actor.id,
+    hc.content,
+    0,
+    NOW() - INTERVAL hc.minute_offset MINUTE,
+    NOW() - INTERVAL hc.minute_offset MINUTE,
+    NULL
+FROM highlighted_comments hc
+JOIN records r
+  ON r.share_code = hc.share_code
+JOIN actors actor
+  ON actor.rn = hc.actor_rn
+WHERE actor.id <> r.user_id;
 
 UPDATE records r
 LEFT JOIN (

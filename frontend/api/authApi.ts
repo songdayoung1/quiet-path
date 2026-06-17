@@ -1,4 +1,5 @@
 import { OnboardingStatus, MeResponse } from '../types';
+import { apiUrl, parseErrorMessage } from './apiClient';
 
 /**
  * Auth API
@@ -12,24 +13,6 @@ const isMockAccessToken = (token: string) =>
   token.startsWith('mock_token_') || token.startsWith('mock_access_');
 const mockStatusByToken = (token: string): OnboardingStatus =>
   token.includes('new') ? 'NEW' : 'EXISTING';
-
-const resolveApiBaseUrl = () => {
-  const configured = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  if (!configured) return '';
-  return configured.endsWith('/') ? configured.slice(0, -1) : configured;
-};
-
-const apiBaseUrl = resolveApiBaseUrl();
-const apiUrl = (path: string) => `${apiBaseUrl}${path}`;
-
-const parseErrorMessage = async (response: Response) => {
-  try {
-    const body = await response.json();
-    return body?.message || '요청 처리에 실패했습니다.';
-  } catch {
-    return '요청 처리에 실패했습니다.';
-  }
-};
 
 export const authApi = {
   startKakaoLogin: async (): Promise<void> => {
