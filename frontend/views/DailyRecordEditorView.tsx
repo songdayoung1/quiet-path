@@ -17,7 +17,13 @@ interface DailyRecordEditorViewProps {
   onStartDirection: () => void;
 }
 
-export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({ state, initialRecord = null, onSave, onCancel, onStartDirection }) => {
+export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
+  state,
+  initialRecord = null,
+  onSave,
+  onCancel,
+  onStartDirection,
+}) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const [action, setAction] = useState('');
