@@ -20,6 +20,7 @@ import kr.co.quietpath.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
@@ -38,6 +39,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
 
@@ -62,6 +64,8 @@ public class AuthService {
     private static final int NICKNAME_MAX_LENGTH = 12;
     private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[A-Za-z0-9가-힣]+$");
     private static final int REFRESH_TOKEN_RANDOM_BYTES = 32;
+    private static final Duration REFRESH_ROTATION_LOCK_TTL = Duration.ofSeconds(5);
+    private static final String REFRESH_ROTATION_LOCK_PREFIX = "auth:refresh:lock:";
     private static final String SHA_256 = "SHA-256";
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
@@ -70,6 +74,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtProperties jwtProperties;
     private final KakaoAuthProperties kakaoAuthProperties;
+    private final StringRedisTemplate stringRedisTemplate;
     private final RestClient restClient = RestClient.builder().build();
 
     @Transactional(readOnly = true)
@@ -143,35 +148,35 @@ public class AuthService {
             throw new ApiException(ErrorCode.REFRESH_TOKEN_REQUIRED);
         }
 
-        RefreshTokenSession session = refreshTokenSessionRepository.findByTokenHash(hashToken(refreshToken))
-            .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
-
-        LocalDateTime now = LocalDateTime.now();
-        if (session.isRevoked()) {
+        String currentTokenHash = hashToken(refreshToken);
+        String lockKey = REFRESH_ROTATION_LOCK_PREFIX + currentTokenHash;
+        if (!Boolean.TRUE.equals(stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "1", REFRESH_ROTATION_LOCK_TTL))) {
             throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
         }
-        if (session.isExpired(now)) {
-            session.revoke();
-            throw new ApiException(ErrorCode.REFRESH_TOKEN_EXPIRED);
+
+        try {
+            // Redis TTL이 만료되면 키 자체가 없으므로 INVALID로 처리된다.
+            RefreshTokenSession session = refreshTokenSessionRepository.findByTokenHash(currentTokenHash)
+                .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
+
+            String rotatedRefreshToken = generateOpaqueRefreshToken();
+            session.rotate(hashToken(rotatedRefreshToken), getRefreshTokenTtlSeconds());
+            refreshTokenSessionRepository.save(session);
+
+            String newAccessToken = jwtTokenProvider.createAccessToken(session.getUserId(), session.getSessionId());
+            return AuthRefreshResponse.builder()
+                .token(newAccessToken)
+                .refreshToken(rotatedRefreshToken)
+                .build();
+        } finally {
+            stringRedisTemplate.delete(lockKey);
         }
-
-        String rotatedRefreshToken = generateOpaqueRefreshToken();
-        session.rotate(
-            hashToken(rotatedRefreshToken),
-            now.plusSeconds(jwtProperties.getRefreshTokenTtlSeconds())
-        );
-        String newAccessToken = jwtTokenProvider.createAccessToken(session.getUserId(), session.getSessionId());
-
-        return AuthRefreshResponse.builder()
-            .token(newAccessToken)
-            .refreshToken(rotatedRefreshToken)
-            .build();
     }
 
     public AuthLogoutResponse logout(Long userId, String sessionId) {
         if (StringUtils.hasText(sessionId)) {
             refreshTokenSessionRepository.findByUserIdAndSessionId(userId, sessionId)
-                .ifPresent(RefreshTokenSession::revoke);
+                .ifPresent(refreshTokenSessionRepository::delete);
         }
         return AuthLogoutResponse.builder()
             .success(true)
@@ -312,11 +317,18 @@ public class AuthService {
 
     private String issueRefreshToken(Long userId, String sessionId) {
         String refreshToken = generateOpaqueRefreshToken();
-        LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(jwtProperties.getRefreshTokenTtlSeconds());
         refreshTokenSessionRepository.save(
-            RefreshTokenSession.issue(userId, sessionId, hashToken(refreshToken), expiresAt)
+            RefreshTokenSession.issue(userId, sessionId, hashToken(refreshToken), getRefreshTokenTtlSeconds())
         );
         return refreshToken;
+    }
+
+    private Long getRefreshTokenTtlSeconds() {
+        Long ttlSeconds = jwtProperties.getRefreshTokenTtlSeconds();
+        if (ttlSeconds == null || ttlSeconds <= 0) {
+            throw new IllegalStateException("app.jwt.refresh-token-ttl-seconds는 0보다 커야 합니다.");
+        }
+        return ttlSeconds;
     }
 
     private String generateOpaqueRefreshToken() {

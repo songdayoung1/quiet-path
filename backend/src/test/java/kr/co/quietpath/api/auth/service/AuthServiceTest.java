@@ -15,17 +15,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.lang.reflect.Field;
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +49,12 @@ class AuthServiceTest {
     @Mock
     private KakaoAuthProperties kakaoAuthProperties;
 
+    @Mock
+    private StringRedisTemplate stringRedisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+
     @InjectMocks
     private AuthService authService;
 
@@ -57,46 +65,27 @@ class AuthServiceTest {
     }
 
     @Test
-    void refresh_revokedToken_returns401() {
-        RefreshTokenSession session = RefreshTokenSession.issue(
-            1L,
-            "session-1",
-            "hashed-old-token",
-            LocalDateTime.now().plusMinutes(30)
-        );
-        session.revoke();
-
-        when(refreshTokenSessionRepository.findByTokenHash(anyString())).thenReturn(Optional.of(session));
+    void refresh_missingSession_returns401() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
+        when(refreshTokenSessionRepository.findByTokenHash(anyString())).thenReturn(Optional.empty());
 
         ApiException ex = assertThrows(ApiException.class, () -> authService.refresh("plain-refresh-token"));
+
         assertEquals(ErrorCode.REFRESH_TOKEN_INVALID, ex.getErrorCode());
     }
 
     @Test
-    void refresh_expiredToken_revokesAndReturns401() {
+    void refresh_rotatesRefreshTokenAndPersistsSession() {
         RefreshTokenSession session = RefreshTokenSession.issue(
             1L,
             "session-1",
             "hashed-old-token",
-            LocalDateTime.now().minusSeconds(1)
+            300L
         );
 
-        when(refreshTokenSessionRepository.findByTokenHash(anyString())).thenReturn(Optional.of(session));
-
-        ApiException ex = assertThrows(ApiException.class, () -> authService.refresh("plain-refresh-token"));
-        assertEquals(ErrorCode.REFRESH_TOKEN_EXPIRED, ex.getErrorCode());
-        assertTrue(session.isRevoked());
-    }
-
-    @Test
-    void refresh_rotatesRefreshTokenAndIssuesAccessToken() {
-        RefreshTokenSession session = RefreshTokenSession.issue(
-            1L,
-            "session-1",
-            "hashed-old-token",
-            LocalDateTime.now().plusMinutes(30)
-        );
-
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
         when(refreshTokenSessionRepository.findByTokenHash(anyString())).thenReturn(Optional.of(session));
         when(jwtProperties.getRefreshTokenTtlSeconds()).thenReturn(1_209_600L);
         when(jwtTokenProvider.createAccessToken(1L, "session-1")).thenReturn("new-access-token");
@@ -107,17 +96,49 @@ class AuthServiceTest {
         assertTrue(response.getRefreshToken() != null && !response.getRefreshToken().isBlank());
         assertNotEquals("plain-refresh-token", response.getRefreshToken());
         assertNotEquals("hashed-old-token", session.getTokenHash());
-        assertFalse(session.isRevoked());
+        assertEquals(1_209_600L, session.getTtlSeconds());
+        verify(refreshTokenSessionRepository).save(session);
         verify(jwtTokenProvider).createAccessToken(1L, "session-1");
+        verify(stringRedisTemplate).delete(anyString());
     }
 
     @Test
-    void logout_revokesCurrentSession() {
+    void refresh_whenRotationLockAlreadyHeld_returns401() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(false);
+
+        ApiException ex = assertThrows(ApiException.class, () -> authService.refresh("plain-refresh-token"));
+
+        assertEquals(ErrorCode.REFRESH_TOKEN_INVALID, ex.getErrorCode());
+        verify(refreshTokenSessionRepository, never()).findByTokenHash(anyString());
+    }
+
+    @Test
+    void refresh_invalidTtl_throwsIllegalState() {
         RefreshTokenSession session = RefreshTokenSession.issue(
             1L,
             "session-1",
             "hashed-old-token",
-            LocalDateTime.now().plusMinutes(30)
+            300L
+        );
+
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
+        when(refreshTokenSessionRepository.findByTokenHash(anyString())).thenReturn(Optional.of(session));
+        when(jwtProperties.getRefreshTokenTtlSeconds()).thenReturn(0L);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> authService.refresh("plain-refresh-token"));
+
+        assertEquals("app.jwt.refresh-token-ttl-seconds는 0보다 커야 합니다.", ex.getMessage());
+    }
+
+    @Test
+    void logout_deletesCurrentSession() {
+        RefreshTokenSession session = RefreshTokenSession.issue(
+            1L,
+            "session-1",
+            "hashed-old-token",
+            300L
         );
         when(refreshTokenSessionRepository.findByUserIdAndSessionId(1L, "session-1"))
             .thenReturn(Optional.of(session));
@@ -125,7 +146,15 @@ class AuthServiceTest {
         boolean success = authService.logout(1L, "session-1").isSuccess();
 
         assertTrue(success);
-        assertTrue(session.isRevoked());
+        verify(refreshTokenSessionRepository).delete(session);
+    }
+
+    @Test
+    void logout_blankSessionId_doesNotLookupRepository() {
+        boolean success = authService.logout(1L, " ").isSuccess();
+
+        assertTrue(success);
+        verify(refreshTokenSessionRepository, never()).findByUserIdAndSessionId(1L, " ");
     }
 
     @Test

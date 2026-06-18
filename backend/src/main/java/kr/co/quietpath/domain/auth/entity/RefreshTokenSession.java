@@ -1,117 +1,67 @@
 package kr.co.quietpath.domain.auth.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.redis.core.RedisHash;
+import org.springframework.data.redis.core.TimeToLive;
+import org.springframework.data.redis.core.index.Indexed;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.UUID;
 
-@Entity
-@Table(
-    name = "refresh_tokens",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_refresh_token_hash", columnNames = {"token_hash"}),
-        @UniqueConstraint(name = "uk_refresh_user_session", columnNames = {"user_id", "session_id"})
-    },
-    indexes = {
-        @Index(name = "idx_refresh_user_expires", columnList = "user_id, expires_at"),
-        @Index(name = "idx_refresh_expires", columnList = "expires_at")
-    }
-)
+@RedisHash("refreshToken")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RefreshTokenSession {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private String id;
 
-    @Column(nullable = false)
+    @Indexed
     private Long userId;
 
-    @Column(nullable = false, length = 36)
+    @Indexed
     private String sessionId;
 
-    @Column(nullable = false, length = 64)
+    @Indexed
     private String tokenHash;
 
-    @Column(nullable = false)
-    private LocalDateTime expiresAt;
+    @TimeToLive
+    private Long ttlSeconds;
 
-    @Column
-    private LocalDateTime revokedAt;
-
-    @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
-
-    @Builder(access = AccessLevel.PRIVATE)
-    private RefreshTokenSession(
-        Long userId,
-        String sessionId,
-        String tokenHash,
-        LocalDateTime expiresAt
-    ) {
+    private RefreshTokenSession(Long userId, String sessionId, String tokenHash, Long ttlSeconds) {
+        this.id = UUID.randomUUID().toString();
         this.userId = userId;
         this.sessionId = sessionId;
         this.tokenHash = tokenHash;
-        this.expiresAt = expiresAt;
+        this.ttlSeconds = ttlSeconds;
         this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
-    public static RefreshTokenSession issue(
-        Long userId,
-        String sessionId,
-        String tokenHash,
-        LocalDateTime expiresAt
-    ) {
+    public static RefreshTokenSession issue(Long userId, String sessionId, String tokenHash, Long ttlSeconds) {
         Objects.requireNonNull(userId, "userId는 필수입니다.");
         Objects.requireNonNull(sessionId, "sessionId는 필수입니다.");
         Objects.requireNonNull(tokenHash, "tokenHash는 필수입니다.");
-        Objects.requireNonNull(expiresAt, "expiresAt은 필수입니다.");
-
-        return RefreshTokenSession.builder()
-            .userId(userId)
-            .sessionId(sessionId)
-            .tokenHash(tokenHash)
-            .expiresAt(expiresAt)
-            .build();
+        validateTtlSeconds(ttlSeconds);
+        return new RefreshTokenSession(userId, sessionId, tokenHash, ttlSeconds);
     }
 
-    public void rotate(String newTokenHash, LocalDateTime newExpiresAt) {
+    public void rotate(String newTokenHash, Long ttlSeconds) {
+        Objects.requireNonNull(newTokenHash, "newTokenHash는 필수입니다.");
+        validateTtlSeconds(ttlSeconds);
         this.tokenHash = newTokenHash;
-        this.expiresAt = newExpiresAt;
-        this.revokedAt = null;
-        touch();
+        this.ttlSeconds = ttlSeconds;
     }
 
-    public void revoke() {
-        this.revokedAt = LocalDateTime.now();
-        touch();
-    }
-
-    public boolean isRevoked() {
-        return revokedAt != null;
-    }
-
-    public boolean isExpired(LocalDateTime now) {
-        return expiresAt.isBefore(now);
-    }
-
-    private void touch() {
-        this.updatedAt = LocalDateTime.now();
+    private static void validateTtlSeconds(Long ttlSeconds) {
+        Objects.requireNonNull(ttlSeconds, "ttlSeconds는 필수입니다.");
+        if (ttlSeconds <= 0) {
+            throw new IllegalArgumentException("ttlSeconds는 0보다 커야 합니다.");
+        }
     }
 }
