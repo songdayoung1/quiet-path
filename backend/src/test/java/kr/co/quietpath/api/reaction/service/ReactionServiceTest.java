@@ -2,6 +2,7 @@ package kr.co.quietpath.api.reaction.service;
 
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
+import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
 import kr.co.quietpath.api.reaction.dto.request.ReactionCreateRequest;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.path.entity.Path;
@@ -32,6 +33,9 @@ class ReactionServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private WeeklyTop3CacheService weeklyTop3CacheService;
 
     @InjectMocks
     private ReactionService reactionService;
