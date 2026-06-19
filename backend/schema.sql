@@ -155,7 +155,7 @@ CREATE TABLE path_summaries (
     path_id BIGINT NOT NULL,
     version_no INT NOT NULL,
     status VARCHAR(20) NOT NULL,
-    format VARCHAR(20) NOT NULL DEFAULT 'MARKDOWN',
+    format VARCHAR(20) NOT NULL DEFAULT 'JSON',
     content MEDIUMTEXT,
     prompt_version VARCHAR(30),
     model VARCHAR(50),

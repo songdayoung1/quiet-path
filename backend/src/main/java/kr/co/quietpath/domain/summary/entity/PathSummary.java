@@ -68,7 +68,7 @@ public class PathSummary {
         this.path = path;
         this.versionNo = versionNo != null ? versionNo : 1;
         this.status = "PENDING";
-        this.format = "MARKDOWN";
+        this.format = "JSON";
         this.promptVersion = promptVersion;
         this.model = model;
         this.inputHash = inputHash;
@@ -83,6 +83,7 @@ public class PathSummary {
 
     public void complete(String content) {
         this.status = "DONE";
+        this.format = "JSON";
         this.content = content;
         this.updatedAt = LocalDateTime.now();
     }
@@ -94,6 +95,16 @@ public class PathSummary {
 
     public void updateContent(String content) {
         this.content = content;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void retry(String promptVersion, String model, String inputHash) {
+        this.status = "PENDING";
+        this.format = "JSON";
+        this.content = null;
+        this.promptVersion = promptVersion;
+        this.model = model;
+        this.inputHash = inputHash;
         this.updatedAt = LocalDateTime.now();
     }
 }

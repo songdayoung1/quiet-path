@@ -15,7 +15,7 @@ public class PathDetailResponse {
     private String createdAt;
     private String reviewAt;
     private String completedAt;
-    private String summary;
+    private PathSummaryPayload summary;
     private String summaryStatus;
     private List<PathRecordItem> records;
 }

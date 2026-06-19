@@ -1,9 +1,12 @@
 package kr.co.quietpath.api.path.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.path.dto.request.PathCreateRequest;
 import kr.co.quietpath.api.path.dto.response.*;
+import kr.co.quietpath.api.summary.service.PathSummaryPolicy;
 import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.record.entity.Record;
@@ -35,15 +38,13 @@ public class PathService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
     private static final String STATUS_COMPLETED = "COMPLETED";
-    private static final String SUMMARY_STATUS_DONE = "DONE";
-    private static final String SUMMARY_STATUS_LOCKED = "LOCKED";
-    private static final String SUMMARY_STATUS_UNLOCKED = "UNLOCKED";
     private static final Set<String> ALLOWED_CATEGORY_CODES = Set.of("job", "study", "workout", "hobby", "cert");
 
     private final PathRepository pathRepository;
     private final UserRepository userRepository;
     private final RecordRepository recordRepository;
     private final PathSummaryRepository pathSummaryRepository;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public PathActiveResponse getActivePath(Long userId) {
@@ -183,13 +184,14 @@ public class PathService {
 
         LocalDate unlockAtDate = path.getReviewAt().toLocalDate();
 
-        String summary = null;
-        String summaryStatus = resolveSummaryStatus(path.getId(), unlockAtDate);
-        if (SUMMARY_STATUS_DONE.equals(summaryStatus)) {
-            summary = findLatestSummary(path.getId());
+        List<Record> records = recordRepository.findAllByPath_IdOrderByRecordDateAsc(pathId);
+        PathSummary latestSummary = findLatestSummary(pathId);
+        String summaryStatus = resolveSummaryStatus(unlockAtDate, records, latestSummary);
+        PathSummaryPayload summary = null;
+        if (PathSummaryPolicy.STATUS_DONE.equals(summaryStatus) && latestSummary != null) {
+            summary = readSummaryPayload(latestSummary.getContent());
         }
 
-        List<Record> records = recordRepository.findAllByPath_IdOrderByRecordDateAsc(pathId);
         List<PathRecordItem> recordItems = new ArrayList<>();
         for (Record record : records) {
             recordItems.add(PathRecordItem.builder()
@@ -245,26 +247,43 @@ public class PathService {
         return categoryCode;
     }
 
-    private String resolveSummaryStatus(Long pathId, LocalDate unlockAtDate) {
+    private String resolveSummaryStatus(LocalDate unlockAtDate, List<Record> records, PathSummary latestSummary) {
         if (LocalDate.now().isBefore(unlockAtDate)) {
-            return SUMMARY_STATUS_LOCKED;
+            return PathSummaryPolicy.STATUS_LOCKED;
         }
-        List<PathSummary> summaries = pathSummaryRepository.findByPathIdOrderByVersionNoDesc(pathId);
-        if (!summaries.isEmpty()) {
-            PathSummary latest = summaries.get(0);
-            if (SUMMARY_STATUS_DONE.equals(latest.getStatus())) {
-                return SUMMARY_STATUS_DONE;
-            }
+        // 요약 row가 있더라도 기록이 없으면 화면 정책상 EMPTY를 우선한다.
+        if (records.isEmpty()) {
+            return PathSummaryPolicy.STATUS_EMPTY;
         }
-        return SUMMARY_STATUS_UNLOCKED;
+        if (latestSummary == null) {
+            return PathSummaryPolicy.STATUS_READY;
+        }
+        if (PathSummaryPolicy.STATUS_DONE.equals(latestSummary.getStatus())) {
+            return PathSummaryPolicy.STATUS_DONE;
+        }
+        if (PathSummaryPolicy.STATUS_FAILED.equals(latestSummary.getStatus())) {
+            return PathSummaryPolicy.STATUS_FAILED;
+        }
+        if (PathSummaryPolicy.isStale(latestSummary)) {
+            return PathSummaryPolicy.STATUS_FAILED;
+        }
+        if (PathSummaryPolicy.isInFlight(latestSummary.getStatus())) {
+            return PathSummaryPolicy.STATUS_PROCESSING;
+        }
+        return PathSummaryPolicy.STATUS_READY;
     }
 
-    private String findLatestSummary(Long pathId) {
-        List<PathSummary> summaries = pathSummaryRepository.findByPathIdOrderByVersionNoDesc(pathId);
-        if (summaries.isEmpty()) {
-            return null;
+    private PathSummary findLatestSummary(Long pathId) {
+        return pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(pathId)
+            .orElse(null);
+    }
+
+    private PathSummaryPayload readSummaryPayload(String content) {
+        try {
+            return objectMapper.readValue(content, PathSummaryPayload.class);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("summary payload parse failed", ex);
         }
-        return summaries.get(0).getContent();
     }
 
     private String resolvePreview(Record record) {

@@ -39,3 +39,9 @@ app:
     issuer: ${APP_JWT_ISSUER:quiet-path}
   cors:
     allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:5173,http://127.0.0.1:5173}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: ${OPENAI_MODEL:gpt-5.5}
+  summary-prompt-version: ${OPENAI_SUMMARY_PROMPT_VERSION:v1}
+  summary-timeout-ms: ${OPENAI_SUMMARY_TIMEOUT_MS:45000}

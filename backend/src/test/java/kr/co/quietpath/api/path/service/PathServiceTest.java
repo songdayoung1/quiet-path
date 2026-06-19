@@ -4,17 +4,21 @@ import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.path.dto.request.PathCreateRequest;
 import kr.co.quietpath.api.path.dto.response.PathDetailResponse;
+import kr.co.quietpath.api.path.dto.response.PathSummaryPayload;
 import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.path.repository.PathRepository;
+import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.summary.entity.PathSummary;
 import kr.co.quietpath.domain.summary.repository.PathSummaryRepository;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
@@ -45,6 +49,9 @@ class PathServiceTest {
 
     @Mock
     private PathSummaryRepository pathSummaryRepository;
+
+    @Spy
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks
     private PathService pathService;
@@ -147,7 +154,7 @@ class PathServiceTest {
 
     @Test
     void getPathDetail_summaryExistsBeforeReviewAt_returnsLocked() {
-        Path path = buildPath(1L);
+        Path path = buildFutureReviewPath(1L);
         PathSummary summary = PathSummary.builder()
             .path(path)
             .versionNo(1)
@@ -167,7 +174,58 @@ class PathServiceTest {
         assertNull(response.getSummary());
     }
 
-    private Path buildPath(Long id) {
+    @Test
+    void getPathDetail_afterReviewAt_withoutRecords_returnsEmpty() {
+        Path path = buildPastReviewCompletedPath(1L);
+
+        when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
+        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of());
+
+        PathDetailResponse response = pathService.getPathDetail(1L, 1L);
+
+        assertEquals("EMPTY", response.getSummaryStatus());
+        assertNull(response.getSummary());
+    }
+
+    @Test
+    void getPathDetail_afterReviewAt_withRecordsAndNoSummary_returnsReady() {
+        Path path = buildPastReviewCompletedPath(1L);
+        Record record = buildRecord(path, 10L, LocalDate.now().minusDays(2));
+
+        when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
+        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
+        when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.empty());
+
+        PathDetailResponse response = pathService.getPathDetail(1L, 1L);
+
+        assertEquals("READY", response.getSummaryStatus());
+        assertNull(response.getSummary());
+    }
+
+    @Test
+    void getPathDetail_doneSummary_returnsPayload() throws Exception {
+        Path path = buildPastReviewCompletedPath(1L);
+        Record record = buildRecord(path, 10L, LocalDate.now().minusDays(2));
+        PathSummary summary = PathSummary.builder()
+            .path(path)
+            .versionNo(1)
+            .promptVersion("v1")
+            .model("gpt-test")
+            .inputHash("hash")
+            .build();
+        summary.complete(objectMapper.writeValueAsString(buildPayload()));
+
+        when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
+        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
+        when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
+
+        PathDetailResponse response = pathService.getPathDetail(1L, 1L);
+
+        assertEquals("DONE", response.getSummaryStatus());
+        assertEquals("천천히 나아갔습니다.", response.getSummary().getHeadline());
+    }
+
+    private Path buildFutureReviewPath(Long id) {
         Path path = Path.builder()
             .userId(1L)
             .categoryCode("study")
@@ -177,6 +235,47 @@ class PathServiceTest {
             .build();
         setId(path, id);
         return path;
+    }
+
+    private Path buildPath(Long id) {
+        return buildFutureReviewPath(id);
+    }
+
+    private Path buildPastReviewCompletedPath(Long id) {
+        Path path = Path.builder()
+            .userId(1L)
+            .categoryCode("study")
+            .directionName("질문")
+            .directionText("설명")
+            .reviewAt(LocalDateTime.now().minusDays(1))
+            .build();
+        setId(path, id);
+        path.complete();
+        return path;
+    }
+
+    private Record buildRecord(Path path, Long id, LocalDate recordDate) {
+        Record record = Record.builder()
+            .user(null)
+            .path(path)
+            .categoryCode(path.getCategoryCode())
+            .recordDate(recordDate)
+            .sceneText("한 장면")
+            .oneWordText("한 단어")
+            .tomorrowText("내일 계획")
+            .moodCode("잔잔")
+            .build();
+        setId(record, id);
+        return record;
+    }
+
+    private PathSummaryPayload buildPayload() {
+        PathSummaryPayload payload = new PathSummaryPayload();
+        payload.setHeadline("천천히 나아갔습니다.");
+        payload.setBody("흐름이 이어졌습니다.");
+        payload.setObservations(List.of("기록이 끊기지 않았습니다."));
+        payload.setClosing("다음에도 이어가 보세요.");
+        return payload;
     }
 
     private void setId(Object target, Long id) {
