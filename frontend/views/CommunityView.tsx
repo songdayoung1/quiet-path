@@ -170,6 +170,7 @@ interface WeeklyTopCarouselProps {
   onComment: (item: CommunityRecordItem) => void;
   onCloseComments: () => void;
   onCommentCountChange: (recordId: number, nextCount: number) => void;
+  onActiveRecordChange: (recordId: number | null) => void;
 }
 
 const WeeklyTopCarousel: React.FC<WeeklyTopCarouselProps> = ({
@@ -183,6 +184,7 @@ const WeeklyTopCarousel: React.FC<WeeklyTopCarouselProps> = ({
   onComment,
   onCloseComments,
   onCommentCountChange,
+  onActiveRecordChange,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
@@ -193,6 +195,7 @@ const WeeklyTopCarousel: React.FC<WeeklyTopCarouselProps> = ({
   useEffect(() => {
     if (items.length === 0) {
       activeRecordIdRef.current = null;
+      onActiveRecordChange(null);
       setActiveIndex(0);
       return;
     }
@@ -203,11 +206,12 @@ const WeeklyTopCarousel: React.FC<WeeklyTopCarouselProps> = ({
       const nextIndex = items.findIndex((item) => item.recordId === preferredRecordId);
       return nextIndex >= 0 ? nextIndex : 0;
     });
-  }, [items]);
+  }, [items, onActiveRecordChange]);
 
   useEffect(() => {
     activeRecordIdRef.current = items[activeIndex]?.recordId ?? null;
-  }, [activeIndex, items]);
+    onActiveRecordChange(items[activeIndex]?.recordId ?? null);
+  }, [activeIndex, items, onActiveRecordChange]);
 
   if (items.length === 0) {
     return null;
@@ -397,9 +401,15 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
   const [pendingReactionIds, setPendingReactionIds] = useState<Record<number, boolean>>({});
   const [commentTarget, setCommentTarget] = useState<CommunityRecordItem | null>(null);
+  const [topActiveRecordId, setTopActiveRecordId] = useState<number | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const hasNextRef = useRef(false);
   const loadingMoreRef = useRef(false);
+  const feedRequestSeqRef = useRef(0);
+  const weeklyTopRequestSeqRef = useRef(0);
+  const viewContextRef = useRef<string | null>(null);
+  const requestContextKey = `${selectedCategory}:${accessToken ?? 'guest'}:${isGuest ? 'guest' : 'member'}`;
+  viewContextRef.current = requestContextKey;
 
   const handleRestrictedAction = useCallback(() => {
     if (isGuest || !accessToken) {
@@ -410,9 +420,12 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const refreshWeeklyTop3 = useCallback(async (options?: { bypassCache?: boolean }) => {
     if (selectedCategory !== 'all') {
       setWeeklyTopItems([]);
+      setTopActiveRecordId(null);
       return;
     }
 
+    const requestSeq = ++weeklyTopRequestSeqRef.current;
+    const requestContext = requestContextKey;
     const requestKey = `${selectedCategory}:${accessToken ?? 'guest'}`;
     if (activeWeeklyTopRequests.has(requestKey)) {
       return;
@@ -423,16 +436,24 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       const response = isGuest
         ? await feedApi.getWeeklyTop3(null, options)
         : await feedApi.getWeeklyTop3(accessToken, options);
+      if (weeklyTopRequestSeqRef.current !== requestSeq || viewContextRef.current !== requestContext || selectedCategory !== 'all') {
+        return;
+      }
       setWeeklyTopItems(response.items ?? []);
     } catch {
+      if (weeklyTopRequestSeqRef.current !== requestSeq || viewContextRef.current !== requestContext || selectedCategory !== 'all') {
+        return;
+      }
       setWeeklyTopItems([]);
     } finally {
       activeWeeklyTopRequests.delete(requestKey);
     }
-  }, [accessToken, isGuest, selectedCategory]);
+  }, [accessToken, isGuest, requestContextKey, selectedCategory]);
 
   const loadFeedPage = useCallback(
     async (cursor: string | null, append: boolean) => {
+      const requestSeq = append ? feedRequestSeqRef.current : ++feedRequestSeqRef.current;
+      const requestContext = requestContextKey;
       if (append) {
         if (loadingMoreRef.current || !hasNextRef.current || !cursor) {
           return;
@@ -467,6 +488,9 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               size: 20,
             });
 
+        if (feedRequestSeqRef.current !== requestSeq || viewContextRef.current !== requestContext) {
+          return;
+        }
         setFeedItems((prev) => (append ? [...prev, ...response.items] : response.items));
         const nextHasNext = isGuest ? false : response.hasNext;
         const resolvedCursor = isGuest ? null : response.nextCursor;
@@ -474,6 +498,9 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         setHasNext(nextHasNext);
         setNextCursor(resolvedCursor);
       } catch (err) {
+        if (feedRequestSeqRef.current !== requestSeq || viewContextRef.current !== requestContext) {
+          return;
+        }
         if (!append) {
           setError(err instanceof Error ? err.message : '피드를 불러오지 못했습니다.');
         }
@@ -487,7 +514,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         }
       }
     },
-    [accessToken, isGuest, selectedCategory]
+    [accessToken, isGuest, requestContextKey, selectedCategory]
   );
 
   useEffect(() => {
@@ -497,6 +524,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   useEffect(() => {
     if (selectedCategory !== 'all') {
       setWeeklyTopItems([]);
+      setTopActiveRecordId(null);
       return undefined;
     }
 
@@ -506,7 +534,8 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
   useEffect(() => {
     setCommentTarget(null);
-  }, [selectedCategory]);
+    setTopActiveRecordId(null);
+  }, [selectedCategory, accessToken, isGuest]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -542,6 +571,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
     ),
     [feedItems, isGuest]
   );
+  const topVisibleCommentRecordId = selectedCategory === 'all' ? topActiveRecordId : null;
 
   const updateCommunityItem = useCallback((recordId: number, updater: (item: CommunityRecordItem) => CommunityRecordItem) => {
     setFeedItems((prev) => prev.map((item) => (item.recordId === recordId ? updater(item) as FeedItemResponse : item)));
@@ -662,6 +692,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
           onComment={handleOpenComments}
           onCloseComments={() => setCommentTarget(null)}
           onCommentCountChange={handleCommentCountChange}
+          onActiveRecordChange={setTopActiveRecordId}
         />
       )}
 
@@ -704,7 +735,10 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
                 commentOpen={commentTarget?.recordId === item.recordId}
               />
               <CommunityCommentsSheet
-                open={commentTarget?.recordId === item.recordId}
+                open={
+                  commentTarget?.recordId === item.recordId &&
+                  topVisibleCommentRecordId !== item.recordId
+                }
                 accessToken={accessToken}
                 onRefreshAuth={onRefreshAuth}
                 currentUserId={currentUserId}

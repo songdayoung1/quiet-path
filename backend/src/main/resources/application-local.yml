@@ -3,7 +3,7 @@ spring:
     import: optional:file:./backend/.env.local[.properties],optional:file:./.env.local[.properties]
 
   datasource:
-    url: jdbc:mysql://localhost:3306/quietpath?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&useUnicode=true&characterEncoding=UTF-8
+    url: jdbc:mysql://localhost:3306/quietpath?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&useUnicode=true&connectionCollation=utf8mb4_unicode_ci
     username: quietpath
     password: quietpath
     driver-class-name: com.mysql.cj.jdbc.Driver

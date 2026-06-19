@@ -2,6 +2,8 @@ package kr.co.quietpath.api.record.service;
 
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
+import kr.co.quietpath.api.comment.service.CommentPageCacheService;
+import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
@@ -43,6 +45,12 @@ class RecordDetailServiceTest {
     @Mock
     private CommentRepository commentRepository;
 
+    @Mock
+    private WeeklyTop3CacheService weeklyTop3CacheService;
+
+    @Mock
+    private CommentPageCacheService commentPageCacheService;
+
     @InjectMocks
     private RecordService recordService;
 
@@ -62,7 +70,7 @@ class RecordDetailServiceTest {
 
         when(reactionRepository.countByTargetTypeAndTargetId("RECORD", 10L)).thenReturn(3L);
         when(reactionRepository.existsByUserIdAndTargetTypeAndTargetId(99L, "RECORD", 10L)).thenReturn(true);
-        when(commentRepository.countByRecordId(10L)).thenReturn(2L);
+        when(commentRepository.countByRecordIdAndDeletedFalse(10L)).thenReturn(2L);
 
         RecordDetailResponse response = recordService.getRecordDetail(99L, 10L);
 

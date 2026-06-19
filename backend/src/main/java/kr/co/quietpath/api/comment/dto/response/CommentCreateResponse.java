@@ -10,6 +10,7 @@ public class CommentCreateResponse {
     private Long recordId;
     private Long userId;
     private String content;
+    private long commentCount;
     private boolean deleted;
     private String createdAt;
 }

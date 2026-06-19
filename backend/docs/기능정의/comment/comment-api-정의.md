@@ -41,6 +41,7 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
 | recordId   | Long          | 대상 Record ID         |
 | userId     | Long          | 작성자 ID               |
 | content    | String        | 댓글 내용                |
+| commentCount | long        | 활성 댓글 수             |
 | deleted    | boolean       | 삭제 여부                |
 | createdAt  | LocalDateTime | 생성 시각                |
 | updatedAt  | LocalDateTime | 수정 시각                |
@@ -87,6 +88,7 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
   "recordId": 1203,
   "userId": 12,
   "content": "좋은 기록이네요",
+  "commentCount": 8,
   "deleted": false,
   "createdAt": "2026-02-08T10:12:31"
 }
@@ -160,6 +162,8 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
 ```json
 {
   "commentId": 9001,
+  "recordId": 1203,
+  "commentCount": 8,
   "content": "내용을 수정했습니다",
   "updatedAt": "2026-02-08T11:01:00"
 }
@@ -180,6 +184,8 @@ Comment는 사용자가 공개된 콘텐츠(Record)에 대해 댓글을 남기�
 ```json
 {
   "commentId": 9001,
+  "recordId": 1203,
+  "commentCount": 7,
   "deleted": true,
   "deletedAt": "2026-02-08T11:10:00"
 }

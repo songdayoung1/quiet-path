@@ -5,9 +5,10 @@ import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.feed.dto.response.OwnerSummary;
 import kr.co.quietpath.api.feed.dto.response.FeedItem;
 import kr.co.quietpath.api.feed.dto.response.FeedResponse;
+import kr.co.quietpath.api.feed.dto.response.WeeklyTop3BaseItem;
+import kr.co.quietpath.api.feed.dto.response.WeeklyTop3BaseResponse;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Item;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Response;
-import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Window;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
@@ -19,10 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +34,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class FeedService {
 
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
-    private static final int TOP_LIMIT = 3;
     private static final int MAX_FEED_SIZE = 50;
     private static final String VISIBILITY_PUBLIC = "PUBLIC";
     private static final Set<String> ALLOWED_CATEGORY_CODES = Set.of("job", "study", "workout", "hobby", "cert");
@@ -44,6 +41,7 @@ public class FeedService {
     private final ReactionRepository reactionRepository;
     private final CommentRepository commentRepository;
     private final RecordRepository recordRepository;
+    private final WeeklyTop3CacheService weeklyTop3CacheService;
 
     public FeedResponse getFeed(Long userId, String category, int size, String cursor) {
         int pageSize = normalizeSize(size);
@@ -141,90 +139,36 @@ public class FeedService {
     }
 
     public WeeklyTop3Response getWeeklyTop3(Long userId) {
-        LocalDateTime now = LocalDateTime.now(KST);
-        LocalDateTime from = now.minusDays(7);
+        WeeklyTop3BaseResponse base = weeklyTop3CacheService.getWeeklyTop3Base();
 
-        List<ReactionRepository.WeeklyTop3Projection> candidates =
-            reactionRepository.findWeeklyTop3Candidates(from, now);
-
-        List<ReactionRepository.WeeklyTop3Projection> sorted = candidates.stream()
-            .sorted(Comparator
-                .comparing(ReactionRepository.WeeklyTop3Projection::getReactionCount).reversed()
-                .thenComparing(ReactionRepository.WeeklyTop3Projection::getReactedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(ReactionRepository.WeeklyTop3Projection::getRecordId, Comparator.nullsLast(Comparator.reverseOrder()))
-            )
-            .limit(TOP_LIMIT)
+        List<Long> recordIds = base.getItems().stream()
+            .map(WeeklyTop3BaseItem::getRecordId)
             .toList();
 
-        List<Long> recordIds = sorted.stream()
-            .map(ReactionRepository.WeeklyTop3Projection::getRecordId)
-            .toList();
-
-        if (recordIds.isEmpty()) {
-            WeeklyTop3Window window = WeeklyTop3Window.builder()
-                .from(from.toLocalDate().toString())
-                .to(now.toLocalDate().toString())
-                .build();
-            return WeeklyTop3Response.builder()
-                .window(window)
-                .items(List.of())
-                .build();
-        }
-
-        Map<Long, Record> recordMap = recordRepository.findAllById(recordIds).stream()
-            .collect(Collectors.toMap(Record::getId, record -> record));
-
-        Map<Long, Long> reactionCountMap = new HashMap<>();
-        reactionRepository.countByRecordIds(recordIds)
-            .forEach(row -> reactionCountMap.put(row.getRecordId(), row.getReactionCount()));
-
-        Map<Long, Long> commentCountMap = new HashMap<>();
-        commentRepository.countByRecordIds(recordIds)
-            .forEach(row -> commentCountMap.put(row.getRecordId(), row.getCommentCount()));
-
-        Set<Long> reactedRecordIds = recordIds.isEmpty() || userId == null
+        Set<Long> reactedRecordIds = (userId == null || recordIds.isEmpty())
             ? Set.of()
             : reactionRepository.findReactedRecordIds(userId, recordIds).stream()
                 .collect(Collectors.toSet());
 
-        List<WeeklyTop3Item> items = new ArrayList<>();
-        for (ReactionRepository.WeeklyTop3Projection projection : sorted) {
-            Record record = recordMap.get(projection.getRecordId());
-            if (record == null) {
-                continue;
-            }
-            kr.co.quietpath.domain.path.entity.Path path = record.getPath();
-            User owner = record.getUser();
-            OwnerSummary ownerSummary = OwnerSummary.builder()
-                .userId(owner != null ? owner.getId() : null)
-                .nickname(owner != null ? owner.getNickname() : null)
-                .profileImageUrl(null)
-                .build();
-
-            WeeklyTop3Item item = WeeklyTop3Item.builder()
-                .pathId(path != null ? path.getId() : null)
-                .recordId(record.getId())
-                .title(path != null ? path.getDirectionName() : null)
-                .content(resolveContent(record))
-                .status(path != null ? mapStatus(path.getStatus()) : null)
-                .owner(ownerSummary)
-                .categoryCode(record.getCategoryCode())
-                .reactionCount(reactionCountMap.getOrDefault(record.getId(), 0L))
-                .commentCount(commentCountMap.getOrDefault(record.getId(), 0L))
-                .isReacted(reactedRecordIds.contains(record.getId()))
-                .sharedAt(formatDateTime(record.getSharedAt()))
-                .createdAt(formatDateTime(record.getCreatedAt()))
-                .build();
-            items.add(item);
-        }
-
-        WeeklyTop3Window window = WeeklyTop3Window.builder()
-            .from(from.toLocalDate().toString())
-            .to(now.toLocalDate().toString())
-            .build();
+        List<WeeklyTop3Item> items = base.getItems().stream()
+            .map(baseItem -> WeeklyTop3Item.builder()
+                .pathId(baseItem.getPathId())
+                .recordId(baseItem.getRecordId())
+                .title(baseItem.getTitle())
+                .content(baseItem.getContent())
+                .status(baseItem.getStatus())
+                .owner(baseItem.getOwner())
+                .categoryCode(baseItem.getCategoryCode())
+                .reactionCount(baseItem.getReactionCount())
+                .commentCount(baseItem.getCommentCount())
+                .isReacted(reactedRecordIds.contains(baseItem.getRecordId()))
+                .sharedAt(baseItem.getSharedAt())
+                .createdAt(baseItem.getCreatedAt())
+                .build())
+            .toList();
 
         return WeeklyTop3Response.builder()
-            .window(window)
+            .window(base.getWindow())
             .items(items)
             .build();
     }

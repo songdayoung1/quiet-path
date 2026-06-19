@@ -17,7 +17,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
 
     Page<Comment> findByRecordIdAndDeletedFalseOrderByCreatedAtAsc(Long recordId, Pageable pageable);
 
-    long countByRecordId(Long recordId);
+    long countByRecordIdAndDeletedFalse(Long recordId);
 
     @Query("""
         select c.recordId as recordId,

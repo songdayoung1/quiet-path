@@ -2,6 +2,10 @@ package kr.co.quietpath.api.feed.service;
 
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Response;
+import kr.co.quietpath.api.feed.dto.response.OwnerSummary;
+import kr.co.quietpath.api.feed.dto.response.WeeklyTop3BaseItem;
+import kr.co.quietpath.api.feed.dto.response.WeeklyTop3BaseResponse;
+import kr.co.quietpath.api.feed.dto.response.WeeklyTop3Window;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
@@ -38,38 +42,22 @@ class FeedServiceTest {
     @Mock
     private RecordRepository recordRepository;
 
+    @Mock
+    private WeeklyTop3CacheService weeklyTop3CacheService;
+
     @InjectMocks
     private FeedService feedService;
 
     @Test
-    void weeklyTop3_sortingUsesTieBreakers() {
-        ReactionRepository.WeeklyTop3Projection p1 = projection(10L, 5L, LocalDateTime.of(2026, 2, 7, 10, 0));
-        ReactionRepository.WeeklyTop3Projection p2 = projection(11L, 5L, LocalDateTime.of(2026, 2, 7, 10, 0));
-        ReactionRepository.WeeklyTop3Projection p3 = projection(12L, 5L, LocalDateTime.of(2026, 2, 6, 9, 0));
+    void weeklyTop3_preservesCachedBaseOrder() {
+        when(weeklyTop3CacheService.getWeeklyTop3Base())
+            .thenReturn(baseResponse(List.of(
+                baseItem(11L, 7L, 2L),
+                baseItem(10L, 5L, 1L),
+                baseItem(12L, 3L, 0L)
+            )));
 
-        when(reactionRepository.findWeeklyTop3Candidates(any(), any()))
-            .thenReturn(List.of(p1, p2, p3));
-
-        Record record10 = buildRecord(10L, 110L, 1L, "study", LocalDateTime.of(2026, 2, 6, 8, 0), LocalDateTime.of(2026, 2, 6, 8, 10));
-        Record record11 = buildRecord(11L, 111L, 2L, "workout", LocalDateTime.of(2026, 2, 7, 8, 0), LocalDateTime.of(2026, 2, 7, 8, 10));
-        Record record12 = buildRecord(12L, 112L, 3L, "hobby", LocalDateTime.of(2026, 2, 5, 8, 0), LocalDateTime.of(2026, 2, 5, 8, 10));
-        when(recordRepository.findAllById(List.of(11L, 10L, 12L)))
-            .thenReturn(List.of(record10, record11, record12));
-
-        when(reactionRepository.countByRecordIds(List.of(11L, 10L, 12L)))
-            .thenReturn(List.of(
-                reactionCount(10L, 5L),
-                reactionCount(11L, 7L),
-                reactionCount(12L, 3L)
-            ));
-        when(commentRepository.countByRecordIds(List.of(11L, 10L, 12L)))
-            .thenReturn(List.of(
-                commentCount(10L, 1L),
-                commentCount(11L, 2L),
-                commentCount(12L, 0L)
-            ));
-
-        when(reactionRepository.findReactedRecordIds(any(), any()))
+        when(reactionRepository.findReactedRecordIds(99L, List.of(11L, 10L, 12L)))
             .thenReturn(List.of());
 
         WeeklyTop3Response response = feedService.getWeeklyTop3(99L);
@@ -82,26 +70,11 @@ class FeedServiceTest {
 
     @Test
     void weeklyTop3_isReactedMappingUsesUserId() {
-        ReactionRepository.WeeklyTop3Projection p1 = projection(10L, 7L, LocalDateTime.of(2026, 2, 7, 10, 0));
-        ReactionRepository.WeeklyTop3Projection p2 = projection(11L, 6L, LocalDateTime.of(2026, 2, 7, 9, 0));
-
-        when(reactionRepository.findWeeklyTop3Candidates(any(), any()))
-            .thenReturn(List.of(p1, p2));
-
-        Record record10 = buildRecord(10L, 210L, 1L, "study", LocalDateTime.of(2026, 2, 7, 8, 0), LocalDateTime.of(2026, 2, 7, 8, 10));
-        Record record11 = buildRecord(11L, 211L, 2L, "workout", LocalDateTime.of(2026, 2, 7, 9, 0), LocalDateTime.of(2026, 2, 7, 9, 10));
-        when(recordRepository.findAllById(List.of(10L, 11L)))
-            .thenReturn(List.of(record10, record11));
-        when(reactionRepository.countByRecordIds(List.of(10L, 11L)))
-            .thenReturn(List.of(
-                reactionCount(10L, 4L),
-                reactionCount(11L, 2L)
-            ));
-        when(commentRepository.countByRecordIds(List.of(10L, 11L)))
-            .thenReturn(List.of(
-                commentCount(10L, 1L),
-                commentCount(11L, 0L)
-            ));
+        when(weeklyTop3CacheService.getWeeklyTop3Base())
+            .thenReturn(baseResponse(List.of(
+                baseItem(10L, 4L, 1L),
+                baseItem(11L, 2L, 0L)
+            )));
 
         when(reactionRepository.findReactedRecordIds(99L, List.of(10L, 11L)))
             .thenReturn(List.of(11L));
@@ -208,6 +181,36 @@ class FeedServiceTest {
                 return reactedAt;
             }
         };
+    }
+
+    private WeeklyTop3BaseResponse baseResponse(List<WeeklyTop3BaseItem> items) {
+        return WeeklyTop3BaseResponse.builder()
+            .window(WeeklyTop3Window.builder()
+                .from("2026-06-11")
+                .to("2026-06-18")
+                .build())
+            .items(items)
+            .build();
+    }
+
+    private WeeklyTop3BaseItem baseItem(Long recordId, Long reactionCount, Long commentCount) {
+        return WeeklyTop3BaseItem.builder()
+            .pathId(recordId + 100L)
+            .recordId(recordId)
+            .title("질문 " + recordId)
+            .content("내용 " + recordId)
+            .status("ACTIVE")
+            .owner(OwnerSummary.builder()
+                .userId(recordId)
+                .nickname("nick" + recordId)
+                .profileImageUrl(null)
+                .build())
+            .categoryCode("study")
+            .reactionCount(reactionCount)
+            .commentCount(commentCount)
+            .sharedAt("2026-06-18T10:00:00")
+            .createdAt("2026-06-18T09:00:00")
+            .build();
     }
 
     private Path buildPath(Long pathId, Long ownerId, LocalDateTime updatedAt) {

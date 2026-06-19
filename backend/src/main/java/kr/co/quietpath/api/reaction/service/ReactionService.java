@@ -9,6 +9,7 @@ import kr.co.quietpath.api.reaction.dto.response.ReactionCountResponse;
 import kr.co.quietpath.api.reaction.dto.response.ReactionCreateResponse;
 import kr.co.quietpath.api.reaction.dto.response.ReactionDeleteResponse;
 import kr.co.quietpath.api.reaction.dto.response.ReactionMeResponse;
+import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
 import kr.co.quietpath.domain.reaction.entity.Reaction;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
@@ -33,6 +34,7 @@ public class ReactionService {
     private final ReactionRepository reactionRepository;
     private final RecordRepository recordRepository;
     private final UserRepository userRepository;
+    private final WeeklyTop3CacheService weeklyTop3CacheService;
 
     public ReactionCreateResponse createReaction(Long userId, ReactionCreateRequest request) {
         validateTargetType(request.getTargetType());
@@ -53,6 +55,7 @@ public class ReactionService {
         record.increaseReactionCount();
 
         long reactionCount = reactionRepository.countByTargetTypeAndTargetId(request.getTargetType(), request.getTargetId());
+        weeklyTop3CacheService.evict();
         return ReactionCreateResponse.builder()
             .reactionId(reaction.getId())
             .targetType(request.getTargetType())
@@ -73,6 +76,7 @@ public class ReactionService {
         record.decreaseReactionCount();
 
         long reactionCount = reactionRepository.countByTargetTypeAndTargetId(request.getTargetType(), request.getTargetId());
+        weeklyTop3CacheService.evict();
         return ReactionDeleteResponse.builder()
             .targetType(request.getTargetType())
             .targetId(request.getTargetId())

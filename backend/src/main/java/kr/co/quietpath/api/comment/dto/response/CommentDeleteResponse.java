@@ -7,6 +7,8 @@ import lombok.Getter;
 @Builder
 public class CommentDeleteResponse {
     private Long commentId;
+    private Long recordId;
+    private long commentCount;
     private boolean deleted;
     private String deletedAt;
 }

@@ -2,6 +2,8 @@ package kr.co.quietpath.api.record.service;
 
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
+import kr.co.quietpath.api.comment.service.CommentPageCacheService;
+import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
 import kr.co.quietpath.api.record.dto.request.RecordCreateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
@@ -29,6 +31,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +51,12 @@ class RecordServiceTest {
 
     @Mock
     private CommentRepository commentRepository;
+
+    @Mock
+    private WeeklyTop3CacheService weeklyTop3CacheService;
+
+    @Mock
+    private CommentPageCacheService commentPageCacheService;
 
     @InjectMocks
     private RecordService recordService;
@@ -191,6 +200,22 @@ class RecordServiceTest {
     }
 
     @Test
+    void updateRecord_publicRecord_evictsWeeklyTop3Cache() {
+        User owner = User.createGoogle("provider", "owner@example.com", "owner");
+        setId(owner, 1L);
+        Record record = buildRecord(owner, LocalDate.now());
+        record.share();
+        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+
+        RecordUpdateRequest request = new RecordUpdateRequest();
+        request.setContent("공개 글 수정");
+
+        recordService.updateRecord(1L, 10L, request);
+
+        verify(weeklyTop3CacheService).evict();
+    }
+
+    @Test
     void updateVisibility_publicSetsSharedAt() {
         User owner = User.createGoogle("provider", "owner@example.com", "owner");
         setId(owner, 1L);
@@ -206,6 +231,8 @@ class RecordServiceTest {
         assertEquals("PUBLIC", record.getVisibility());
         assertEquals(true, record.getSharedAt() != null);
         assertEquals(true, response.getSharedAt() != null);
+        verify(weeklyTop3CacheService).evict();
+        verify(commentPageCacheService).evictRecord(10L);
     }
 
     @Test
@@ -225,6 +252,22 @@ class RecordServiceTest {
         assertEquals("PRIVATE", record.getVisibility());
         assertEquals(null, record.getSharedAt());
         assertEquals(null, response.getSharedAt());
+        verify(weeklyTop3CacheService).evict();
+        verify(commentPageCacheService).evictRecord(10L);
+    }
+
+    @Test
+    void shareRecord_evictsCommunityCaches() {
+        User owner = User.createGoogle("provider", "owner@example.com", "owner");
+        setId(owner, 1L);
+        Record record = buildRecord(owner, LocalDate.now());
+        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+
+        var response = recordService.shareRecord(1L, 10L);
+
+        assertEquals("PUBLIC", response.getVisibility());
+        verify(weeklyTop3CacheService).evict();
+        verify(commentPageCacheService).evictRecord(10L);
     }
 
     private Path buildPath(Long id) {

@@ -2,6 +2,8 @@ package kr.co.quietpath.api.record.service;
 
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
+import kr.co.quietpath.api.comment.service.CommentPageCacheService;
+import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
 import kr.co.quietpath.api.record.dto.request.RecordCreateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
@@ -48,6 +50,8 @@ public class RecordService {
     private final PathRepository pathRepository;
     private final ReactionRepository reactionRepository;
     private final CommentRepository commentRepository;
+    private final WeeklyTop3CacheService weeklyTop3CacheService;
+    private final CommentPageCacheService commentPageCacheService;
 
     public RecordCreateResponse createRecord(Long userId, RecordCreateRequest request) {
         User user = getUser(userId);
@@ -151,7 +155,7 @@ public class RecordService {
 
         long reactionCount = reactionRepository.countByTargetTypeAndTargetId("RECORD", record.getId());
         boolean isReacted = reactionRepository.existsByUserIdAndTargetTypeAndTargetId(userId, "RECORD", record.getId());
-        long commentCount = commentRepository.countByRecordId(record.getId());
+        long commentCount = commentRepository.countByRecordIdAndDeletedFalse(record.getId());
 
         User owner = record.getUser();
         RecordDetailResponse.OwnerSummary ownerSummary = RecordDetailResponse.OwnerSummary.builder()
@@ -189,6 +193,10 @@ public class RecordService {
             moodCode,
             normalizeOptionalText(request.getImageUrl())
         );
+        // 공개 글의 본문이 바뀌면 Top3 카드 내용도 stale 될 수 있다.
+        if (VISIBILITY_PUBLIC.equals(record.getVisibility())) {
+            weeklyTop3CacheService.evict();
+        }
 
         return RecordUpdateResponse.builder()
             .id(record.getId())
@@ -209,6 +217,9 @@ public class RecordService {
             throw new ApiException(ErrorCode.RECORD_ALREADY_SHARED);
         }
         record.share();
+        // 비공개 -> 공개 전환은 Top3 후보와 댓글 접근 가능 상태를 동시에 바꾼다.
+        weeklyTop3CacheService.evict();
+        commentPageCacheService.evictRecord(record.getId());
         return RecordShareResponse.builder()
             .id(record.getId())
             .visibility(record.getVisibility())
@@ -221,6 +232,9 @@ public class RecordService {
 
         String visibility = normalizeVisibility(request.getVisibility());
         applyVisibility(record, visibility);
+        // 공개/비공개 전환 뒤에는 기존 feed/top3/comments 캐시를 신뢰하면 안 된다.
+        weeklyTop3CacheService.evict();
+        commentPageCacheService.evictRecord(record.getId());
 
         return RecordVisibilityResponse.builder()
             .id(record.getId())
