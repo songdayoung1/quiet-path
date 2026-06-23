@@ -165,7 +165,7 @@ class PathServiceTest {
         summary.complete("요약");
 
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
-        lenient().when(pathSummaryRepository.findByPathIdOrderByVersionNoDesc(1L)).thenReturn(List.of(summary));
+        lenient().when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
         when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of());
 
         PathDetailResponse response = pathService.getPathDetail(1L, 1L);
@@ -273,7 +273,10 @@ class PathServiceTest {
         PathSummaryPayload payload = new PathSummaryPayload();
         payload.setHeadline("천천히 나아갔습니다.");
         payload.setBody("흐름이 이어졌습니다.");
+        payload.setPerspective("스스로 흔들림을 줄이려는 관점이 읽힙니다.");
         payload.setObservations(List.of("기록이 끊기지 않았습니다."));
+        payload.setImprovements(List.of("흔들린 날의 이유를 더 또렷하게 남기면 좋습니다."));
+        payload.setSuggestions(List.of("내일 한 걸음을 더 작게 쪼개 적어보세요."));
         payload.setClosing("다음에도 이어가 보세요.");
         return payload;
     }

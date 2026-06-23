@@ -104,9 +104,6 @@ public class PathService {
         getUser(userId);
         Path currentPath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
             .orElseThrow(() -> new ApiException(ErrorCode.PATH_NOT_ACTIVE));
-        if (currentPath == null) {
-            throw new ApiException(ErrorCode.PATH_NOT_ACTIVE);
-        }
         if (currentPath.getId() == null || !currentPath.getId().equals(pathId)) {
             throw new ApiException(ErrorCode.NOT_OWNER);
         }
@@ -198,6 +195,7 @@ public class PathService {
                 .recordId(record.getId())
                 .date(record.getRecordDate().toString())
                 .preview(resolvePreview(record))
+                .oneWordText(record.getOneWordText())
                 .moodText(record.getMoodCode())
                 .build());
         }

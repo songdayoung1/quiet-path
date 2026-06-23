@@ -12,6 +12,9 @@ import java.util.List;
 public class PathSummaryPayload {
     private String headline;
     private String body;
+    private String perspective;
     private List<String> observations;
+    private List<String> improvements;
+    private List<String> suggestions;
     private String closing;
 }

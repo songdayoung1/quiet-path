@@ -14,7 +14,7 @@ import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
 import { configureApiClient } from './api/apiClient';
 import { authApi } from './api/authApi';
-import { pathApi, PathActiveResponse, PathCreateResponse } from './api/pathApi';
+import { pathApi, PastPathListItem, PathActiveResponse, PathCreateResponse } from './api/pathApi';
 import { recordApi, RecordResponse } from './api/recordApi';
 import { Settings, Compass, AlertCircle } from 'lucide-react';
 import { AppModal } from './components/AppModal';
@@ -162,6 +162,15 @@ const buildDirectionFromCreatedPath = (
   createdAt: parseLocalDateString(path.createdAt) ?? fallback.createdAt,
   reviewAt: parseLocalDateString(path.reviewAt) ?? fallback.reviewAt,
   isActive: path.status ? path.status === 'ACTIVE' : true,
+});
+
+const buildDirectionFromPastPath = (path: PastPathListItem): Direction => ({
+  id: String(path.pathId),
+  question: path.directionName,
+  description: path.directionName,
+  createdAt: parseLocalDateString(path.createdAt) ?? Date.now(),
+  endedAt: parseLocalDateString(path.completedAt ?? undefined),
+  isActive: false,
 });
 
 const buildRecordFromResponse = (
@@ -351,19 +360,27 @@ const App: React.FC = () => {
                 const restored = await restoreWithRefresh();
                 let activeDirection: Direction | null = null;
                 const activePath = await pathApi.getActive(restored.accessToken);
-                activeDirection = buildDirectionFromActivePath(activePath, loaded.currentDirection);
-                let restoredRecords: Record[] = loaded.records || [];
+                activeDirection = buildDirectionFromActivePath(activePath, null);
+                let restoredRecords: Record[] = [];
+                let restoredPastDirections: Direction[] = [];
                 try {
                   const recordsResponse = await recordApi.getRecords(restored.accessToken);
                   restoredRecords = recordsResponse.items.map((record) =>
                     buildRecordFromResponse(record, activeDirection)
                   );
                 } catch {
-                  restoredRecords = loaded.records || [];
+                  restoredRecords = [];
+                }
+                try {
+                  const pastPathsResponse = await pathApi.getPastPaths(restored.accessToken);
+                  restoredPastDirections = pastPathsResponse.items.map(buildDirectionFromPastPath);
+                } catch {
+                  restoredPastDirections = [];
                 }
                 setState(prev => ({
                     ...prev,
                     currentDirection: activeDirection,
+                    pastDirections: restoredPastDirections,
                     records: restoredRecords,
                     hasLoggedToday: hasLoggedTodayForCurrentPath(restoredRecords, activeDirection),
                     auth: {
@@ -478,6 +495,7 @@ const App: React.FC = () => {
     const activePath = await pathApi.getActive(token);
     const activeDirection = buildDirectionFromActivePath(activePath, fallbackDirection);
     let records: Record[] = [];
+    let pastDirections: Direction[] = [];
 
     try {
       const recordsResponse = await recordApi.getRecords(token);
@@ -486,10 +504,18 @@ const App: React.FC = () => {
       records = [];
     }
 
+    try {
+      const pastPathsResponse = await pathApi.getPastPaths(token);
+      pastDirections = pastPathsResponse.items.map(buildDirectionFromPastPath);
+    } catch {
+      pastDirections = [];
+    }
+
     if (activeDirection || applyWhenEmpty) {
       setState(prev => ({
         ...prev,
         currentDirection: activeDirection,
+        pastDirections,
         records,
         hasLoggedToday: hasLoggedTodayForCurrentPath(records, activeDirection),
         hasSeenOnboarding: true,
@@ -684,7 +710,8 @@ const App: React.FC = () => {
       }
 
       setState(prev => ({
-         ...prev,
+         ...clearServerDrivenState(prev),
+         hasSeenOnboarding: true,
          auth: {
            isLoggedIn: true,
            token,
@@ -700,32 +727,7 @@ const App: React.FC = () => {
           // Existing Users go to HOME. Show skeleton while fetching path + records.
           setIsHomeDataLoading(true);
           setCurrentView('NOW');
-          pathApi.getActive(token)
-            .then(async (activePath) => {
-              const activeDirection = buildDirectionFromActivePath(activePath, state.currentDirection);
-              let records: Record[] = [];
-              try {
-                const recordsResponse = await recordApi.getRecords(token);
-                records = recordsResponse.items.map((record) => buildRecordFromResponse(record, activeDirection));
-              } catch {
-                records = [];
-              }
-              setState(prev => ({
-                ...prev,
-                currentDirection: activeDirection,
-                records,
-                hasLoggedToday: hasLoggedTodayForCurrentPath(records, activeDirection),
-                hasSeenOnboarding: true,
-                auth: {
-                  ...prev.auth,
-                  isLoggedIn: true,
-                  token,
-                  refreshToken,
-                  userId: me?.id ?? prev.auth.userId ?? null,
-                  onboardingStatus: status,
-                }
-              }));
-            })
+          syncRemotePathAndRecords(token, null)
             .catch(() => {
               setState(prev => ({
                 ...clearServerDrivenState(prev),
@@ -1056,6 +1058,8 @@ const App: React.FC = () => {
             <PastDirectionsView 
                 pastDirections={state.pastDirections} 
                 records={state.records}
+                accessToken={state.auth?.token}
+                onLoginRequired={() => setCurrentView('ACCOUNT_CONNECT')}
                 onBack={() => setCurrentView('DIRECTION')} 
             />
         )}

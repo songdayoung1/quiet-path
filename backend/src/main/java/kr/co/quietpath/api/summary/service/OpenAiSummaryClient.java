@@ -20,11 +20,16 @@ import java.util.List;
 public class OpenAiSummaryClient implements AiSummaryClient {
 
     private static final String SUMMARY_INSTRUCTIONS = """
-        당신은 사용자의 기록 흐름을 조용하게 정리해 주는 한국어 회고 코치다.
-        과장하거나 단정하지 말고, 기록에 드러난 흐름만 기반으로 요약하라.
-        headline은 한 문장, body는 2~3문장, observations는 2~3개, closing은 한 문장으로 작성하라.
-        observations는 각 항목을 완전한 문장으로 작성하라.
-        비어 있는 정보를 추측으로 채우지 말고, 기록이 부족하면 조심스럽게 표현하라.
+        당신은 사용자의 기록 흐름을 해석해 주는 한국어 회고 코치다.
+        단순 칭찬이나 응원으로 끝내지 말고, 기록에 드러난 흐름과 관점을 읽고 실질적인 피드백을 주어라.
+        기록에 없는 사실을 지어내지 말고, 근거가 약하면 조심스럽게 표현하라.
+        너무 치료적이거나 과장된 표현, 뻔한 위로, 추상적인 자기계발 문구는 피하라.
+        사용자가 무엇을 지키려 했는지, 무엇을 기준으로 기록했는지, 어떤 방식으로 하루를 해석했는지를 perspective에 담아라.
+        body에는 기간 전체의 흐름과 변화, 반복 패턴, 감정과 행동의 연결을 3~4문장으로 요약하라.
+        improvements에는 보완하면 좋을 점을 2개 이상 완전한 문장으로 적어라.
+        suggestions에는 다음 방향에서 바로 써볼 수 있는 추천 방안을 2개 이상, 구체적 행동 단위로 적어라.
+        observations는 선택적으로 쓰되, 있다면 기록에서 읽히는 특징을 1~2개 문장으로 적어라.
+        headline과 closing은 과장 없는 한 문장으로 작성하라.
         """;
 
     private final OpenAiProperties openAiProperties;
@@ -90,9 +95,13 @@ public class OpenAiSummaryClient implements AiSummaryClient {
         if (payload == null
             || isBlank(payload.getHeadline())
             || isBlank(payload.getBody())
-            || payload.getObservations() == null
-            || payload.getObservations().isEmpty()
-            || payload.getObservations().stream().anyMatch(this::isBlank)
+            || isBlank(payload.getPerspective())
+            || payload.getImprovements() == null
+            || payload.getImprovements().isEmpty()
+            || payload.getImprovements().stream().anyMatch(this::isBlank)
+            || payload.getSuggestions() == null
+            || payload.getSuggestions().isEmpty()
+            || payload.getSuggestions().stream().anyMatch(this::isBlank)
             || isBlank(payload.getClosing())) {
             throw new ApiException(ErrorCode.AI_SUMMARY_REQUEST_FAILED);
         }

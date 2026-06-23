@@ -13,7 +13,6 @@ import kr.co.quietpath.domain.summary.repository.PathSummaryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -81,7 +80,7 @@ class PathSummaryCommandServiceTest {
     }
 
     @Test
-    void requestSummary_doneAlreadyExists_returnsDone() {
+    void requestSummary_doneAlreadyExists_restartsGeneration() {
         Path path = buildCompletedPath(1L, LocalDateTime.now().minusDays(1));
         Record record = buildRecord(path, 10L);
         PathSummary summary = PathSummary.builder()
@@ -96,11 +95,44 @@ class PathSummaryCommandServiceTest {
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
         when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
         when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
+        when(pathSummaryRepository.save(any(PathSummary.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(openAiProperties.getSummaryPromptVersion()).thenReturn("v2");
+        when(openAiProperties.getModel()).thenReturn("gpt-5.5");
         doNothing().when(aiSummaryClient).ensureConfigured();
 
         PathSummaryStartResponse response = pathSummaryCommandService.requestSummary(1L, 1L);
 
-        assertEquals("DONE", response.getSummaryStatus());
+        assertEquals("PROCESSING", response.getSummaryStatus());
+        assertEquals("PENDING", summary.getStatus());
+        assertEquals("v2", summary.getPromptVersion());
+        assertEquals("gpt-5.5", summary.getModel());
+        assertEquals("JSON", summary.getFormat());
+        verify(pathSummaryRepository).save(summary);
+        verify(applicationEventPublisher).publishEvent(any(PathSummaryRequestedEvent.class));
+    }
+
+    @Test
+    void requestSummary_processingAlreadyExists_returnsProcessing() {
+        Path path = buildCompletedPath(1L, LocalDateTime.now().minusDays(1));
+        Record record = buildRecord(path, 10L);
+        PathSummary summary = PathSummary.builder()
+            .path(path)
+            .versionNo(1)
+            .promptVersion("v1")
+            .model("gpt-test")
+            .inputHash("hash")
+            .build();
+        summary.startProcessing();
+
+        when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
+        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
+        when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
+        doNothing().when(aiSummaryClient).ensureConfigured();
+
+        PathSummaryStartResponse response = pathSummaryCommandService.requestSummary(1L, 1L);
+
+        assertEquals("PROCESSING", response.getSummaryStatus());
+        verify(pathSummaryRepository, never()).save(any(PathSummary.class));
         verify(applicationEventPublisher, never()).publishEvent(any());
     }
 

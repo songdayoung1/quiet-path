@@ -59,13 +59,7 @@ public class PathSummaryCommandService {
 
         PathSummary latestSummary = pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(pathId)
             .orElse(null);
-        // DONE은 기존 결과를 재사용하고, 진행 중이면 새 작업을 만들지 않는다.
-        if (latestSummary != null && PathSummaryPolicy.STATUS_DONE.equals(latestSummary.getStatus())) {
-            return PathSummaryStartResponse.builder()
-                .pathId(pathId)
-                .summaryStatus(PathSummaryPolicy.STATUS_DONE)
-                .build();
-        }
+        // 진행 중인 요약은 그대로 유지하고, DONE/FAILED는 같은 재생성 경로로 태운다.
         if (latestSummary != null && PathSummaryPolicy.isInFlight(latestSummary.getStatus())
             && !PathSummaryPolicy.isStale(latestSummary)) {
             return PathSummaryStartResponse.builder()
