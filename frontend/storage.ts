@@ -13,6 +13,15 @@ const INITIAL_STATE: AppState = {
   auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
 };
 
+const stripServerDrivenState = (state: AppState): AppState => ({
+  ...state,
+  currentDirection: null,
+  pastDirections: [],
+  records: [],
+  hasLoggedToday: false,
+  userLevel: 'Beginning',
+});
+
 // TONE DATA DEFINITION
 const TONES: { [key in ToneType]: DailyTone } = {
   Fact: {
@@ -81,14 +90,36 @@ const sanitizeState = (state: AppState): AppState => {
   };
 };
 
+const buildPersistedState = (state: AppState): AppState => {
+  const sanitized = sanitizeState(state);
+  if (!sanitized.auth?.isLoggedIn) {
+    return sanitized;
+  }
+
+  return stripServerDrivenState({
+    ...INITIAL_STATE,
+    hasSeenOnboarding: sanitized.hasSeenOnboarding,
+    auth: {
+      ...INITIAL_STATE.auth,
+      ...(sanitized.auth || {}),
+      refreshToken: sanitized.auth?.refreshToken ?? null,
+      userId: sanitized.auth?.userId ?? null,
+    },
+  });
+};
+
 export const loadState = (): AppState => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     const parsed = saved ? JSON.parse(saved) : null;
-    const sanitized = sanitizeState({
+    let sanitized = sanitizeState({
       ...INITIAL_STATE,
       ...(parsed || {}),
     });
+
+    if (sanitized.auth?.isLoggedIn) {
+      sanitized = buildPersistedState(sanitized);
+    }
 
     if (parsed && JSON.stringify(parsed) !== JSON.stringify(sanitized)) {
       saveState(sanitized);
@@ -123,7 +154,7 @@ export const loadState = (): AppState => {
 
 export const saveState = (state: AppState) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistedState(state)));
   } catch (e) {
     console.error("Failed to save state", e);
   }

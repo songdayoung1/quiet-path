@@ -7,6 +7,7 @@ import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.path.dto.request.PathCreateRequest;
 import kr.co.quietpath.api.path.dto.response.*;
 import kr.co.quietpath.api.path.service.PathService;
+import kr.co.quietpath.api.summary.service.PathSummaryCommandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class PathController {
 
     private final PathService pathService;
+    private final PathSummaryCommandService pathSummaryCommandService;
 
     @GetMapping("/active")
     public PathActiveResponse getActivePath(@AuthenticationPrincipal UserPrincipal principal) {
@@ -63,6 +65,15 @@ public class PathController {
     ) {
         Long userId = extractUserId(principal);
         return pathService.getPathDetail(userId, pathId);
+    }
+
+    @PostMapping("/{pathId}/summary")
+    public PathSummaryStartResponse requestSummary(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long pathId
+    ) {
+        Long userId = extractUserId(principal);
+        return pathSummaryCommandService.requestSummary(userId, pathId);
     }
 
     private Long extractUserId(UserPrincipal principal) {

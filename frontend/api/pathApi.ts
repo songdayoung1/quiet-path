@@ -31,6 +31,54 @@ export interface PathFinishResponse {
   completedAt: string;
 }
 
+export interface PathDetailRecordItem {
+  recordId: number;
+  date: string;
+  preview: string;
+  oneWordText?: string | null;
+  moodText?: string | null;
+}
+
+export interface PastPathListItem {
+  pathId: number;
+  createdAt: string;
+  completedAt?: string | null;
+  directionName: string;
+}
+
+export interface PastPathListResponse {
+  items: PastPathListItem[];
+  nextCursor?: string | null;
+}
+
+export interface PathSummaryPayload {
+  headline: string;
+  body: string;
+  perspective?: string | null;
+  observations?: string[] | null;
+  improvements?: string[] | null;
+  suggestions?: string[] | null;
+  closing: string;
+}
+
+export interface PathDetailResponse {
+  pathId: number;
+  directionName: string;
+  directionText: string;
+  status: string;
+  createdAt: string;
+  reviewAt: string;
+  completedAt?: string | null;
+  summaryStatus: 'LOCKED' | 'EMPTY' | 'READY' | 'PROCESSING' | 'DONE' | 'FAILED';
+  summary: PathSummaryPayload | null;
+  records: PathDetailRecordItem[];
+}
+
+export interface PathSummaryStartResponse {
+  pathId: number;
+  summaryStatus: 'PROCESSING';
+}
+
 export const pathApi = {
   async getActive(token: string): Promise<PathActiveResponse> {
     const response = await apiFetch('/api/v1/paths/active', {
@@ -66,6 +114,56 @@ export const pathApi = {
 
   async finish(token: string, pathId: number): Promise<PathFinishResponse> {
     const response = await apiFetch(`/api/v1/paths/${pathId}/finish`, {
+      method: 'POST',
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+
+    return response.json();
+  },
+
+  async getDetail(token: string, pathId: number): Promise<PathDetailResponse> {
+    const response = await apiFetch(`/api/v1/paths/${pathId}`, {
+      method: 'GET',
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+
+    return response.json();
+  },
+
+  async getPastPaths(token: string, cursor?: string | null, size = 20): Promise<PastPathListResponse> {
+    const query = new URLSearchParams({
+      status: 'FINISHED',
+      size: String(size),
+    });
+    if (cursor) {
+      query.set('cursor', cursor);
+    }
+
+    const response = await apiFetch(`/api/v1/paths?${query.toString()}`, {
+      method: 'GET',
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+
+    return response.json();
+  },
+
+  async requestSummary(token: string, pathId: number): Promise<PathSummaryStartResponse> {
+    const response = await apiFetch(`/api/v1/paths/${pathId}/summary`, {
       method: 'POST',
     }, {
       accessToken: token,

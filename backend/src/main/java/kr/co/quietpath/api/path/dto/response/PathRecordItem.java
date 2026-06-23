@@ -9,5 +9,6 @@ public class PathRecordItem {
     private Long recordId;
     private String date;
     private String preview;
+    private String oneWordText;
     private String moodText;
 }

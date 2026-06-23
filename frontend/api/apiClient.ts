@@ -40,6 +40,13 @@ export const buildApiError = async (response: Response) => {
   return error;
 };
 
+export const buildApiErrorMessage = (error: unknown, fallbackMessage: string) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallbackMessage;
+};
+
 export const apiFetch = async (
   path: string,
   init: RequestInit = {},
