@@ -35,7 +35,7 @@ export const ProgressBand: React.FC<ProgressBandProps> = ({
         {onExpandHeatmap && (
           <div className="flex items-center justify-end gap-1 mt-3 pt-3" style={{ borderTop: `1px solid ${palette.divider}` }}>
             <span className="text-[11px] font-medium" style={{ color: palette.mutedText }}>
-              더 길게 보기
+              월별로 자세히 보기
             </span>
             <ChevronDown size={12} style={{ color: palette.mutedText }} />
           </div>

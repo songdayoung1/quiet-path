@@ -475,6 +475,31 @@ export const StreakHeatmap: React.FC<{
         {KPI_LABELS.recent21Panel}
       </p>
 
+      {/* Day-of-week labels — aligned to the actual weekday each column falls on */}
+      {days.length > 0 && (() => {
+        const ALL_DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+        const startDow = days[0].date.getDay();
+        return (
+          <div className="grid grid-cols-7 gap-[5px] mb-1.5">
+            {ALL_DAYS.map((_, offset) => {
+              const dow = (startDow + offset) % 7;
+              return (
+                <div key={offset} className="text-center">
+                  <span
+                    className="text-[9px] font-semibold"
+                    style={{
+                      color: dow === 0 ? '#F87171' : dow === 6 ? '#60A5FA' : palette.faintText,
+                    }}
+                  >
+                    {ALL_DAYS[dow]}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* Heatmap grid */}
       <div className="grid grid-cols-7 gap-[5px]">
         {days.map((day, i) => {

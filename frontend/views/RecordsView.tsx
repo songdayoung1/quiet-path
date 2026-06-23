@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Record as RecordType, Direction } from '../types';
-import { Card, MoodSticker } from '../components/UI';
-import { Globe2, Pin, Calendar, Image as ImageIcon, BookOpenText, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MoodSticker } from '../components/UI';
+import { Calendar, Image as ImageIcon, BookOpenText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CharacterTone } from '../components/WaterDropCharacter';
+import { RecordDetailDiary } from '../components/RecordDetailDiary';
 
 import { AlbumTab } from '../components/records/AlbumTab';
 import { RecordsListTab } from '../components/records/RecordsListTab';
@@ -117,70 +118,18 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   ───────────────────────────────────────── */
   if (selectedRecordForDetail) {
     const record = selectedRecordForDetail;
+    const pageNumber = activeRecords.findIndex((r) => r.id === record.id) + 1;
     return (
-      <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen">
-        <div className="px-4 flex justify-between items-center mb-6">
-          <button
-            onClick={() => setSelectedRecordForDetail(null)}
-            className="transition-colors p-2 text-sm font-bold"
-            style={{ color: palette.mutedText }}
-          >
-            닫기
-          </button>
-          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>
-            {new Date(record.timestamp).toLocaleDateString()}
-          </span>
-          <div className="w-10" />
-        </div>
-
-        <div className="px-5 flex flex-col gap-6 max-w-md mx-auto">
-          <div className="text-center">
-            {record.moodCode && (
-              <MoodSticker code={record.moodCode} className="mb-4 scale-125 hover:scale-125 pointer-events-none" />
-            )}
-            {record.action && (
-              <h2 className="text-2xl font-bold mt-2 break-keep" style={{ color: palette.strongText }}>{record.action}</h2>
-            )}
-            <div className="mt-4 flex items-center justify-center gap-2 text-[11px]" style={{ color: palette.mutedText }}>
-              {record.isShared && (
-                <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 shadow-sm border" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
-                  <span className="text-point-400">●</span> 공유됨
-                </span>
-              )}
-              {record.isPinned && (
-                <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 shadow-sm border" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
-                  <Pin size={12} className="text-mist-400" /> 기억할 장면
-                </span>
-              )}
-            </div>
-          </div>
-
-          {record.imageUrl && (
-            <div className="w-full rounded-3xl overflow-hidden shadow-sm border" style={{ borderColor: palette.border }}>
-              <img src={record.imageUrl} alt="Scene" className="w-full object-cover aspect-[4/5] max-h-96" />
-            </div>
-          )}
-
-          {record.oneWordText && (
-            <div className="p-6 rounded-3xl shadow-sm border" style={{ background: palette.cardBg, borderColor: palette.border }}>
-              <p className="text-xs text-point-500 font-bold mb-3 uppercase tracking-wide">오늘을 한 단어로 표현한다면?</p>
-              <p className="text-[15px] leading-relaxed whitespace-pre-line" style={{ color: palette.strongText }}>{record.oneWordText}</p>
-            </div>
-          )}
-
-          {record.tomorrowText && (
-            <div className="p-6 rounded-3xl shadow-sm border" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
-              <p className="text-xs font-bold mb-3 uppercase tracking-wide" style={{ color: palette.faintText }}>내일의 한 걸음</p>
-              <p className="text-[14px] leading-relaxed" style={{ color: palette.strongText }}>{record.tomorrowText}</p>
-            </div>
-          )}
-
-          <div className="text-center mt-6 mb-4">
-            <p className="text-[10px] tracking-wide" style={{ color: palette.faintText }}>
-              이 기록은 당신의 궤적에 안전하게 보관되어 있습니다.
-            </p>
-          </div>
-        </div>
+      <div className="relative min-h-screen">
+        <RecordDetailDiary
+          record={record}
+          pageNumber={pageNumber > 0 ? pageNumber : 1}
+          onClose={() => setSelectedRecordForDetail(null)}
+          onHide={() => {
+            onUpdateRecord({ ...record, isHidden: true });
+            setSelectedRecordForDetail(null);
+          }}
+        />
       </div>
     );
   }
