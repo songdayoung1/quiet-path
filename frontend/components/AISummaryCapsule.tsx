@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type CapsuleState = 'locked' | 'generating' | 'ready';
+export type CapsuleState = 'locked' | 'idle' | 'generating' | 'ready';
 
 interface AISummaryCapsuleProps {
   state: CapsuleState;
@@ -8,6 +8,7 @@ interface AISummaryCapsuleProps {
   recordCount?: number;
   summary?: { headline: string; body: string; perspective?: string; closing?: string; observations?: string[]; improvements?: string[]; suggestions?: string[] };
   version?: string;
+  failed?: boolean;
   onRegenerate?: () => void;
   onLike?: () => void;
   liked?: boolean;
@@ -21,9 +22,32 @@ const cardShell = [
 
 export const AISummaryCapsule: React.FC<AISummaryCapsuleProps> = (props) => {
   if (props.state === 'locked') return <Locked {...props} />;
+  if (props.state === 'idle') return <Idle {...props} />;
   if (props.state === 'generating') return <Generating {...props} />;
   return <Ready {...props} />;
 };
+
+const Idle: React.FC<AISummaryCapsuleProps> = ({ recordCount = 0, failed = false }) => (
+  <div className={`${cardShell} p-7`}>
+    <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-point-200/30 blur-2xl pointer-events-none" />
+    <div className="relative flex flex-col items-center text-center">
+      <div className="w-14 h-14 rounded-full bg-white/85 border border-white grid place-items-center mb-4 shadow-sm">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#A78BFA" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3l1.7 4.8L18.5 9l-4.8 1.2L12 15l-1.7-4.8L5.5 9l4.8-1.2L12 3z" />
+        </svg>
+      </div>
+      <p className="font-mono text-[10px] font-bold text-point-500 tracking-[0.22em] mb-2">
+        AI RETROSPECT · IDLE
+      </p>
+      <p className="text-[14px] font-semibold text-mist-600 leading-relaxed">
+        {failed ? '요약을 다시 정리할 준비가 되었어요.' : '기록을 바탕으로 회고 캡슐을 만들 수 있어요.'}
+      </p>
+      <p className="text-[11px] text-mist-400 mt-3">
+        기록 {recordCount}개를 바탕으로 흐름을 정리합니다.
+      </p>
+    </div>
+  </div>
+);
 
 const Locked: React.FC<AISummaryCapsuleProps> = ({ unlockDate }) => {
   const dDay = unlockDate
