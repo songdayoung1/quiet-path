@@ -39,8 +39,6 @@ const CATEGORY_LABEL_MAP: Record<string, string> = {
 
 const GUEST_VISIBLE_POST_COUNT = 1;
 const GUEST_BLUR_POST_COUNT = 4;
-const activeFeedRequests = new Set<string>();
-const activeWeeklyTopRequests = new Set<string>();
 
 const formatRelativeTime = (value?: string | null) => {
   if (!value) return '방금';
@@ -407,6 +405,8 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const loadingMoreRef = useRef(false);
   const feedRequestSeqRef = useRef(0);
   const weeklyTopRequestSeqRef = useRef(0);
+  const activeFeedRequestsRef = useRef(new Set<string>());
+  const activeWeeklyTopRequestsRef = useRef(new Set<string>());
   const viewContextRef = useRef<string | null>(null);
   const requestContextKey = `${selectedCategory}:${accessToken ?? 'guest'}:${isGuest ? 'guest' : 'member'}`;
   viewContextRef.current = requestContextKey;
@@ -424,13 +424,13 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       return;
     }
 
-    const requestSeq = ++weeklyTopRequestSeqRef.current;
-    const requestContext = requestContextKey;
     const requestKey = `${selectedCategory}:${accessToken ?? 'guest'}`;
-    if (activeWeeklyTopRequests.has(requestKey)) {
+    if (activeWeeklyTopRequestsRef.current.has(requestKey)) {
       return;
     }
-    activeWeeklyTopRequests.add(requestKey);
+    activeWeeklyTopRequestsRef.current.add(requestKey);
+    const requestSeq = ++weeklyTopRequestSeqRef.current;
+    const requestContext = requestContextKey;
 
     try {
       const response = isGuest
@@ -446,26 +446,32 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       }
       setWeeklyTopItems([]);
     } finally {
-      activeWeeklyTopRequests.delete(requestKey);
+      activeWeeklyTopRequestsRef.current.delete(requestKey);
     }
   }, [accessToken, isGuest, requestContextKey, selectedCategory]);
 
   const loadFeedPage = useCallback(
     async (cursor: string | null, append: boolean) => {
-      const requestSeq = append ? feedRequestSeqRef.current : ++feedRequestSeqRef.current;
-      const requestContext = requestContextKey;
+      let requestSeq: number;
+      let requestContext: string;
+      let requestKey: string | null = null;
+
       if (append) {
         if (loadingMoreRef.current || !hasNextRef.current || !cursor) {
           return;
         }
+        requestSeq = feedRequestSeqRef.current;
+        requestContext = requestContextKey;
         loadingMoreRef.current = true;
         setIsLoadingMore(true);
       } else {
-        const requestKey = `${selectedCategory}:${accessToken ?? 'guest'}:${cursor ?? 'first'}:${isGuest ? 'guest' : 'member'}`;
-        if (activeFeedRequests.has(requestKey)) {
+        requestKey = `${selectedCategory}:${accessToken ?? 'guest'}:${cursor ?? 'first'}:${isGuest ? 'guest' : 'member'}`;
+        if (activeFeedRequestsRef.current.has(requestKey)) {
           return;
         }
-        activeFeedRequests.add(requestKey);
+        activeFeedRequestsRef.current.add(requestKey);
+        requestSeq = ++feedRequestSeqRef.current;
+        requestContext = requestContextKey;
         hasNextRef.current = false;
         loadingMoreRef.current = false;
         setIsLoadingMore(false);
@@ -509,7 +515,9 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
           loadingMoreRef.current = false;
           setIsLoadingMore(false);
         } else {
-          activeFeedRequests.delete(`${selectedCategory}:${accessToken ?? 'guest'}:${cursor ?? 'first'}:${isGuest ? 'guest' : 'member'}`);
+          if (requestKey) {
+            activeFeedRequestsRef.current.delete(requestKey);
+          }
           setIsInitialLoading(false);
         }
       }
