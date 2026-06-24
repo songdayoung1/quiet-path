@@ -15,7 +15,7 @@ const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const MOOD_BG_LIGHT: Record<string, string> = {
   포근: '#F5F3FF',
   멍함: '#F1F5F9',
-  반짝: '#EEF2FF',
+  반짝: '#FFFBEB',
   잔잔: '#EFF6FF',
   버팀: '#F0FDF4',
   두근: '#FFF1F2',
@@ -24,7 +24,7 @@ const MOOD_BG_LIGHT: Record<string, string> = {
 const MOOD_BG_DARK: Record<string, string> = {
   포근: 'rgba(91,33,182,0.22)',
   멍함: 'rgba(71,85,105,0.28)',
-  반짝: 'rgba(67,56,202,0.24)',
+  반짝: 'rgba(180,83,9,0.18)',
   잔잔: 'rgba(30,64,175,0.22)',
   버팀: 'rgba(21,128,61,0.22)',
   두근: 'rgba(190,24,93,0.20)',
@@ -34,7 +34,7 @@ const MOOD_BG_DARK: Record<string, string> = {
 const MOOD_DOT: Record<string, string> = {
   포근: '#A78BFA',
   멍함: '#94A3B8',
-  반짝: '#818CF8',
+  반짝: '#FBBF24',
   잔잔: '#60A5FA',
   버팀: '#34D399',
   두근: '#FB7185',
@@ -108,29 +108,27 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
       {/* Calendar grid */}
       <div className="rounded-[2rem] border shadow-sm overflow-hidden mb-6" style={{ background: palette.cardBg, borderColor: palette.border }}>
         {/* Weekday header */}
-        <div className="grid grid-cols-7 border-b" style={{ background: palette.cardBgSoft, borderColor: palette.divider }}>
-          {WEEKDAY_LABELS.map((label) => (
-            <div
-              key={label}
-              className="text-center text-[11px] font-bold py-3 tracking-wide"
-              style={{ color: palette.mutedText }}
-            >
-              {label}
+        <div className="grid grid-cols-7 pt-5 pb-2 px-3">
+          {WEEKDAY_LABELS.map((label, i) => (
+            <div key={label} className="text-center">
+              <span
+                className="text-[10px] font-bold tracking-wide"
+                style={{ color: i === 0 ? '#F87171' : i === 6 ? '#60A5FA' : palette.faintText }}
+              >
+                {label}
+              </span>
             </div>
           ))}
         </div>
 
-        {/* Day cells */}
-        <div className="grid grid-cols-7 gap-px p-px" style={{ background: palette.divider }}>
+        {/* Subtle divider */}
+        <div className="mx-4 mb-1" style={{ height: 1, background: palette.divider }} />
+
+        {/* Day cells — circle-based, no grid lines */}
+        <div className="grid grid-cols-7 px-3 pb-5 gap-y-0.5">
           {calendarCells.map((cell, index) => {
             if (cell.type === 'empty') {
-              return (
-                <div
-                  key={`empty-${index}`}
-                  className="aspect-square"
-                  style={{ background: palette.subtleCell }}
-                />
-              );
+              return <div key={`empty-${index}`} className="h-12" />;
             }
 
             const { day, record } = cell;
@@ -150,46 +148,51 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                 type="button"
                 disabled={!record}
                 onClick={() => record && onSelectRecord(record)}
-                style={{
-                  backgroundColor: record && bgColor ? bgColor : record ? palette.cardBgSoft : palette.subtleCell,
-                }}
-                className={[
-                  'aspect-square flex flex-col items-center justify-between py-1.5 px-0.5 relative transition-all duration-200',
-                  record
-                    ? 'cursor-pointer hover:brightness-95 active:scale-95'
-                    : 'cursor-default',
-                  isToday ? 'ring-2 ring-inset ring-point-400' : '',
-                ].join(' ')}
+                className="flex flex-col items-center gap-0.5 h-12 justify-center relative"
               >
-                {/* Date number */}
-                <span
-                    className={[
-                      'text-[11px] font-bold leading-none',
-                    record ? '' : '',
-                    isToday ? 'text-point-500' : '',
+                {/* Circle indicator */}
+                <div
+                  className={[
+                    'w-8 h-8 rounded-full flex items-center justify-center relative transition-all duration-200',
+                    record ? 'active:scale-90' : '',
+                    isToday && !record ? 'ring-[1.5px] ring-point-400' : '',
                   ].join(' ')}
-                  style={{ color: isToday ? undefined : record ? palette.strongText : palette.faintText }}
+                  style={{
+                    background: record && bgColor ? bgColor : 'transparent',
+                    boxShadow: isToday && record ? `0 0 0 2px ${dotColor || '#A78BFA'}` : undefined,
+                  }}
                 >
-                  {day}
-                </span>
+                  <span
+                    className="text-[13px] leading-none tabular-nums select-none"
+                    style={{
+                      fontWeight: record || isToday ? 700 : 400,
+                      color: record
+                        ? dotColor || palette.strongText
+                        : isToday
+                          ? '#7C3AED'
+                          : palette.faintText,
+                    }}
+                  >
+                    {day}
+                  </span>
 
-                {/* Mood label pill */}
+                  {/* Photo dot */}
+                  {record?.imageUrl && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border-[1.5px] border-white"
+                      style={{ backgroundColor: dotColor || '#A78BFA' }}
+                    />
+                  )}
+                </div>
+
+                {/* Mood label */}
                 {moodLabel && dotColor && (
                   <span
-                    className="text-[9px] font-bold px-1 py-0.5 rounded-full leading-none"
-                    style={{ color: dotColor, backgroundColor: `${dotColor}22` }}
+                    className="text-[8px] font-bold leading-none tracking-wide"
+                    style={{ color: dotColor }}
                   >
                     {moodLabel}
                   </span>
-                )}
-
-                {/* Photo dot indicator */}
-                {record?.imageUrl && (
-                  <span
-                    className="absolute top-1 right-1 w-2 h-2 rounded-full shadow-sm"
-                    style={{ backgroundColor: dotColor || '#A78BFA' }}
-                    title="사진 있음"
-                  />
                 )}
               </button>
             );
@@ -198,16 +201,16 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
       </div>
 
       {/* Legend */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 px-1 opacity-80">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-1 opacity-80">
         <span className="text-[10px] font-bold uppercase tracking-widest mr-1" style={{ color: palette.mutedText }}>무드</span>
         {MOOD_LEGEND.map(({ code, dot }) => (
           <div key={code} className="flex items-center gap-1">
-            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: dot }} />
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dot }} />
             <span className="text-[10px] font-medium" style={{ color: palette.mutedText }}>{code}</span>
           </div>
         ))}
-        <div className="flex items-center gap-1 ml-2">
-          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-point-400" />
+        <div className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full flex-shrink-0 bg-point-400" />
           <span className="text-[10px] font-medium" style={{ color: palette.mutedText }}>사진 있음</span>
         </div>
       </div>
