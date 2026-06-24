@@ -4,10 +4,8 @@ import { MOOD_STICKERS } from '../constants';
 import { KPI_LABELS } from '../kpiLabels';
 import { getThemePalette, useResolvedTheme } from '../theme';
 import {
-  DEFAULT_HEATMAP_CELLS,
   buildRecordDateMap,
-  buildRecentHeatmapDays,
-  countFilledHeatmapCells,
+  toLocalDateKey,
 } from '../utils/heatmap';
 
 // Enhanced Card with Depth, Gradient, and optional Traces
@@ -426,101 +424,109 @@ export const ForestObject: React.FC<{ index: number; type: string; isLocked: boo
   );
 };
 
-// Streak Heatmap: recent activity grid (GitHub-inspired)
+const MOOD_HEATMAP_COLOR: Record<string, string> = {
+  '포근': 'bg-point-300',
+  '멍함': 'bg-mist-200',
+  '반짝': 'bg-amber-300',
+  '잔잔': 'bg-blue-200',
+  '버팀': 'bg-green-300',
+  '두근': 'bg-rose-300',
+};
+
+const HEATMAP_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+// Streak Heatmap: current-month activity grid (GitHub-inspired)
 export const StreakHeatmap: React.FC<{
   records: { timestamp: number; isHidden?: boolean; moodCode?: string }[];
   className?: string;
 }> = ({ records, className = '' }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
-  const totalCells = DEFAULT_HEATMAP_CELLS;
   const recordDateMap = buildRecordDateMap(records);
-  const days = buildRecentHeatmapDays(recordDateMap, totalCells);
-  const filledCells = countFilledHeatmapCells(days);
-  const recentRate = Math.round((filledCells / totalCells) * 100);
 
-  // Mood to color mapping
-  const getMoodColor = (moodCode?: string, hasRecord?: boolean) => {
-    if (!hasRecord) return '';
-    if (!moodCode) return 'bg-point-300';
-    const map: Record<string, string> = {
-      '포근': 'bg-point-400',
-      '멍함': 'bg-mist-300',
-      '반짝': 'bg-lavender-400',
-      '잔잔': 'bg-blue-300',
-      '버팀': 'bg-green-400',
-      '두근': 'bg-rose-400',
-    };
-    return map[moodCode] || 'bg-point-300';
-  };
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const firstDayOfWeek = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const todayDay = today.getDate();
+
+  type DayCell = null | { day: number; hasRecord: boolean; moodCode?: string; isToday: boolean; isFuture: boolean };
+  const cells: DayCell[] = [];
+  for (let i = 0; i < firstDayOfWeek; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(currentYear, currentMonth, d);
+    const key = toLocalDateKey(date);
+    const isFuture = d > todayDay;
+    const rawMood = recordDateMap.get(key);
+    cells.push({
+      day: d,
+      hasRecord: !isFuture && recordDateMap.has(key),
+      moodCode: rawMood !== '__recorded__' ? rawMood : undefined,
+      isToday: d === todayDay,
+      isFuture,
+    });
+  }
+
+  const recordedDays = cells.filter((c): c is NonNullable<DayCell> => c !== null && (c as NonNullable<DayCell>).hasRecord).length;
+  const currentMonthRate = todayDay > 0 ? Math.round((recordedDays / todayDay) * 100) : 0;
 
   return (
-    <div className={`${className}`}>
+    <div className={className}>
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-point-500">{recentRate}%</span>
-            <span className="text-xs font-medium" style={{ color: palette.mutedText }}>{KPI_LABELS.recent21Rate}</span>
-          </div>
-          <div className="w-px h-5" style={{ background: palette.divider }} />
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-sm font-bold" style={{ color: palette.strongText }}>{filledCells}</span>
-            <span className="text-[10px]" style={{ color: palette.faintText }}>/ {totalCells}{KPI_LABELS.recent21CountUnit}</span>
-          </div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold text-point-500">{currentMonthRate}%</span>
+          <span className="text-xs font-medium" style={{ color: palette.mutedText }}>{KPI_LABELS.recent21Rate}</span>
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>{KPI_LABELS.recent21Tag}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold" style={{ color: palette.strongText }}>{recordedDays}</span>
+          <span className="text-[10px]" style={{ color: palette.faintText }}>/ {todayDay}{KPI_LABELS.recent21CountUnit}</span>
+          <div className="w-px h-4 mx-0.5" style={{ background: palette.divider }} />
+          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>{KPI_LABELS.recent21Tag}</span>
+        </div>
       </div>
 
       <p className="text-[10px] font-medium mb-3" style={{ color: palette.faintText }}>
         {KPI_LABELS.recent21Panel}
       </p>
 
-      {/* Day-of-week labels — aligned to the actual weekday each column falls on */}
-      {days.length > 0 && (() => {
-        const ALL_DAYS = ['일', '월', '화', '수', '목', '금', '토'];
-        const startDow = days[0].date.getDay();
-        return (
-          <div className="grid grid-cols-7 gap-[5px] mb-1.5">
-            {ALL_DAYS.map((_, offset) => {
-              const dow = (startDow + offset) % 7;
-              return (
-                <div key={offset} className="text-center">
-                  <span
-                    className="text-[9px] font-semibold"
-                    style={{
-                      color: dow === 0 ? '#F87171' : dow === 6 ? '#60A5FA' : palette.faintText,
-                    }}
-                  >
-                    {ALL_DAYS[dow]}
-                  </span>
-                </div>
-              );
-            })}
+      {/* Day-of-week header (always Sun→Sat) */}
+      <div className="grid grid-cols-7 gap-[5px] mb-1.5">
+        {HEATMAP_WEEKDAYS.map((label, i) => (
+          <div key={label} className="text-center">
+            <span
+              className="text-[9px] font-semibold"
+              style={{ color: i === 0 ? '#F87171' : i === 6 ? '#60A5FA' : palette.faintText }}
+            >
+              {label}
+            </span>
           </div>
-        );
-      })()}
+        ))}
+      </div>
 
       {/* Heatmap grid */}
       <div className="grid grid-cols-7 gap-[5px]">
-        {days.map((day, i) => {
-          const color = getMoodColor(day.moodCode, day.hasRecord);
+        {cells.map((cell, i) => {
+          if (!cell) return <div key={`gap-${i}`} className="aspect-square" />;
+          const colorClass = cell.hasRecord
+            ? (MOOD_HEATMAP_COLOR[cell.moodCode || ''] || 'bg-point-300')
+            : '';
           return (
             <div
-              key={i}
-              className={`
-                aspect-square rounded-lg transition-all duration-300
-                ${day.hasRecord ? `${color} shadow-sm` : ''}
-                ${day.isToday ? 'ring-2 ring-point-300 ring-offset-1' : ''}
-              `}
+              key={cell.day}
+              className={[
+                'aspect-square rounded-lg transition-all duration-300',
+                cell.hasRecord ? `${colorClass} shadow-sm` : '',
+                cell.isToday ? 'ring-2 ring-point-300 ring-offset-1' : '',
+              ].join(' ')}
               style={{
-                backgroundColor:
-                  day.hasRecord
-                    ? undefined
-                    : palette.emptyCell,
+                backgroundColor: cell.hasRecord ? undefined : palette.emptyCell,
+                opacity: cell.isFuture ? 0.28 : 1,
               }}
-              title={`${day.date.getMonth() + 1}/${day.date.getDate()}`}
+              title={`${currentMonth + 1}/${cell.day}`}
             >
-              {day.isToday && !day.hasRecord && (
+              {cell.isToday && !cell.hasRecord && (
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="w-1.5 h-1.5 rounded-full bg-point-400 animate-pulse" />
                 </div>
@@ -537,11 +543,11 @@ export const StreakHeatmap: React.FC<{
           <span className="text-[9px]" style={{ color: palette.faintText }}>없음</span>
         </div>
         {[
-          { code: '포근', color: 'bg-point-400' },
-          { code: '반짝', color: 'bg-lavender-400' },
-          { code: '잔잔', color: 'bg-blue-300' },
-          { code: '버팀', color: 'bg-green-400' },
-          { code: '두근', color: 'bg-rose-400' },
+          { code: '포근', color: 'bg-point-300' },
+          { code: '반짝', color: 'bg-amber-300' },
+          { code: '잔잔', color: 'bg-blue-200' },
+          { code: '버팀', color: 'bg-green-300' },
+          { code: '두근', color: 'bg-rose-300' },
         ].map(m => (
           <div key={m.code} className="flex items-center gap-1">
             <div className={`w-2.5 h-2.5 rounded-sm ${m.color}`} />

@@ -17,24 +17,24 @@ const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 const RECORDED_SENTINEL = '__recorded__';
 
 const MOOD_COLOR_MAP: Record<string, string> = {
-  포근: 'bg-point-400',
-  멍함: 'bg-mist-300',
-  반짝: 'bg-lavender-400',
-  잔잔: 'bg-blue-300',
-  버팀: 'bg-green-400',
-  두근: 'bg-rose-400',
+  포근: 'bg-point-300',
+  멍함: 'bg-mist-200',
+  반짝: 'bg-amber-300',
+  잔잔: 'bg-blue-200',
+  버팀: 'bg-green-300',
+  두근: 'bg-rose-300',
 };
 
-// Lighter colors need dark text; dark colors need light text
-const MOOD_TEXT_DARK = new Set(['멍함']);
+// All pastel shades — use dark text for readability
+const MOOD_TEXT_DARK = new Set(['포근', '멍함', '반짝', '잔잔', '버팀', '두근']);
 
 const MOOD_LEGEND = [
-  { code: '포근', color: 'bg-point-400' },
-  { code: '반짝', color: 'bg-lavender-400' },
-  { code: '잔잔', color: 'bg-blue-300' },
-  { code: '버팀', color: 'bg-green-400' },
-  { code: '두근', color: 'bg-rose-400' },
-  { code: '멍함', color: 'bg-mist-300' },
+  { code: '포근', color: 'bg-point-300' },
+  { code: '반짝', color: 'bg-amber-300' },
+  { code: '잔잔', color: 'bg-blue-200' },
+  { code: '버팀', color: 'bg-green-300' },
+  { code: '두근', color: 'bg-rose-300' },
+  { code: '멍함', color: 'bg-mist-200' },
 ];
 
 type DayCell = {

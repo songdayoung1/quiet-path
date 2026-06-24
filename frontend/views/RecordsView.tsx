@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Record as RecordType, Direction } from '../types';
-import { MoodSticker } from '../components/UI';
 import { Calendar, Image as ImageIcon, BookOpenText, ChevronLeft, ChevronRight } from 'lucide-react';
-import { CharacterTone } from '../components/WaterDropCharacter';
 import { RecordDetailDiary } from '../components/RecordDetailDiary';
 
 import { AlbumTab } from '../components/records/AlbumTab';
@@ -56,15 +54,6 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   );
 
   /* ── Stats ── */
-  const moodCounts = monthlyRecords.reduce(
-    (acc, r) => {
-      if (r.moodCode) acc[r.moodCode] = (acc[r.moodCode] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
-  const topMoods = Object.entries(moodCounts).sort((a, b) => b[1] - a[1]).slice(0, 1);
-
   const photoRecords = useMemo(
     () =>
       monthlyRecords
@@ -174,47 +163,31 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
       </div>
 
       <div className="px-4 mb-6">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {/* Records Card */}
-          <div className="p-4 rounded-[2rem] border shadow-sm flex flex-col items-center min-h-[105px]" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
+          <div className="p-5 rounded-[2rem] border shadow-sm flex flex-col items-center min-h-[105px]" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
             <div className="h-6 flex items-center mb-1">
               <span className="text-[10px] font-bold uppercase tracking-widest text-center" style={{ color: palette.faintText }}>Records</span>
             </div>
             <div className="flex-1 flex items-center justify-center w-full">
-              <span className="text-3xl font-bold text-point-500 leading-none">{monthlyRecords.length}</span>
+              <span className="text-4xl font-bold text-point-500 leading-none">{monthlyRecords.length}</span>
             </div>
           </div>
-          
+
           {/* Photos Card */}
-          <div className="p-4 rounded-[2rem] border shadow-sm flex flex-col items-center min-h-[105px]" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
+          <div className="p-5 rounded-[2rem] border shadow-sm flex flex-col items-center min-h-[105px]" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
             <div className="h-6 flex items-center mb-1">
               <span className="text-[10px] font-bold uppercase tracking-widest text-center" style={{ color: palette.faintText }}>Photos</span>
             </div>
             <div className="flex-1 flex items-center justify-center w-full">
               <div className="relative flex items-baseline">
-                <span className="text-3xl font-bold leading-none" style={{ color: palette.strongText }}>{photoRecords.length}</span>
+                <span className="text-4xl font-bold leading-none" style={{ color: palette.strongText }}>{photoRecords.length}</span>
                 {photoCoverage > 0 && (
                   <span className="absolute left-full ml-1 bottom-0.5 text-[10px] font-bold whitespace-nowrap" style={{ color: palette.faintText }}>
                     {photoCoverage}%
                   </span>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* Top Mood Card */}
-          <div className="p-4 rounded-[2rem] border shadow-sm flex flex-col items-center min-h-[105px]" style={{ background: palette.cardBgSoft, borderColor: palette.border }}>
-            <div className="h-6 flex items-center mb-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-center" style={{ color: palette.faintText }}>Top Mood</span>
-            </div>
-            <div className="flex-1 flex items-center justify-center w-full">
-              {topMoods.length > 0 ? (
-                topMoods.map(([code]) => (
-                  <MoodSticker key={code} code={code} className="scale-90 opacity-100" />
-                ))
-              ) : (
-                <span className="text-sm" style={{ color: palette.faintText }}>-</span>
-              )}
             </div>
           </div>
         </div>
@@ -251,7 +224,6 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
       {activeTab === 'album' && (
         <AlbumTab
           photoRecords={displayedPhotoRecords}
-          mascotTone={(topMoods[0]?.[0] || 'default') as CharacterTone}
           onSelectRecord={setSelectedRecordForDetail}
         />
       )}
