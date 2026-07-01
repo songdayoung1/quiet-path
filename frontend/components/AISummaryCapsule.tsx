@@ -12,6 +12,7 @@ interface AISummaryCapsuleProps {
   onRegenerate?: () => void;
   onLike?: () => void;
   liked?: boolean;
+  onRequest?: () => void;
 }
 
 const cardShell = [
@@ -27,26 +28,31 @@ export const AISummaryCapsule: React.FC<AISummaryCapsuleProps> = (props) => {
   return <Ready {...props} />;
 };
 
-const Idle: React.FC<AISummaryCapsuleProps> = ({ recordCount = 0, failed = false }) => (
-  <div className={`${cardShell} p-7`}>
-    <div className="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-point-200/30 blur-2xl pointer-events-none" />
+const Idle: React.FC<AISummaryCapsuleProps> = ({ onRequest }) => (
+  <button
+    type="button"
+    onClick={onRequest}
+    className={`${cardShell} p-7 w-full active:scale-[0.98] transition-transform`}
+  >
+    <div className="absolute -right-12 -top-12 w-44 h-44 rounded-full bg-point-200/40 blur-2xl pointer-events-none" />
+    <div className="absolute -left-10 -bottom-10 w-36 h-36 rounded-full bg-lavender-200/35 blur-2xl pointer-events-none" />
     <div className="relative flex flex-col items-center text-center">
-      <div className="w-14 h-14 rounded-full bg-white/85 border border-white grid place-items-center mb-4 shadow-sm">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#A78BFA" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <div className="w-16 h-16 rounded-full bg-white/85 border border-white/90 grid place-items-center mb-5 shadow-sm">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#A78BFA" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 3l1.7 4.8L18.5 9l-4.8 1.2L12 15l-1.7-4.8L5.5 9l4.8-1.2L12 3z" />
         </svg>
       </div>
-      <p className="font-mono text-[10px] font-bold text-point-500 tracking-[0.22em] mb-2">
-        AI RETROSPECT · IDLE
+      <p className="font-mono text-[10px] font-bold text-point-500 tracking-[0.22em] mb-3">
+        AI RETROSPECT
       </p>
-      <p className="text-[14px] font-semibold text-mist-600 leading-relaxed">
-        {failed ? '요약을 다시 정리할 준비가 되었어요.' : '기록을 바탕으로 회고 캡슐을 만들 수 있어요.'}
+      <p className="text-[17px] font-bold text-mist-700 leading-tight">
+        AI 회고 캡슐 열기
       </p>
-      <p className="text-[11px] text-mist-400 mt-3">
-        기록 {recordCount}개를 바탕으로 흐름을 정리합니다.
+      <p className="text-[12px] text-mist-400 mt-2 leading-relaxed">
+        나의 방향을 AI로 정리해 볼까요?
       </p>
     </div>
-  </div>
+  </button>
 );
 
 const Locked: React.FC<AISummaryCapsuleProps> = ({ unlockDate }) => {
