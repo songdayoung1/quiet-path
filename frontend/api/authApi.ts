@@ -1,5 +1,5 @@
 import { OnboardingStatus, MeResponse } from '../types';
-import { apiUrl, parseErrorMessage } from './apiClient';
+import { apiUrl, buildApiError, parseErrorMessage } from './apiClient';
 
 /**
  * Auth API
@@ -117,7 +117,7 @@ export const authApi = {
     });
 
     if (!response.ok) {
-      throw new Error(await parseErrorMessage(response));
+      throw await buildApiError(response);
     }
 
     const data = await response.json();
