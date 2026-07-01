@@ -166,7 +166,7 @@ class PathServiceTest {
 
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
         lenient().when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
-        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of());
+        when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of());
 
         PathDetailResponse response = pathService.getPathDetail(1L, 1L);
 
@@ -179,7 +179,7 @@ class PathServiceTest {
         Path path = buildPastReviewCompletedPath(1L);
 
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
-        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of());
+        when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of());
 
         PathDetailResponse response = pathService.getPathDetail(1L, 1L);
 
@@ -193,7 +193,7 @@ class PathServiceTest {
         Record record = buildRecord(path, 10L, LocalDate.now().minusDays(2));
 
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
-        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
+        when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
         when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.empty());
 
         PathDetailResponse response = pathService.getPathDetail(1L, 1L);
@@ -216,7 +216,7 @@ class PathServiceTest {
         summary.complete(objectMapper.writeValueAsString(buildPayload()));
 
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
-        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
+        when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
         when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
 
         PathDetailResponse response = pathService.getPathDetail(1L, 1L);

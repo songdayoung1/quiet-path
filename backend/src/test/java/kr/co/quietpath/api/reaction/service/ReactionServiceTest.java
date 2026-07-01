@@ -47,7 +47,7 @@ class ReactionServiceTest {
         request.setTargetId(10L);
 
         Record record = buildRecord("PUBLIC");
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
         when(reactionRepository.existsByUserIdAndTargetTypeAndTargetId(1L, "RECORD", 10L))
             .thenReturn(true);
 
@@ -62,7 +62,7 @@ class ReactionServiceTest {
         request.setTargetId(10L);
 
         Record record = buildRecord("PRIVATE");
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         ApiException ex = assertThrows(ApiException.class, () -> reactionService.createReaction(1L, request));
         assertEquals(ErrorCode.TARGET_NOT_PUBLIC, ex.getErrorCode());

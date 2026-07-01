@@ -9,20 +9,27 @@ interface AlbumTabProps {
   photoRecords: RecordType[];
   onSelectRecord: (record: RecordType) => void;
   mascotTone?: CharacterTone;
+  emptyMonthLabel?: string;
 }
 
-const EmptyAlbum: React.FC<{ mascotTone?: CharacterTone }> = ({ mascotTone = 'default' }) => (
-  <EmptyAlbumInner mascotTone={mascotTone} />
+const EmptyAlbum: React.FC<{ mascotTone?: CharacterTone; emptyMonthLabel?: string }> = ({
+  mascotTone = 'default',
+  emptyMonthLabel,
+}) => (
+  <EmptyAlbumInner mascotTone={mascotTone} emptyMonthLabel={emptyMonthLabel} />
 );
 
-const EmptyAlbumInner: React.FC<{ mascotTone?: CharacterTone }> = ({ mascotTone = 'default' }) => {
+const EmptyAlbumInner: React.FC<{ mascotTone?: CharacterTone; emptyMonthLabel?: string }> = ({
+  mascotTone = 'default',
+  emptyMonthLabel = '이번 달',
+}) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
 
   return (
     <div className="mx-4 flex flex-col items-center justify-center text-center py-12 px-6">
       <WaterDropCharacter size={80} mood="neutral" tone={mascotTone} animate={true} className="mb-4" />
-      <p className="text-sm font-bold mb-1" style={{ color: palette.strongText }}>아직 이번 달 장면이 없어요</p>
+      <p className="text-sm font-bold mb-1" style={{ color: palette.strongText }}>아직 {emptyMonthLabel} 장면이 없어요</p>
       <p className="text-[11px] leading-relaxed opacity-80" style={{ color: palette.mutedText }}>
         오늘의 한 걸음을 사진으로 남겨보세요.<br />이곳에 소중한 장면들이 모입니다.
       </p>
@@ -30,11 +37,16 @@ const EmptyAlbumInner: React.FC<{ mascotTone?: CharacterTone }> = ({ mascotTone 
   );
 };
 
-export const AlbumTab: React.FC<AlbumTabProps> = ({ photoRecords, onSelectRecord, mascotTone = 'default' }) => {
+export const AlbumTab: React.FC<AlbumTabProps> = ({
+  photoRecords,
+  onSelectRecord,
+  mascotTone = 'default',
+  emptyMonthLabel,
+}) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
 
-  if (photoRecords.length === 0) return <EmptyAlbum mascotTone={mascotTone} />;
+  if (photoRecords.length === 0) return <EmptyAlbum mascotTone={mascotTone} emptyMonthLabel={emptyMonthLabel} />;
 
   return (
     <div className="px-2">

@@ -117,7 +117,7 @@ public class CommentService {
     }
 
     private Record getRecord(Long recordId) {
-        return recordRepository.findById(recordId)
+        return recordRepository.findByIdAndIsHiddenFalse(recordId)
             .orElseThrow(() -> new ApiException(ErrorCode.TARGET_NOT_FOUND));
     }
 

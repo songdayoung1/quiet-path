@@ -13,6 +13,7 @@ import { OAuthCallbackView } from './views/OAuthCallbackView';
 import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
 import { configureApiClient } from './api/apiClient';
+import type { ApiErrorWithStatus } from './api/apiClient';
 import { authApi } from './api/authApi';
 import { pathApi, PastPathListItem, PathActiveResponse, PathCreateResponse } from './api/pathApi';
 import { recordApi, RecordResponse } from './api/recordApi';
@@ -193,6 +194,7 @@ const buildRecordFromResponse = (
     moodCode: record.moodCode ?? undefined,
     imageUrl: record.imageUrl ?? undefined,
     isShared: record.visibility === 'PUBLIC',
+    isPinned: record.isPinned ?? undefined,
   };
 };
 
@@ -212,6 +214,18 @@ const clearServerDrivenState = (prev: AppState): AppState => ({
   hasLoggedToday: false,
   userLevel: 'Beginning',
 });
+
+type AuthSessionSnapshot = {
+  isLoggedIn: boolean;
+  accessToken: string | null;
+  refreshToken: string | null;
+  userId: string | null;
+};
+
+const isRefreshSessionInvalid = (error: unknown) => {
+  const status = (error as ApiErrorWithStatus | undefined)?.status;
+  return status === 400 || status === 401;
+};
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -238,6 +252,12 @@ const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
   const refreshAuthRequestRef = useRef<Promise<string | null> | null>(null);
+  const authSessionRef = useRef<AuthSessionSnapshot>({
+    isLoggedIn: false,
+    accessToken: null,
+    refreshToken: null,
+    userId: null,
+  });
   const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
   const shellFrameStyle = useMemo<React.CSSProperties>(
     () => ({
@@ -295,6 +315,22 @@ const App: React.FC = () => {
     return () => media.removeEventListener?.('change', onChange);
   }, [themeMode]);
 
+  const syncAuthSessionRef = useCallback((nextAuth: Partial<AuthSessionSnapshot>) => {
+    authSessionRef.current = {
+      ...authSessionRef.current,
+      ...nextAuth,
+    };
+  }, []);
+
+  useEffect(() => {
+    syncAuthSessionRef({
+      isLoggedIn: state.auth.isLoggedIn,
+      accessToken: state.auth.token,
+      refreshToken: state.auth.refreshToken,
+      userId: state.auth.userId ?? null,
+    });
+  }, [state.auth.isLoggedIn, state.auth.refreshToken, state.auth.token, state.auth.userId, syncAuthSessionRef]);
+
   useEffect(() => {
     const initApp = async () => {
         const loaded = loadState();
@@ -306,6 +342,12 @@ const App: React.FC = () => {
           loaded.auth.userId = null;
         }
         setState(loaded);
+        syncAuthSessionRef({
+          isLoggedIn: loaded.auth.isLoggedIn,
+          accessToken: loaded.auth.token,
+          refreshToken: loaded.auth.refreshToken,
+          userId: loaded.auth.userId ?? null,
+        });
 
         const params = new URLSearchParams(window.location.search);
         const urlCode = params.get('code');
@@ -391,17 +433,33 @@ const App: React.FC = () => {
                       onboardingStatus: restored.me.onboardingStatus
                     }
                 }));
+                syncAuthSessionRef({
+                  isLoggedIn: true,
+                  accessToken: restored.accessToken,
+                  refreshToken: restored.refreshToken,
+                  userId: restored.me.id,
+                });
                 if (restored.me.onboardingStatus === 'NEW') {
                    setCurrentView('NICKNAME_SETUP');
                 } else {
                    setCurrentView('NOW');
                 }
             } catch (err) {
-                setState(prev => ({
-                  ...clearServerDrivenState(prev),
-                  auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null }
-                }));
-                setCurrentView('ONBOARDING');
+                if (isRefreshSessionInvalid(err)) {
+                  setState(prev => ({
+                    ...clearServerDrivenState(prev),
+                    auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null }
+                  }));
+                  syncAuthSessionRef({
+                    isLoggedIn: false,
+                    accessToken: null,
+                    refreshToken: null,
+                    userId: null,
+                  });
+                  setCurrentView('ONBOARDING');
+                } else {
+                  setCurrentView(loaded.hasSeenOnboarding ? 'NOW' : 'ONBOARDING');
+                }
             }
         } else {
             if (!loaded.hasSeenOnboarding) {
@@ -413,7 +471,7 @@ const App: React.FC = () => {
         setIsLoaded(true);
     };
     initApp();
-  }, []);
+  }, [syncAuthSessionRef]);
 
   useEffect(() => {
     if (isLoaded) {
@@ -487,6 +545,17 @@ const App: React.FC = () => {
     });
   };
 
+  const handleDeleteLog = (recordId: string) => {
+    setState(prev => {
+      const records = prev.records.filter((record) => record.id !== recordId);
+      return {
+        ...prev,
+        records,
+        hasLoggedToday: hasLoggedTodayForCurrentPath(records, prev.currentDirection),
+      };
+    });
+  };
+
   const syncRemotePathAndRecords = async (
     token: string,
     fallbackDirection?: Direction | null,
@@ -526,12 +595,18 @@ const App: React.FC = () => {
   };
 
   const refreshCommunityAccessToken = useCallback(async (): Promise<string | null> => {
-    const refreshToken = state.auth.refreshToken;
+    const refreshToken = authSessionRef.current.refreshToken;
     if (!refreshToken) {
       setState(prev => ({
         ...clearServerDrivenState(prev),
         auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
       }));
+      syncAuthSessionRef({
+        isLoggedIn: false,
+        accessToken: null,
+        refreshToken: null,
+        userId: null,
+      });
       return null;
     }
 
@@ -542,14 +617,21 @@ const App: React.FC = () => {
     refreshAuthRequestRef.current = (async () => {
       try {
         const refreshed = await authApi.refresh(refreshToken);
-        let nextUserId = state.auth.userId ?? null;
+        let nextUserId = authSessionRef.current.userId ?? null;
 
         try {
           const me = await authApi.getMe(refreshed.token);
           nextUserId = me.id;
         } catch {
-          nextUserId = state.auth.userId ?? null;
+          nextUserId = authSessionRef.current.userId ?? null;
         }
+
+        syncAuthSessionRef({
+          isLoggedIn: true,
+          accessToken: refreshed.token,
+          refreshToken: refreshed.refreshToken,
+          userId: nextUserId,
+        });
 
         setState(prev => ({
           ...prev,
@@ -563,11 +645,19 @@ const App: React.FC = () => {
         }));
 
         return refreshed.token;
-      } catch {
-        setState(prev => ({
-          ...clearServerDrivenState(prev),
-          auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
-        }));
+      } catch (error) {
+        if (isRefreshSessionInvalid(error)) {
+          setState(prev => ({
+            ...clearServerDrivenState(prev),
+            auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+          }));
+          syncAuthSessionRef({
+            isLoggedIn: false,
+            accessToken: null,
+            refreshToken: null,
+            userId: null,
+          });
+        }
         return null;
       } finally {
         refreshAuthRequestRef.current = null;
@@ -575,7 +665,7 @@ const App: React.FC = () => {
     })();
 
     return refreshAuthRequestRef.current;
-  }, [state.auth.refreshToken, state.auth.userId]);
+  }, [syncAuthSessionRef]);
 
   useEffect(() => {
     configureApiClient({ refreshAccessToken: refreshCommunityAccessToken });
@@ -720,7 +810,12 @@ const App: React.FC = () => {
            onboardingStatus: status,
          }
       }));
-      
+      syncAuthSessionRef({
+        isLoggedIn: true,
+        accessToken: token,
+        refreshToken,
+        userId: me?.id ?? null,
+      });
       if (status === 'NEW') {
           setCurrentView('NICKNAME_SETUP');
       } else {
@@ -772,6 +867,12 @@ const App: React.FC = () => {
       ...clearServerDrivenState(prev),
       auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
     }));
+    syncAuthSessionRef({
+      isLoggedIn: false,
+      accessToken: null,
+      refreshToken: null,
+      userId: null,
+    });
     setCurrentView('NOW');
   };
 
@@ -1028,11 +1129,8 @@ const App: React.FC = () => {
         {currentView === 'RECORDS' && (
           <RecordsView
             records={state.records}
-            currentDirection={state.currentDirection}
-            pastDirections={state.pastDirections}
             onUpdateRecord={handleUpdateLog}
-            hasLoggedToday={state.hasLoggedToday}
-            onLogClick={handleOpenLogEditor}
+            onDeleteRecord={handleDeleteLog}
             accessToken={state.auth?.token}
             onLoginRequired={() => setCurrentView('ACCOUNT_CONNECT')}
           />

@@ -18,6 +18,7 @@ public class RecordListItem {
     private String moodCode;
     private String imageUrl;
     private String visibility;
+    private Boolean isPinned;
     private String sharedAt;
     private String createdAt;
     private String updatedAt;

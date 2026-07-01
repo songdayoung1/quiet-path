@@ -32,6 +32,7 @@ export interface RecordResponse {
   moodCode: string | null;
   imageUrl?: string | null;
   visibility: RecordVisibility;
+  isPinned?: boolean | null;
   sharedAt?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -54,6 +55,17 @@ export interface RecordListResponse {
   items: RecordResponse[];
 }
 
+export interface RecordMonthlyResponse {
+  year: number;
+  month: number;
+  firstRecordYear?: number | null;
+  firstRecordMonth?: number | null;
+  recordsCount: number;
+  photoCount: number;
+  photoCoverage: number;
+  items: RecordResponse[];
+}
+
 export interface RecordVisibilityResponse {
   id: number;
   visibility: RecordVisibility;
@@ -63,6 +75,25 @@ export interface RecordVisibilityResponse {
 export const recordApi = {
   async getRecords(token: string): Promise<RecordListResponse> {
     const response = await apiFetch('/api/v1/records', {
+      method: 'GET',
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+
+    return response.json();
+  },
+
+  async getMonthly(token: string, year: number, month: number): Promise<RecordMonthlyResponse> {
+    const query = new URLSearchParams({
+      year: String(year),
+      month: String(month),
+    });
+
+    const response = await apiFetch(`/api/v1/records/monthly?${query.toString()}`, {
       method: 'GET',
     }, {
       accessToken: token,
@@ -153,5 +184,17 @@ export const recordApi = {
     }
 
     return response.json();
+  },
+
+  async delete(token: string, recordId: number): Promise<void> {
+    const response = await apiFetch(`/api/v1/records/${recordId}`, {
+      method: 'DELETE',
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
   },
 };

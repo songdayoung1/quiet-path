@@ -68,7 +68,7 @@ class RecordServiceTest {
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(activePath));
-        when(recordRepository.existsByPath_IdAndRecordDate(1L, LocalDate.now()))
+        when(recordRepository.existsByPath_IdAndRecordDateAndIsHiddenFalse(1L, LocalDate.now()))
             .thenReturn(true);
 
         RecordCreateRequest request = new RecordCreateRequest();
@@ -87,7 +87,7 @@ class RecordServiceTest {
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(activePath));
-        when(recordRepository.existsByPath_IdAndRecordDate(1L, LocalDate.now()))
+        when(recordRepository.existsByPath_IdAndRecordDateAndIsHiddenFalse(1L, LocalDate.now()))
             .thenReturn(false);
         when(recordRepository.save(any(Record.class))).thenAnswer(invocation -> {
             Record savedRecord = invocation.getArgument(0);
@@ -115,7 +115,7 @@ class RecordServiceTest {
         record.share();
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(recordRepository.findByUser_IdOrderByRecordDateDescIdDesc(1L)).thenReturn(List.of(record));
+        when(recordRepository.findByUser_IdAndIsHiddenFalseOrderByRecordDateDescIdDesc(1L)).thenReturn(List.of(record));
 
         var response = recordService.getRecords(1L);
 
@@ -124,6 +124,37 @@ class RecordServiceTest {
         assertEquals("질문", response.getItems().get(0).getDirectionName());
         assertEquals("설명", response.getItems().get(0).getDirectionText());
         assertEquals("PUBLIC", response.getItems().get(0).getVisibility());
+    }
+
+    @Test
+    void getMonthlyRecords_returnsMonthlyKpisAndPinnedFlag() {
+        User user = User.createGoogle("provider", "user@example.com", "nick");
+        setId(user, 1L);
+        Record first = buildRecord(user, LocalDate.of(2026, 6, 24));
+        first.pinMemory();
+        Record second = buildRecord(user, LocalDate.of(2026, 6, 10));
+        second.updateContent("기록", null, null, "반짝", "https://image.test/sample.png");
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(recordRepository.findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByRecordDateDescIdDesc(
+            1L,
+            LocalDate.of(2026, 6, 1),
+            LocalDate.of(2026, 6, 30)
+        )).thenReturn(List.of(first, second));
+        when(recordRepository.findTopByUser_IdAndIsHiddenFalseOrderByRecordDateAscIdAsc(1L))
+            .thenReturn(Optional.of(second));
+
+        var response = recordService.getMonthlyRecords(1L, 2026, 6);
+
+        assertEquals(2026, response.getYear());
+        assertEquals(6, response.getMonth());
+        assertEquals(2026, response.getFirstRecordYear());
+        assertEquals(6, response.getFirstRecordMonth());
+        assertEquals(2, response.getRecordsCount());
+        assertEquals(1, response.getPhotoCount());
+        assertEquals(50, response.getPhotoCoverage());
+        assertEquals(true, response.getItems().get(0).getIsPinned());
+        assertEquals(false, response.getItems().get(1).getIsPinned());
     }
 
     @Test
@@ -143,7 +174,7 @@ class RecordServiceTest {
             .build();
         setId(record, 10L);
 
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         RecordUpdateRequest request = new RecordUpdateRequest();
         request.setContent("수정 내용");
@@ -169,7 +200,7 @@ class RecordServiceTest {
             .build();
         setId(record, 10L);
 
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         RecordUpdateRequest request = new RecordUpdateRequest();
         request.setContent("수정 내용");
@@ -188,7 +219,7 @@ class RecordServiceTest {
         setId(owner, 1L);
         Record record = buildRecord(owner, LocalDate.now());
         record.share();
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         RecordUpdateRequest request = new RecordUpdateRequest();
         request.setContent("공개 상태로 내용만 수정");
@@ -205,7 +236,7 @@ class RecordServiceTest {
         setId(owner, 1L);
         Record record = buildRecord(owner, LocalDate.now());
         record.share();
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         RecordUpdateRequest request = new RecordUpdateRequest();
         request.setContent("공개 글 수정");
@@ -220,7 +251,7 @@ class RecordServiceTest {
         User owner = User.createGoogle("provider", "owner@example.com", "owner");
         setId(owner, 1L);
         Record record = buildRecord(owner, LocalDate.now().minusDays(3));
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         RecordVisibilityRequest request = new RecordVisibilityRequest();
         request.setVisibility("PUBLIC");
@@ -241,7 +272,7 @@ class RecordServiceTest {
         setId(owner, 1L);
         Record record = buildRecord(owner, LocalDate.now().minusDays(3));
         record.share();
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         RecordVisibilityRequest request = new RecordVisibilityRequest();
         request.setVisibility("PRIVATE");
@@ -261,11 +292,26 @@ class RecordServiceTest {
         User owner = User.createGoogle("provider", "owner@example.com", "owner");
         setId(owner, 1L);
         Record record = buildRecord(owner, LocalDate.now());
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         var response = recordService.shareRecord(1L, 10L);
 
         assertEquals("PUBLIC", response.getVisibility());
+        verify(weeklyTop3CacheService).evict();
+        verify(commentPageCacheService).evictRecord(10L);
+    }
+
+    @Test
+    void deleteRecord_publicRecord_softDeletesAndEvictsCommunityCaches() {
+        User owner = User.createGoogle("provider", "owner@example.com", "owner");
+        setId(owner, 1L);
+        Record record = buildRecord(owner, LocalDate.now().minusDays(2));
+        record.share();
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
+
+        recordService.deleteRecord(1L, 10L);
+
+        assertEquals(true, record.getIsHidden());
         verify(weeklyTop3CacheService).evict();
         verify(commentPageCacheService).evictRecord(10L);
     }

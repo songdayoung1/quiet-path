@@ -71,7 +71,7 @@ class PathSummaryCommandServiceTest {
     void requestSummary_withoutRecords_returnsEmpty() {
         Path path = buildCompletedPath(1L, LocalDateTime.now().minusDays(1));
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
-        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of());
+        when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of());
         doNothing().when(aiSummaryClient).ensureConfigured();
 
         ApiException ex = assertThrows(ApiException.class, () -> pathSummaryCommandService.requestSummary(1L, 1L));
@@ -93,7 +93,7 @@ class PathSummaryCommandServiceTest {
         summary.complete("{\"headline\":\"done\"}");
 
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
-        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
+        when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
         when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
         when(pathSummaryRepository.save(any(PathSummary.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(openAiProperties.getSummaryPromptVersion()).thenReturn("v2");
@@ -125,7 +125,7 @@ class PathSummaryCommandServiceTest {
         summary.startProcessing();
 
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
-        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
+        when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
         when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
         doNothing().when(aiSummaryClient).ensureConfigured();
 
@@ -142,7 +142,7 @@ class PathSummaryCommandServiceTest {
         Record record = buildRecord(path, 10L);
 
         when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
-        when(recordRepository.findAllByPath_IdOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
+        when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
         when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.empty());
         when(pathSummaryRepository.save(any(PathSummary.class))).thenAnswer(invocation -> {
             PathSummary summary = invocation.getArgument(0);

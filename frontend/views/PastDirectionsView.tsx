@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Direction, Record as RecordType } from '../types';
-import { PageHeader, SoftButton } from '../components/UI';
-import { ChevronLeft, Sparkles, AlertCircle } from 'lucide-react';
+import { PageHeader } from '../components/UI';
+import { ChevronLeft } from 'lucide-react';
 import { getThemePalette, useResolvedTheme } from '../theme';
 import { PathDetailResponse, pathApi } from '../api/pathApi';
 import { buildApiErrorMessage } from '../api/apiClient';
@@ -16,37 +16,40 @@ interface PastDirectionsViewProps {
 }
 
 // ─────────────── Trail SVG ───────────────
-const SLOT_H = 220;
+const SLOT_H = 270;
 const TRAIL_PAD = 30;
 const TRAIL_ACCENT = '#C4B5FD';
 const TRAIL_MID = '#A78BFA';
+const CP = 88; // bezier control point amplitude
 
 interface TrailSVGProps {
   count: number;
   totalHeight: number;
 }
 
-const getMarkerPos = (i: number, totalHeight: number) => ({
+const getMarkerPos = (i: number) => ({
   x: i % 2 === 0 ? 70 : 330,
-  y: TRAIL_PAD + i * SLOT_H + SLOT_H / 2,
+  y: TRAIL_PAD + i * SLOT_H + Math.round(SLOT_H / 2),
 });
 
 const TrailSVG: React.FC<TrailSVGProps> = ({ count, totalHeight }) => {
   if (count === 0) return null;
 
-  // Build bezier path
+  // Build bezier path — smooth S-curves between alternating markers
   let d = 'M 200 20';
   for (let i = 0; i < count; i++) {
-    const m = getMarkerPos(i, totalHeight);
+    const m = getMarkerPos(i);
     if (i === 0) {
-      d += ` C 200 80, ${m.x} ${m.y - 70}, ${m.x} ${m.y}`;
+      // First segment: use midpoint to avoid vertical reversal
+      const mid = Math.round((20 + m.y) / 2);
+      d += ` C 200 ${mid - 20}, ${m.x} ${mid + 20}, ${m.x} ${m.y}`;
     } else {
-      const prev = getMarkerPos(i - 1, totalHeight);
-      d += ` C ${prev.x} ${prev.y + 70}, ${m.x} ${m.y - 70}, ${m.x} ${m.y}`;
+      const prev = getMarkerPos(i - 1);
+      d += ` C ${prev.x} ${prev.y + CP}, ${m.x} ${m.y - CP}, ${m.x} ${m.y}`;
     }
   }
-  const last = getMarkerPos(count - 1, totalHeight);
-  d += ` C ${last.x} ${last.y + 70}, 200 ${totalHeight - 30}, 200 ${totalHeight}`;
+  const last = getMarkerPos(count - 1);
+  d += ` C ${last.x} ${last.y + CP}, 200 ${totalHeight - 20}, 200 ${totalHeight}`;
 
   return (
     <svg
@@ -56,19 +59,27 @@ const TrailSVG: React.FC<TrailSVGProps> = ({ count, totalHeight }) => {
       preserveAspectRatio="none"
     >
       <defs>
-        <linearGradient id="trailGrad" x1="0" y1="0" x2="0" y2="1">
+        {/* Absolute-coordinate gradient so fade works correctly regardless of path bounding box */}
+        <linearGradient id="trailGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={totalHeight}>
           <stop offset="0%" stopColor={TRAIL_ACCENT} stopOpacity="0" />
-          <stop offset="12%" stopColor={TRAIL_ACCENT} stopOpacity="0.85" />
-          <stop offset="65%" stopColor={TRAIL_MID} stopOpacity="0.45" />
+          <stop offset="8%" stopColor={TRAIL_ACCENT} stopOpacity="0.9" />
+          <stop offset="60%" stopColor={TRAIL_MID} stopOpacity="0.55" />
+          <stop offset="85%" stopColor={TRAIL_MID} stopOpacity="0.18" />
           <stop offset="100%" stopColor={TRAIL_MID} stopOpacity="0" />
         </linearGradient>
-        <filter id="trailGlow" x="-25%" y="-5%" width="150%" height="110%">
+        <linearGradient id="trailGlow" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={totalHeight}>
+          <stop offset="0%" stopColor={TRAIL_ACCENT} stopOpacity="0" />
+          <stop offset="8%" stopColor={TRAIL_ACCENT} stopOpacity="0.28" />
+          <stop offset="60%" stopColor={TRAIL_ACCENT} stopOpacity="0.14" />
+          <stop offset="100%" stopColor={TRAIL_ACCENT} stopOpacity="0" />
+        </linearGradient>
+        <filter id="glowBlur" x="-25%" y="-5%" width="150%" height="110%">
           <feGaussianBlur stdDeviation="6" />
         </filter>
       </defs>
 
       {/* Glow layer */}
-      <path d={d} fill="none" stroke={TRAIL_ACCENT} strokeOpacity="0.28" strokeWidth="12" strokeLinecap="round" filter="url(#trailGlow)" />
+      <path d={d} fill="none" stroke="url(#trailGlow)" strokeWidth="12" strokeLinecap="round" filter="url(#glowBlur)" />
 
       {/* Main trail */}
       <path d={d} fill="none" stroke="url(#trailGrad)" strokeWidth="2.4" strokeLinecap="round" strokeDasharray="0 8" />
@@ -80,7 +91,7 @@ const TrailSVG: React.FC<TrailSVGProps> = ({ count, totalHeight }) => {
 
       {/* Markers + connector lines */}
       {Array.from({ length: count }, (_, i) => {
-        const m = getMarkerPos(i, totalHeight);
+        const m = getMarkerPos(i);
         const isLeftMarker = i % 2 === 0;
         const connectorEndX = isLeftMarker ? m.x + 18 : m.x - 18;
         return (
@@ -203,10 +214,11 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
     const isEmpty = summaryStatus === 'EMPTY';
     const canRequest = summaryStatus === 'READY' || summaryStatus === 'FAILED' || summaryStatus === 'DONE';
 
-    let capsuleState: 'locked' | 'generating' | 'ready' | null = null;
+    let capsuleState: 'locked' | 'idle' | 'generating' | 'ready' | null = null;
     if (isLocked) capsuleState = 'locked';
-    else if (isProcessing) capsuleState = 'generating';
+    else if (isProcessing || isSummarySubmitting) capsuleState = 'generating';
     else if (isDone) capsuleState = 'ready';
+    else if (canRequest) capsuleState = 'idle';
 
     const bgStyle: React.CSSProperties = {
       background:
@@ -275,33 +287,11 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
                 body: summary.body,
               } : undefined}
               version={isDone ? `v.1 · ${startDate}` : undefined}
+              failed={summaryStatus === 'FAILED'}
               onRegenerate={isDone ? handleSummarize : undefined}
+              onRequest={capsuleState === 'idle' ? handleSummarize : undefined}
             />
-          ) : (
-            /* READY / FAILED — show request button */
-            <div className="flex flex-col gap-3">
-              <SoftButton
-                onClick={handleSummarize}
-                className="w-full !rounded-3xl !py-5 font-bold"
-                variant="secondary"
-                style={{ background: glassCard.background as string, borderColor: 'rgba(255,255,255,0.7)', color: '#8B5CF6' }}
-                disabled={!canRequest || isSummarySubmitting}
-              >
-                <span className="flex gap-2 items-center justify-center text-point-500">
-                  {isSummarySubmitting ? <Sparkles size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                  {isSummarySubmitting ? '지난 조각들을 엮는 중...' : 'AI 회고 캡슐 열기'}
-                </span>
-              </SoftButton>
-              {summaryStatus === 'FAILED' && (
-                <div className="flex items-start gap-2 p-4 rounded-2xl border" style={glassCard}>
-                  <AlertCircle size={16} className="mt-0.5 text-point-500 shrink-0" />
-                  <p className="text-[13px] leading-relaxed text-mist-500">
-                    요약 생성이 끝까지 이어지지 않았어요. 다시 정리해볼 수 있어요.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+          ) : null}
           {detailError && (
             <div className="mt-3 p-4 rounded-2xl border" style={glassCard}>
               <p className="text-[13px] text-mist-400">{detailError}</p>
@@ -365,25 +355,17 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
           )}
         </div>
 
-        {/* Footer pill */}
-        <div className="flex justify-center pb-10 pt-2">
-          <div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border shadow-sm"
-            style={{ background: 'rgba(255,255,255,0.80)', borderColor: 'rgba(255,255,255,0.9)' }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-point-400" />
-            <p className="text-[12px] font-bold text-mist-500">
-              <span className="text-point-500">{flowRecords.length}</span>개의 발자국이 길 위에 남아있습니다.
-            </p>
-          </div>
-        </div>
       </div>
     );
   }
 
   // ─────────────── Trail List View ───────────────
   const sortedDirections = [...pastDirections].sort((a, b) => b.createdAt - a.createdAt);
-  const totalHeight = TRAIL_PAD + sortedDirections.length * SLOT_H + 80;
+  // Height ends just below the last marker's card — no extra blank space
+  const totalHeight =
+    sortedDirections.length === 0
+      ? 200
+      : TRAIL_PAD + (sortedDirections.length - 1) * SLOT_H + Math.round(SLOT_H / 2) + 300;
 
   const bgStyle: React.CSSProperties = {};
 
@@ -397,7 +379,7 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
 
       <PageHeader title="지나온 방향들" subtitle="걸어온 곡선들이 온전히 당신만의 궤적이 됩니다." />
 
-      <div className="flex-1 overflow-y-auto no-scrollbar relative pb-32">
+      <div className="flex-1 overflow-y-auto no-scrollbar relative pb-4" style={{ background: 'var(--qp-outside-bg)' }}>
         {sortedDirections.length === 0 ? (
           <div className="text-center py-20 opacity-60 px-6">
             <p className="font-medium text-mist-400">아직 지나온 길(방향)이 없습니다.</p>
@@ -422,7 +404,8 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
 
               {sortedDirections.map((dir, index) => {
                 const isLeftMarker = index % 2 === 0;
-                const cardTop = TRAIL_PAD + index * SLOT_H + 20;
+                // Center card vertically on its marker pin
+                const cardTop = TRAIL_PAD + index * SLOT_H + Math.round(SLOT_H / 2) - 80;
 
                 const flowRecords = records.filter((r) => {
                   if (r.isHidden) return false;
@@ -492,16 +475,6 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
         )}
       </div>
 
-      {/* Bottom fade */}
-      <div
-        className="absolute bottom-0 left-0 w-full h-32 pointer-events-none z-20"
-        style={{
-          backgroundImage:
-            theme === 'dark'
-              ? 'linear-gradient(to top, rgba(15,23,42,0.88), rgba(15,23,42,0.32), transparent)'
-              : 'linear-gradient(to top, rgba(255,255,255,0.40), rgba(255,255,255,0.10), transparent)',
-        }}
-      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { OnboardingStatus, MeResponse } from '../types';
-import { apiUrl, parseErrorMessage } from './apiClient';
+import { apiUrl, buildApiError, parseErrorMessage } from './apiClient';
 
 /**
  * Auth API
@@ -9,7 +9,7 @@ import { apiUrl, parseErrorMessage } from './apiClient';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MOCK_CODES = new Set(['new_user', 'existing_user', 'error_user']);
-const isMockAccessToken = (token: string) =>
+export const isMockAccessToken = (token: string) =>
   token.startsWith('mock_token_') || token.startsWith('mock_access_');
 const mockStatusByToken = (token: string): OnboardingStatus =>
   token.includes('new') ? 'NEW' : 'EXISTING';
@@ -117,7 +117,7 @@ export const authApi = {
     });
 
     if (!response.ok) {
-      throw new Error(await parseErrorMessage(response));
+      throw await buildApiError(response);
     }
 
     const data = await response.json();

@@ -20,6 +20,8 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     Optional<Record> findByPath_IdAndRecordDate(Long pathId, LocalDate recordDate);
 
+    Optional<Record> findByPath_IdAndRecordDateAndIsHiddenFalse(Long pathId, LocalDate recordDate);
+
     List<Record> findByPathIdOrderByRecordDateDesc(Long pathId);
 
     List<Record> findByPath_IdOrderByRecordDateDesc(Long pathId);
@@ -28,11 +30,21 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     List<Record> findAllByPath_IdOrderByRecordDateAsc(Long pathId);
 
+    List<Record> findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(Long pathId);
+
     List<Record> findByUserIdOrderByRecordDateDesc(Long userId);
 
     List<Record> findByUser_IdOrderByRecordDateDesc(Long userId);
 
-    List<Record> findByUser_IdOrderByRecordDateDescIdDesc(Long userId);
+    List<Record> findByUser_IdAndIsHiddenFalseOrderByRecordDateDescIdDesc(Long userId);
+
+    Optional<Record> findTopByUser_IdAndIsHiddenFalseOrderByRecordDateAscIdAsc(Long userId);
+
+    List<Record> findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByRecordDateDescIdDesc(
+        Long userId,
+        LocalDate from,
+        LocalDate to
+    );
 
     Page<Record> findAllByVisibilityAndCategoryCode(
         String visibility,
@@ -46,11 +58,16 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     boolean existsByPath_IdAndRecordDate(Long pathId, LocalDate recordDate);
 
+    boolean existsByPath_IdAndRecordDateAndIsHiddenFalse(Long pathId, LocalDate recordDate);
+
+    Optional<Record> findByIdAndIsHiddenFalse(Long id);
+
     @Query("""
         select r from Record r
         join fetch r.path p
         join fetch r.user u
         where r.visibility = :visibility
+          and r.isHidden = false
           and r.sharedAt is not null
           and (:categoryCode is null or r.categoryCode = :categoryCode)
           and (

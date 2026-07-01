@@ -1,6 +1,5 @@
 import React from 'react';
 import { Record as RecordType } from '../../types';
-import { WaterDropCharacter } from '../WaterDropCharacter';
 import { getThemePalette, useResolvedTheme } from '../../theme';
 
 interface CalendarTabProps {
@@ -12,23 +11,6 @@ interface CalendarTabProps {
 
 const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
-const MOOD_BG_LIGHT: Record<string, string> = {
-  포근: '#F5F3FF',
-  멍함: '#F1F5F9',
-  반짝: '#FFFBEB',
-  잔잔: '#EFF6FF',
-  버팀: '#F0FDF4',
-  두근: '#FFF1F2',
-};
-
-const MOOD_BG_DARK: Record<string, string> = {
-  포근: 'rgba(91,33,182,0.22)',
-  멍함: 'rgba(71,85,105,0.28)',
-  반짝: 'rgba(180,83,9,0.18)',
-  잔잔: 'rgba(30,64,175,0.22)',
-  버팀: 'rgba(21,128,61,0.22)',
-  두근: 'rgba(190,24,93,0.20)',
-};
 
 /* Mood → dot / accent color */
 const MOOD_DOT: Record<string, string> = {
@@ -59,29 +41,15 @@ const MOOD_LEGEND = [
   { code: '멍함', dot: MOOD_DOT['멍함'] },
 ];
 
-const NoRecordsGuide: React.FC = () => {
-  const theme = useResolvedTheme();
-  const palette = getThemePalette(theme);
-
-  return (
-    <div className="flex flex-col items-center justify-center py-6 px-6 text-center animate-fade-in">
-      <p className="text-sm font-bold mb-1.5 mt-2 tracking-tight" style={{ color: palette.strongText }}>이번 달 기록이 아직 없어요</p>
-      <p className="text-[11px] leading-[1.6] opacity-80 font-medium" style={{ color: palette.mutedText }}>
-        기록을 시작하면 이곳에서 당신의 무드와 흐름을<br />한눈에 매일매일 확인할 수 있습니다.
-      </p>
-    </div>
-  );
-};
-
-const TapGuide: React.FC = () => {
+const CalendarGuide: React.FC = () => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
 
   return (
     <div className="flex flex-col items-center justify-center py-5 px-6 text-center animate-fade-in">
-      <p className="text-[11px] font-bold mb-1.5 opacity-90 tracking-wide uppercase" style={{ color: palette.mutedText }}>Your Mood Journey</p>
+      <p className="text-[11px] font-bold mb-1.5 opacity-90 tracking-wide uppercase" style={{ color: palette.mutedText }}>Monthly Calendar</p>
       <p className="text-[10px] leading-relaxed tracking-wide font-medium" style={{ color: palette.mutedText }}>
-        날짜를 탭하면 해당 기록을 바로 열어볼 수 있어요.
+        한 달의 기록 흐름을 날짜별로 차분히 살펴볼 수 있어요.
       </p>
     </div>
   );
@@ -95,15 +63,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
-  const moodBgMap = theme === 'dark' ? MOOD_BG_DARK : MOOD_BG_LIGHT;
   const today = new Date();
-  const hasAnyRecord = calendarCells.some(
-    (c) => c.type === 'day' && c.record,
-  );
 
   return (
     <div className="px-4 pb-12">
-      {hasAnyRecord ? <TapGuide /> : <NoRecordsGuide />}
+      <CalendarGuide />
       
       {/* Calendar grid */}
       <div className="rounded-[2rem] border shadow-sm overflow-hidden mb-6" style={{ background: palette.cardBg, borderColor: palette.border }}>
@@ -124,11 +88,11 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
         {/* Subtle divider */}
         <div className="mx-4 mb-1" style={{ height: 1, background: palette.divider }} />
 
-        {/* Day cells — circle-based, no grid lines */}
-        <div className="grid grid-cols-7 px-3 pb-5 gap-y-0.5">
+        {/* Day cells — number on top, mood dot below, no overlap */}
+        <div className="grid grid-cols-7 px-3 pb-5">
           {calendarCells.map((cell, index) => {
             if (cell.type === 'empty') {
-              return <div key={`empty-${index}`} className="h-12" />;
+              return <div key={`empty-${index}`} className="h-14" />;
             }
 
             const { day, record } = cell;
@@ -138,7 +102,6 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
               targetYear === today.getFullYear();
 
             const moodCode = record?.moodCode;
-            const bgColor = moodCode ? moodBgMap[moodCode] : undefined;
             const dotColor = moodCode ? MOOD_DOT[moodCode] : undefined;
             const moodLabel = moodCode ? MOOD_LABEL[moodCode] : undefined;
 
@@ -148,28 +111,24 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                 type="button"
                 disabled={!record}
                 onClick={() => record && onSelectRecord(record)}
-                className="flex flex-col items-center gap-0.5 h-12 justify-center relative"
+                className="flex flex-col items-center justify-center h-14 gap-1 relative active:scale-90 transition-transform duration-150"
               >
-                {/* Circle indicator */}
+                {/* Date number — today gets filled circle, others plain */}
                 <div
-                  className={[
-                    'w-8 h-8 rounded-full flex items-center justify-center relative transition-all duration-200',
-                    record ? 'active:scale-90' : '',
-                    isToday && !record ? 'ring-[1.5px] ring-point-400' : '',
-                  ].join(' ')}
+                  className="w-7 h-7 rounded-full flex items-center justify-center relative"
                   style={{
-                    background: record && bgColor ? bgColor : 'transparent',
-                    boxShadow: isToday && record ? `0 0 0 2px ${dotColor || '#A78BFA'}` : undefined,
+                    background: isToday ? (dotColor || '#A78BFA') : 'transparent',
+                    boxShadow: isToday ? `0 2px 8px ${(dotColor || '#A78BFA')}55` : undefined,
                   }}
                 >
                   <span
                     className="text-[13px] leading-none tabular-nums select-none"
                     style={{
                       fontWeight: record || isToday ? 700 : 400,
-                      color: record
-                        ? dotColor || palette.strongText
-                        : isToday
-                          ? '#7C3AED'
+                      color: isToday
+                        ? 'white'
+                        : record
+                          ? palette.strongText
                           : palette.faintText,
                     }}
                   >
@@ -185,14 +144,22 @@ export const CalendarTab: React.FC<CalendarTabProps> = ({
                   )}
                 </div>
 
-                {/* Mood label */}
-                {moodLabel && dotColor && (
-                  <span
-                    className="text-[8px] font-bold leading-none tracking-wide"
-                    style={{ color: dotColor }}
-                  >
-                    {moodLabel}
-                  </span>
+                {/* Mood indicator — colored dot + label below number */}
+                {moodLabel && dotColor ? (
+                  <div className="flex items-center gap-0.5">
+                    <span
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: dotColor }}
+                    />
+                    <span
+                      className="text-[8px] font-bold leading-none"
+                      style={{ color: dotColor }}
+                    >
+                      {moodLabel}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="h-3" />
                 )}
               </button>
             );
