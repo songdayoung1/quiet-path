@@ -193,6 +193,7 @@ const buildRecordFromResponse = (
     moodCode: record.moodCode ?? undefined,
     imageUrl: record.imageUrl ?? undefined,
     isShared: record.visibility === 'PUBLIC',
+    isPinned: record.isPinned ?? undefined,
   };
 };
 
@@ -487,6 +488,17 @@ const App: React.FC = () => {
     });
   };
 
+  const handleDeleteLog = (recordId: string) => {
+    setState(prev => {
+      const records = prev.records.filter((record) => record.id !== recordId);
+      return {
+        ...prev,
+        records,
+        hasLoggedToday: hasLoggedTodayForCurrentPath(records, prev.currentDirection),
+      };
+    });
+  };
+
   const syncRemotePathAndRecords = async (
     token: string,
     fallbackDirection?: Direction | null,
@@ -720,7 +732,6 @@ const App: React.FC = () => {
            onboardingStatus: status,
          }
       }));
-      
       if (status === 'NEW') {
           setCurrentView('NICKNAME_SETUP');
       } else {
@@ -1028,11 +1039,8 @@ const App: React.FC = () => {
         {currentView === 'RECORDS' && (
           <RecordsView
             records={state.records}
-            currentDirection={state.currentDirection}
-            pastDirections={state.pastDirections}
             onUpdateRecord={handleUpdateLog}
-            hasLoggedToday={state.hasLoggedToday}
-            onLogClick={handleOpenLogEditor}
+            onDeleteRecord={handleDeleteLog}
             accessToken={state.auth?.token}
             onLoginRequired={() => setCurrentView('ACCOUNT_CONNECT')}
           />

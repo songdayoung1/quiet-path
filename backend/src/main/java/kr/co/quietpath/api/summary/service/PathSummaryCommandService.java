@@ -52,7 +52,7 @@ public class PathSummaryCommandService {
             throw new ApiException(ErrorCode.PATH_SUMMARY_LOCKED);
         }
 
-        List<Record> records = recordRepository.findAllByPath_IdOrderByRecordDateAsc(pathId);
+        List<Record> records = recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(pathId);
         if (records.isEmpty()) {
             throw new ApiException(ErrorCode.PATH_SUMMARY_EMPTY);
         }

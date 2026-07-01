@@ -9,7 +9,7 @@ import { apiUrl, parseErrorMessage } from './apiClient';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MOCK_CODES = new Set(['new_user', 'existing_user', 'error_user']);
-const isMockAccessToken = (token: string) =>
+export const isMockAccessToken = (token: string) =>
   token.startsWith('mock_token_') || token.startsWith('mock_access_');
 const mockStatusByToken = (token: string): OnboardingStatus =>
   token.includes('new') ? 'NEW' : 'EXISTING';

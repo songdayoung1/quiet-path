@@ -35,7 +35,7 @@ public class PathSummaryStateService {
 
         summary.startProcessing();
 
-        List<Record> records = recordRepository.findAllByPath_IdOrderByRecordDateAsc(summary.getPath().getId());
+        List<Record> records = recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(summary.getPath().getId());
         if (records.isEmpty()) {
             summary.fail();
             return null;

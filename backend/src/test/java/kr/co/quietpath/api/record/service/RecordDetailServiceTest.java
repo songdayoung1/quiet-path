@@ -57,7 +57,7 @@ class RecordDetailServiceTest {
     @Test
     void privateRecord_notOwner_returns403() {
         Record record = buildRecord("PRIVATE", 1L, 10L);
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         ApiException ex = assertThrows(ApiException.class, () -> recordService.getRecordDetail(2L, 10L));
         assertEquals(ErrorCode.RECORD_NOT_PUBLIC, ex.getErrorCode());
@@ -66,7 +66,7 @@ class RecordDetailServiceTest {
     @Test
     void publicRecord_countsAndIsReacted() {
         Record record = buildRecord("PUBLIC", 1L, 10L);
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         when(reactionRepository.countByTargetTypeAndTargetId("RECORD", 10L)).thenReturn(3L);
         when(reactionRepository.existsByUserIdAndTargetTypeAndTargetId(99L, "RECORD", 10L)).thenReturn(true);

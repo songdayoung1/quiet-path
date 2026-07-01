@@ -10,6 +10,7 @@ import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
 import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
 import kr.co.quietpath.api.record.dto.response.RecordListResponse;
+import kr.co.quietpath.api.record.dto.response.RecordMonthlyResponse;
 import kr.co.quietpath.api.record.dto.response.RecordShareResponse;
 import kr.co.quietpath.api.record.dto.response.RecordTodayResponse;
 import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
@@ -37,6 +38,16 @@ public class RecordController {
     ) {
         Long userId = extractUserId(principal);
         return recordService.getRecords(userId);
+    }
+
+    @GetMapping("/monthly")
+    public RecordMonthlyResponse getMonthlyRecords(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @RequestParam @Positive Integer year,
+        @RequestParam @Positive Integer month
+    ) {
+        Long userId = extractUserId(principal);
+        return recordService.getMonthlyRecords(userId, year, month);
     }
 
     @GetMapping("/today")
@@ -78,6 +89,16 @@ public class RecordController {
     ) {
         Long userId = extractUserId(principal);
         return recordService.updateRecord(userId, recordId, request);
+    }
+
+    @DeleteMapping("/{recordId}")
+    public ResponseEntity<Void> deleteRecord(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable @Positive Long recordId
+    ) {
+        Long userId = extractUserId(principal);
+        recordService.deleteRecord(userId, recordId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{recordId}/share")

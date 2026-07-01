@@ -146,9 +146,13 @@ public class Record {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void hide() {
+    public void softDelete() {
         this.isHidden = true;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void hide() {
+        softDelete();
     }
 
     public void pinMemory() {

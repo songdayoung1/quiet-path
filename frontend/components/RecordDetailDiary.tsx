@@ -8,7 +8,7 @@ interface Props {
   onClose?: () => void;
   onEdit?: () => void;
   onShare?: () => void;
-  onHide?: () => void;
+  onDelete?: () => void;
 }
 
 const MOOD_TONE: Record<string, { bg: string; border: string; text: string }> = {
@@ -25,7 +25,7 @@ const WEEKDAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 const fmtTime = (d: Date) => d.toTimeString().slice(0, 5);
 
 export const RecordDetailDiary: React.FC<Props> = ({
-  record, nickname, pageNumber, onClose, onEdit, onShare, onHide,
+  record, nickname, pageNumber, onClose, onEdit, onShare, onDelete,
 }) => {
   const date = new Date(record.timestamp);
   const mood = record.moodCode;
@@ -185,12 +185,12 @@ export const RecordDetailDiary: React.FC<Props> = ({
               공유
             </button>
           )}
-          {onHide && (
+          {onDelete && (
             <button
-              onClick={onHide}
+              onClick={onDelete}
               className="px-4 py-2 rounded-full bg-white/70 border border-white text-rose-400 text-[11px] font-bold hover:bg-rose-50 transition"
             >
-              숨기기
+              삭제하기
             </button>
           )}
         </div>

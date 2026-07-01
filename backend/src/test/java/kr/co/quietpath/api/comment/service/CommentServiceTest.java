@@ -60,7 +60,7 @@ class CommentServiceTest {
         request.setContent("좋은 기록이네요");
 
         Record record = buildRecord("PRIVATE");
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         ApiException ex = assertThrows(ApiException.class, () -> commentService.createComment(1L, request));
         assertEquals(ErrorCode.TARGET_NOT_PUBLIC, ex.getErrorCode());
@@ -73,7 +73,7 @@ class CommentServiceTest {
         request.setContent("좋은 기록이네요");
 
         Record record = buildRecord("PUBLIC");
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
         when(userRepository.findById(1L)).thenReturn(Optional.of(buildUser(1L)));
         when(commentRepository.countByRecordIdAndDeletedFalse(10L)).thenReturn(3L);
         doAnswer(invocation -> {
@@ -117,7 +117,7 @@ class CommentServiceTest {
     @Test
     void getComments_privateRecord_doesNotUseCommentCache() {
         Record record = buildRecord("PRIVATE");
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
 
         CommentListQuery query = new CommentListQuery();
         query.setRecordId(10L);
@@ -133,7 +133,7 @@ class CommentServiceTest {
     @Test
     void getComments_normalizesPageAndSizeBeforeDelegatingToCache() {
         Record record = buildRecord("PUBLIC");
-        when(recordRepository.findById(10L)).thenReturn(Optional.of(record));
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
         CommentListResponse cachedResponse = CommentListResponse.builder()
             .items(List.of())
             .page(0)

@@ -48,6 +48,7 @@ public interface ReactionRepository extends JpaRepository<Reaction, Long> {
         from Reaction r
         where r.createdAt >= :from
           and r.createdAt <= :to
+          and r.record.isHidden = false
           and r.record.visibility = 'PUBLIC'
           and r.record.sharedAt is not null
         group by r.record.id

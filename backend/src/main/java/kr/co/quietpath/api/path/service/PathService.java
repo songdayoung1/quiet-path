@@ -181,7 +181,7 @@ public class PathService {
 
         LocalDate unlockAtDate = path.getReviewAt().toLocalDate();
 
-        List<Record> records = recordRepository.findAllByPath_IdOrderByRecordDateAsc(pathId);
+        List<Record> records = recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(pathId);
         PathSummary latestSummary = findLatestSummary(pathId);
         String summaryStatus = resolveSummaryStatus(unlockAtDate, records, latestSummary);
         PathSummaryPayload summary = null;

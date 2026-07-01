@@ -11,6 +11,7 @@ import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
 import kr.co.quietpath.api.record.dto.response.RecordListItem;
 import kr.co.quietpath.api.record.dto.response.RecordListResponse;
+import kr.co.quietpath.api.record.dto.response.RecordMonthlyResponse;
 import kr.co.quietpath.api.record.dto.response.RecordShareResponse;
 import kr.co.quietpath.api.record.dto.response.RecordTodayResponse;
 import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -59,7 +61,7 @@ public class RecordService {
             .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_PATH_REQUIRED));
 
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
-        if (recordRepository.existsByPath_IdAndRecordDate(activePath.getId(), today)) {
+        if (recordRepository.existsByPath_IdAndRecordDateAndIsHiddenFalse(activePath.getId(), today)) {
             throw new ApiException(ErrorCode.RECORD_ALREADY_EXISTS);
         }
 
@@ -107,7 +109,7 @@ public class RecordService {
     @Transactional(readOnly = true)
     public RecordListResponse getRecords(Long userId) {
         getUser(userId);
-        List<RecordListItem> items = recordRepository.findByUser_IdOrderByRecordDateDescIdDesc(userId)
+        List<RecordListItem> items = recordRepository.findByUser_IdAndIsHiddenFalseOrderByRecordDateDescIdDesc(userId)
             .stream()
             .map(this::toListItem)
             .toList();
@@ -117,10 +119,56 @@ public class RecordService {
     }
 
     @Transactional(readOnly = true)
+    public RecordMonthlyResponse getMonthlyRecords(Long userId, Integer year, Integer month) {
+        getUser(userId);
+
+        YearMonth yearMonth;
+        try {
+            yearMonth = YearMonth.of(year, month);
+        } catch (RuntimeException ex) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST);
+        }
+
+        LocalDate from = yearMonth.atDay(1);
+        LocalDate to = yearMonth.atEndOfMonth();
+
+        List<RecordListItem> items = recordRepository.findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByRecordDateDescIdDesc(
+                userId,
+                from,
+                to
+            )
+            .stream()
+            .map(this::toListItem)
+            .toList();
+        LocalDate firstRecordDate = recordRepository.findTopByUser_IdAndIsHiddenFalseOrderByRecordDateAscIdAsc(userId)
+            .map(Record::getRecordDate)
+            .orElse(null);
+
+        int recordsCount = items.size();
+        int photoCount = (int) items.stream()
+            .filter(item -> item.getImageUrl() != null && !item.getImageUrl().isBlank())
+            .count();
+        int photoCoverage = recordsCount > 0
+            ? Math.round((photoCount * 100f) / recordsCount)
+            : 0;
+
+        return RecordMonthlyResponse.builder()
+            .year(yearMonth.getYear())
+            .month(yearMonth.getMonthValue())
+            .firstRecordYear(firstRecordDate != null ? firstRecordDate.getYear() : null)
+            .firstRecordMonth(firstRecordDate != null ? firstRecordDate.getMonthValue() : null)
+            .recordsCount(recordsCount)
+            .photoCount(photoCount)
+            .photoCoverage(photoCoverage)
+            .items(items)
+            .build();
+    }
+
+    @Transactional(readOnly = true)
     public RecordTodayResponse getTodayRecord(Long userId) {
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
         return pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
-            .flatMap(activePath -> recordRepository.findByPath_IdAndRecordDate(activePath.getId(), today))
+            .flatMap(activePath -> recordRepository.findByPath_IdAndRecordDateAndIsHiddenFalse(activePath.getId(), today))
             .map(record -> RecordTodayResponse.builder()
                 .id(record.getId())
                 .pathId(record.getPath().getId())
@@ -142,8 +190,7 @@ public class RecordService {
 
     @Transactional(readOnly = true)
     public RecordDetailResponse getRecordDetail(Long userId, Long recordId) {
-        Record record = recordRepository.findById(recordId)
-            .orElseThrow(() -> new ApiException(ErrorCode.RECORD_NOT_FOUND));
+        Record record = getRecord(recordId);
 
         boolean isOwner = record.getUser() != null
             && record.getUser().getId() != null
@@ -210,6 +257,17 @@ public class RecordService {
             .build();
     }
 
+    public void deleteRecord(Long userId, Long recordId) {
+        Record record = getRecord(recordId);
+        validateOwner(userId, record);
+        record.softDelete();
+
+        if (VISIBILITY_PUBLIC.equals(record.getVisibility())) {
+            weeklyTop3CacheService.evict();
+            commentPageCacheService.evictRecord(record.getId());
+        }
+    }
+
     public RecordShareResponse shareRecord(Long userId, Long recordId) {
         Record record = getRecord(recordId);
         validateOwner(userId, record);
@@ -249,7 +307,7 @@ public class RecordService {
     }
 
     private Record getRecord(Long recordId) {
-        return recordRepository.findById(recordId)
+        return recordRepository.findByIdAndIsHiddenFalse(recordId)
             .orElseThrow(() -> new ApiException(ErrorCode.RECORD_NOT_FOUND));
     }
 
@@ -333,6 +391,7 @@ public class RecordService {
             .moodCode(record.getMoodCode())
             .imageUrl(record.getImageUrl())
             .visibility(record.getVisibility())
+            .isPinned(record.getPinnedAt() != null)
             .sharedAt(record.getSharedAt() != null ? formatDateTime(record.getSharedAt()) : null)
             .createdAt(formatDateTime(record.getCreatedAt()))
             .updatedAt(formatDateTime(record.getUpdatedAt()))

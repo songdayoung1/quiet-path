@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Record as RecordType } from '../../types';
 import { Card, MoodSticker } from '../UI';
-import { Globe2, Pin, EyeOff, MoreHorizontal, AlertCircle, CheckCircle2, MessageCircle, Link2 } from 'lucide-react';
+import { Globe2, Pin, EyeOff, MoreHorizontal, AlertCircle, CheckCircle2, MessageCircle, Link2, Trash2 } from 'lucide-react';
 import { WaterDropCharacter } from '../WaterDropCharacter';
 import { getThemePalette, useResolvedTheme } from '../../theme';
 import { recordApi } from '../../api/recordApi';
@@ -11,18 +11,20 @@ interface RecordsListTabProps {
   records: RecordType[];
   onSelectRecord: (record: RecordType) => void;
   onUpdateRecord: (record: RecordType) => void;
+  onRequestDeleteRecord: (record: RecordType) => void;
   accessToken?: string | null;
   onLoginRequired: () => void;
+  emptyMonthLabel?: string;
 }
 
-const EmptyRecords: React.FC = () => {
+const EmptyRecords: React.FC<{ emptyMonthLabel?: string }> = ({ emptyMonthLabel = '이번 달' }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
 
   return (
     <div className="mx-4 flex flex-col items-center justify-center text-center py-12 px-6">
       <WaterDropCharacter size={80} mood="waiting" tone="default" animate={true} className="mb-4" />
-      <p className="text-sm font-bold mb-1" style={{ color: palette.strongText }}>아직 이번 달 기록이 없어요</p>
+      <p className="text-sm font-bold mb-1" style={{ color: palette.strongText }}>아직 {emptyMonthLabel} 기록이 없어요</p>
       <p className="text-[11px] leading-relaxed opacity-80" style={{ color: palette.mutedText }}>
         남겨주시는 오늘의 흔적들이<br />이곳에 차곡차곡 쌓일 예정입니다.
       </p>
@@ -34,8 +36,10 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   records,
   onSelectRecord,
   onUpdateRecord,
+  onRequestDeleteRecord,
   accessToken,
   onLoginRequired,
+  emptyMonthLabel,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
@@ -50,10 +54,6 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
     setNoticeModal({ title, description, variant });
   };
 
-  const handleHide = (record: RecordType) => {
-    onUpdateRecord({ ...record, isHidden: true });
-    setActiveMenuId(null);
-  };
   const handlePin = (record: RecordType) => {
     onUpdateRecord({ ...record, isPinned: !record.isPinned });
     setActiveMenuId(null);
@@ -100,7 +100,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
     setActiveMenuId(null);
   };
 
-  if (records.length === 0) return <EmptyRecords />;
+  if (records.length === 0) return <EmptyRecords emptyMonthLabel={emptyMonthLabel} />;
 
   return (
     <>
@@ -228,13 +228,17 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                         <div className="my-1 border-t" style={{ borderColor: palette.divider }} />
 
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleHide(record); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRequestDeleteRecord(record);
+                            setActiveMenuId(null);
+                          }}
                           className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors text-red-500"
                         >
                           <div className="rounded-md p-1 transition-colors" style={{ background: theme === 'dark' ? 'rgba(127,29,29,0.28)' : 'rgba(254,242,242,0.9)' }}>
-                            <EyeOff size={14} className="text-red-400" />
+                            <Trash2 size={14} className="text-red-400" />
                           </div>
-                          <span className="text-[11px] font-bold">숨기기</span>
+                          <span className="text-[11px] font-bold">삭제하기</span>
                         </button>
                       </div>
                     </div>
