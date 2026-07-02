@@ -24,10 +24,10 @@ export const ProgressBand: React.FC<ProgressBandProps> = ({
   const palette = getThemePalette(theme);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 xl:gap-2.5">
        {/* 1. Streak Heatmap Section */}
       <Card
-        className="backdrop-blur-md shadow-sm !p-5 cursor-pointer transition-transform active:scale-[0.995]"
+        className="backdrop-blur-md shadow-sm !p-5 xl:!p-4 cursor-pointer transition-transform active:scale-[0.995]"
         style={{ background: palette.cardBg, borderColor: palette.border }}
         onClick={onExpandHeatmap}
       >
@@ -43,25 +43,25 @@ export const ProgressBand: React.FC<ProgressBandProps> = ({
       </Card>
 
       {/* 2. Monthly Summary Stats */}
-      <Card className="backdrop-blur-md shadow-sm !p-5" style={{ background: palette.cardBg, borderColor: palette.border }}>
-        <div className="flex items-center justify-between mb-4">
+      <Card className="backdrop-blur-md shadow-sm !p-5 xl:!p-4" style={{ background: palette.cardBg, borderColor: palette.border }}>
+        <div className="flex items-center justify-between mb-4 xl:mb-3">
           <div className="flex items-center gap-2">
             <Flame size={16} className="text-point-400" />
-            <span className="text-sm font-medium" style={{ color: palette.strongText }}>이번 달 요약</span>
+            <span className="text-sm xl:text-[13px] font-medium" style={{ color: palette.strongText }}>이번 달 요약</span>
           </div>
           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>This Month</span>
         </div>
         
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-2xl p-3 text-center shadow-[0_2px_8px_rgba(0,0,0,0.02)]" style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}` }}>
+        <div className="grid grid-cols-3 gap-3 xl:gap-2.5">
+          <div className="rounded-2xl p-3 xl:p-2.5 text-center shadow-[0_2px_8px_rgba(0,0,0,0.02)]" style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}` }}>
             <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Records</p>
-            <p className="text-xl font-bold text-point-500 mt-2">{monthlyRecords.length}</p>
+            <p className="text-xl xl:text-lg font-bold text-point-500 mt-2 xl:mt-1.5">{monthlyRecords.length}</p>
           </div>
-          <div className="rounded-2xl p-3 text-center shadow-[0_2px_8px_rgba(0,0,0,0.02)]" style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}` }}>
+          <div className="rounded-2xl p-3 xl:p-2.5 text-center shadow-[0_2px_8px_rgba(0,0,0,0.02)]" style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}` }}>
             <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>{KPI_LABELS.monthRate}</p>
-            <p className="text-xl font-bold mt-2" style={{ color: palette.strongText }}>{monthlyConsistency}%</p>
+            <p className="text-xl xl:text-lg font-bold mt-2 xl:mt-1.5" style={{ color: palette.strongText }}>{monthlyConsistency}%</p>
           </div>
-          <div className="rounded-2xl p-3 text-center shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex flex-col items-center" style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}` }}>
+          <div className="rounded-2xl p-3 xl:p-2.5 text-center shadow-[0_2px_8px_rgba(0,0,0,0.02)] flex flex-col items-center" style={{ background: palette.cardBgSoft, border: `1px solid ${palette.border}` }}>
             <p className="text-[9px] font-bold uppercase tracking-widest mb-2" style={{ color: palette.faintText }}>Top Mood</p>
             {topMood ? (
               <MoodSticker code={topMood} className="opacity-100 scale-[0.85] origin-top" />

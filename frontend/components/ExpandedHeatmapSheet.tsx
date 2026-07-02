@@ -85,6 +85,7 @@ export const ExpandedHeatmapSheet: React.FC<ExpandedHeatmapSheetProps> = ({
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
+  const emptyCellColor = theme === 'dark' ? 'rgba(51,65,85,0.92)' : 'rgba(226,232,240,0.9)';
 
   const [today] = useState(() => {
     const d = new Date();
@@ -120,7 +121,7 @@ export const ExpandedHeatmapSheet: React.FC<ExpandedHeatmapSheetProps> = ({
     const recorded = dayCells.filter((c) => c.hasRecord).length;
     const isCurrentMonth =
       today.getFullYear() === selectedYear && today.getMonth() === selectedMonth;
-    const eligible = isCurrentMonth ? today.getDate() : dayCells.length;
+    const eligible = dayCells.length;
     const rate = eligible > 0 ? Math.round((recorded / eligible) * 100) : 0;
     return { recorded, eligible, rate, isCurrentMonth };
   }, [cells, selectedYear, selectedMonth, today]);
@@ -280,16 +281,13 @@ export const ExpandedHeatmapSheet: React.FC<ExpandedHeatmapSheetProps> = ({
             <span className="text-2xl font-bold text-point-500 tabular-nums">{stats.rate}%</span>
             <p className="text-xs font-medium" style={{ color: palette.mutedText }}>
               {stats.eligible}일 중 {stats.recorded}일 기록
-              {stats.isCurrentMonth && (
-                <span style={{ color: palette.faintText }}> · 오늘까지</span>
-              )}
             </p>
           </div>
 
           {/* Progress bar */}
           <div
             className="h-1.5 rounded-full mb-4 overflow-hidden"
-            style={{ background: palette.emptyCell }}
+            style={{ background: emptyCellColor }}
           >
             <div
               className="h-full rounded-full bg-point-400 transition-all duration-500"
@@ -343,7 +341,7 @@ export const ExpandedHeatmapSheet: React.FC<ExpandedHeatmapSheetProps> = ({
                       ? undefined
                       : cell.isFuture
                         ? 'transparent'
-                        : palette.emptyCell,
+                        : emptyCellColor,
                     opacity: cell.isFuture ? 0.28 : 1,
                   }}
                   title={
@@ -376,7 +374,7 @@ export const ExpandedHeatmapSheet: React.FC<ExpandedHeatmapSheetProps> = ({
           {/* Mood legend */}
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1.5 mt-5">
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-sm" style={{ background: palette.emptyCell }} />
+              <div className="w-2.5 h-2.5 rounded-sm" style={{ background: emptyCellColor }} />
               <span className="text-[9px]" style={{ color: palette.faintText }}>없음</span>
             </div>
             {MOOD_LEGEND.map((m) => (

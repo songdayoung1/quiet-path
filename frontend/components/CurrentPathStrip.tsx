@@ -27,7 +27,7 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
 
   if (!currentDirection) {
     return (
-      <Card className="!rounded-[2rem] !p-6 backdrop-blur-md shadow-sm !transition-all !duration-300 flex items-center justify-center gap-4 py-8" style={{ background: palette.cardBg, borderColor: palette.border }}>
+      <Card className="!rounded-[2rem] !p-6 xl:!p-5 backdrop-blur-md shadow-sm !transition-all !duration-300 flex items-center justify-center gap-4 py-8" style={{ background: palette.cardBg, borderColor: palette.border }}>
         <div className="w-12 h-12 rounded-full flex items-center justify-center mb-1 border shadow-inner" style={{ background: palette.cardBgSoft, borderColor: palette.divider }}>
           <Wind size={22} className="text-mist-300" strokeWidth={1.5} />
         </div>
@@ -41,13 +41,13 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
 
   return (
     <Card
-      className="!rounded-[2rem] !p-5 backdrop-blur-md shadow-sm !transition-all !duration-300"
+      className="!rounded-[2rem] !p-5 xl:!p-4 backdrop-blur-md shadow-sm !transition-all !duration-300"
       style={{ background: palette.cardBg, borderColor: palette.border }}
     >
-      <div className="flex items-center gap-5 relative z-10">
+      <div className="flex items-center gap-5 xl:gap-4 relative z-10">
         {/* Category Section: Icon with subtle background circle */}
-        <div className="flex flex-col items-center gap-2 shrink-0">
-          <span className="text-[10px] font-bold tracking-wider mb-1" style={{ color: accentColor }}>
+        <div className="flex flex-col items-center gap-2 xl:gap-1.5 shrink-0">
+          <span className="text-[10px] font-bold tracking-wider mb-1 xl:mb-0.5" style={{ color: accentColor }}>
             {cat?.label || 'Path'}
           </span>
           <div className="relative">
@@ -65,21 +65,21 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
 
         {/* Content Section: Title and Question */}
         <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <h3 className="text-[17px] font-bold leading-snug break-keep mb-1.5" style={{ color: palette.strongText }}>
+          <h3 className="text-[17px] xl:text-[15px] font-bold leading-snug break-keep mb-1.5 xl:mb-1" style={{ color: palette.strongText }}>
             {currentDirection?.description || '아직 설정된 여정이 없어요'}
           </h3>
           {currentDirection?.question && (
-            <p className="text-[12px] font-medium leading-relaxed break-keep line-clamp-1 opacity-90" style={{ color: palette.mutedText }}>
+            <p className="text-[12px] xl:text-[11px] font-medium leading-relaxed break-keep line-clamp-1 opacity-90" style={{ color: palette.mutedText }}>
               {currentDirection.question}
             </p>
           )}
         </div>
 
         {/* Info Section: Consistency & Review Date */}
-        <div className="flex flex-col items-end shrink-0 gap-2.5">
+        <div className="flex flex-col items-end shrink-0 gap-2.5 xl:gap-2">
           <div className="text-right">
             <div className="flex items-baseline justify-end gap-0.5">
-              <span className="text-2xl font-black tracking-tighter" style={{ color: accentColor }}>
+              <span className="text-2xl xl:text-xl font-black tracking-tighter" style={{ color: accentColor }}>
                 {currentPathConsistency}
               </span>
               <span className="text-[10px] font-bold" style={{ color: palette.faintText }}>%</span>
