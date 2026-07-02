@@ -1,5 +1,7 @@
 import React from 'react';
 import { Record as RecordType } from '../types';
+import { getRecordParagraphs } from '../utils/recordText';
+import { WaterDropCharacter, type CharacterMood } from './WaterDropCharacter';
 
 interface Props {
   record: RecordType;
@@ -24,6 +26,25 @@ const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV
 const WEEKDAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 const fmtTime = (d: Date) => d.toTimeString().slice(0, 5);
 
+const resolveCharacterMood = (mood?: string): CharacterMood => {
+  switch (mood) {
+    case '잔잔':
+      return 'CALM';
+    case '반짝':
+      return 'SPARKLE';
+    case '두근':
+      return 'EXCITED';
+    case '버팀':
+      return 'HOLDING';
+    case '멍함':
+      return 'BLANK';
+    case '포근':
+      return 'COZY';
+    default:
+      return 'COZY';
+  }
+};
+
 export const RecordDetailDiary: React.FC<Props> = ({
   record, nickname, pageNumber, onClose, onEdit, onShare, onDelete,
 }) => {
@@ -34,10 +55,22 @@ export const RecordDetailDiary: React.FC<Props> = ({
   const hasPhoto = !!record.imageUrl;
   const hasOneWord = !!record.oneWordText?.trim();
   const hasTomorrow = !!record.tomorrowText?.trim();
+  const actionParagraphs = getRecordParagraphs(record.action);
+  const tomorrowParagraphs = hasTomorrow ? getRecordParagraphs(record.tomorrowText!) : [];
+  const actionCharacterCount = actionParagraphs.join(' ').replace(/\s+/g, '').length;
+  const isCompactEntry = !hasPhoto && actionParagraphs.length <= 2 && actionCharacterCount <= 42;
+  const characterMood = resolveCharacterMood(mood);
+  const mascotRailMoods: CharacterMood[] = [characterMood, 'COZY', 'SPARKLE', 'CALM', 'HOLDING'];
+  const cardSurfaceStyle: React.CSSProperties = {
+    background: 'linear-gradient(160deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.74) 100%)',
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.94), 0 2px 6px rgba(82,96,109,0.05), 0 18px 36px -22px rgba(82,96,109,0.22)',
+  };
+  const sectionLabelClassName = 'text-[10px] font-bold tracking-[0.12em] text-mist-400';
 
   return (
     <div
-      className="absolute inset-0 z-50 flex flex-col overflow-y-auto"
+      className="fixed inset-y-0 left-1/2 z-50 flex w-full max-w-[430px] -translate-x-1/2 flex-col overflow-y-auto"
       style={{
         background:
           'radial-gradient(circle at -30% -25%, rgba(194,209,255,0.44) 0%, rgba(194,209,255,0) 62%),' +
@@ -45,154 +78,238 @@ export const RecordDetailDiary: React.FC<Props> = ({
           'linear-gradient(180deg, #ECEFFE 0%, #E2EEEC 100%)',
       }}
     >
-      <header className="flex items-center justify-between px-5 pt-6">
-        <button
-          onClick={onClose}
-          className="text-mist-500 text-[13px] font-bold px-2 py-2 rounded-full hover:bg-white/40"
-        >
-          닫기
-        </button>
-        <span className="font-mono text-[11px] font-bold tracking-[0.12em] text-mist-400">
-          RECORD · {String(pageNumber ?? 1).padStart(3, '0')}
+      <header
+        className="sticky top-0 z-30 px-5 pb-4 pt-5"
+        style={{
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          background: 'linear-gradient(180deg, rgba(236,239,254,0.92) 0%, rgba(236,239,254,0.72) 72%, rgba(236,239,254,0))',
+        }}
+      >
+        <span className="block text-center text-[10px] font-bold tracking-[0.3em] uppercase text-mist-400 opacity-85">
+          Quiet Path
         </span>
-        <div className="w-9 h-9" />
       </header>
 
-      <div className="px-5 mt-3 pb-10">
-        <article
-          className="relative rounded-[22px] overflow-hidden border border-white/90"
-          style={{
-            background:
-              'radial-gradient(circle at 30% 0%, rgba(255,255,255,0.85) 0%, transparent 60%),' +
-              'linear-gradient(180deg, #F4F6FE 0%, #EDF1ED 100%)',
-            boxShadow:
-              '0 1px 0 rgba(255,255,255,0.9) inset, 0 18px 36px -22px rgba(82,96,109,0.22), 0 2px 6px -2px rgba(82,96,109,0.06)',
-          }}
-        >
-          {/* noise texture */}
-          <span
-            aria-hidden
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              opacity: 0.03,
-              mixBlendMode: 'multiply',
-              backgroundImage:
-                "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-            }}
-          />
+      <div className="relative flex min-h-[calc(100dvh-64px)] flex-col justify-center px-5 pt-16">
+        <div className="mx-auto flex w-full max-w-[640px] flex-col">
+          <div className="relative mb-6 flex min-h-[48px] items-center justify-center">
+            <span className="font-mono text-[11px] font-bold tracking-[0.12em] text-mist-400">
+              RECORD · {String(pageNumber ?? 1).padStart(3, '0')}
+            </span>
+            <button
+              onClick={onClose}
+              className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full border border-white/70 bg-white/62 px-3 py-2 text-[13px] font-bold text-mist-500 shadow-[0_8px_18px_-14px_rgba(82,96,109,0.35)] backdrop-blur-sm transition-all duration-200 hover:border-white hover:bg-white hover:text-slate-700 hover:shadow-[0_14px_28px_-16px_rgba(82,96,109,0.45)] active:scale-[0.97]"
+            >
+              닫기
+            </button>
+          </div>
 
-          {/* 1) Header */}
-          <div className="px-6 pt-6 pb-4 flex items-end justify-between">
-            <div>
-              <p className="font-mono text-[10px] font-bold text-mist-500 tracking-[0.22em] mb-1">
-                {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
-              </p>
-              <p className="text-[52px] font-bold text-slate-800 leading-none tabular-nums tracking-tight">
-                {String(date.getDate()).padStart(2, '0')}
-              </p>
+          <div className="relative z-10">
+            <article
+              className="overflow-hidden rounded-[26px] border border-white/85"
+              style={cardSurfaceStyle}
+            >
+            {hasPhoto && (
+              <div className="relative aspect-[4/3] overflow-hidden">
+                <img src={record.imageUrl} alt="기록 사진" className="h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,17,30,0.25)_0%,transparent_30%,rgba(15,17,30,0.15)_60%,rgba(15,17,30,0.55)_100%)]" />
+                <div className="absolute inset-x-0 top-0 flex items-start justify-between px-[18px] pb-6 pt-[18px]">
+                  <div className="text-white">
+                    <p className="mb-1 font-mono text-[9px] font-bold tracking-[0.2em] text-white/85">
+                      {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
+                    </p>
+                    <p className="text-[38px] font-extrabold leading-[0.9] tracking-[-0.03em] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
+                      {String(date.getDate()).padStart(2, '0')}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="font-mono text-[10px] tracking-wider text-center text-white/90">{fmtTime(date)}</span>
+                    {mood && (
+                      <span
+                        className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-white/40 px-3 py-1.5 text-xs font-bold leading-none text-white backdrop-blur-sm"
+                        style={{ background: 'rgba(255,255,255,0.24)' }}
+                      >
+                        {mood}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!hasPhoto && (
+              <div className="flex items-end justify-between px-6 pb-[18px] pt-6">
+                <div>
+                  <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-mist-500">
+                    {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
+                  </p>
+                  <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-slate-800">
+                    {String(date.getDate()).padStart(2, '0')}
+                  </p>
+                </div>
+                <div className="flex flex-col items-center gap-2.5">
+                  <span className="font-mono text-[10px] tracking-wider text-center text-mist-400">{fmtTime(date)}</span>
+                  {moodTone && mood && (
+                    <span className={`inline-flex items-center justify-center rounded-xl border-[1.5px] px-3 py-1.5 ${moodTone.bg} ${moodTone.border}`}>
+                      <span className={`text-xs font-bold leading-none ${moodTone.text}`}>{mood}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div
+              className={[
+                hasPhoto ? 'px-6 pt-5 pb-[22px]' : '',
+                !hasPhoto && !isCompactEntry ? 'px-6 pt-1 pb-[22px]' : '',
+                isCompactEntry ? 'relative px-8 pt-4 pb-8' : '',
+              ].join(' ')}
+            >
+              {isCompactEntry && (
+                <>
+                  <div
+                    aria-hidden
+                    className="absolute left-1/2 top-6 h-[180px] w-[180px] -translate-x-1/2 rounded-full blur-3xl"
+                    style={{ background: 'rgba(196,181,253,0.18)' }}
+                  />
+                  <div aria-hidden className="absolute right-5 top-0 opacity-[0.08]">
+                    <WaterDropCharacter size={68} mood={characterMood} animate={false} />
+                  </div>
+                </>
+              )}
+              <p className={`${sectionLabelClassName} ${isCompactEntry ? 'mb-4 text-center' : 'mb-3'}`}>오늘의 기록</p>
+              <div className={`space-y-[18px] ${isCompactEntry ? 'relative mx-auto max-w-[420px] text-center' : ''}`}>
+                {actionParagraphs.map((paragraph, index) => (
+                  <p
+                    key={`${record.id}-action-${index}`}
+                    className={[
+                      'whitespace-pre-line font-bold tracking-[-0.01em] text-slate-800',
+                      isCompactEntry ? 'text-[22px] leading-[1.85]' : 'text-[20px] leading-[1.72]',
+                    ].join(' ')}
+                  >
+                    {paragraph}
+                  </p>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-col items-end gap-2">
-              <span className="font-mono text-[10px] text-mist-400 tracking-wider">{fmtTime(date)}</span>
-              {moodTone && mood && (
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-full border ${moodTone.bg} ${moodTone.border}`}>
-                  <span className={`text-[11px] font-bold leading-none ${moodTone.text}`}>{mood}</span>
+
+            {hasOneWord && (
+              <div className={`px-6 pb-5 ${isCompactEntry ? '' : 'flex items-center gap-[9px]'}`}>
+                {isCompactEntry ? (
+                  <div className="mx-auto flex w-fit items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <span className={sectionLabelClassName}>한 단어</span>
+                    <span className="h-px w-[14px] bg-mist-200" />
+                    <span className="text-[15px] font-semibold italic tracking-[-0.01em] text-point-600">
+                      "{record.oneWordText}"
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <span className={sectionLabelClassName}>한 단어</span>
+                    <span className="h-px w-[14px] bg-mist-200" />
+                    <span className="text-[14px] font-semibold italic tracking-[-0.01em] text-point-600">
+                      "{record.oneWordText}"
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+
+            {hasTomorrow && (
+              <div className="border-t border-mist-200/60 px-6 pb-[18px] pt-4">
+                <div className={isCompactEntry ? 'space-y-2 text-center' : 'flex gap-[10px]'}>
+                  <span className={`${sectionLabelClassName} ${isCompactEntry ? 'block' : 'shrink-0 pt-[2px]'}`}>내일의 메모</span>
+                  <div className={`min-w-0 ${isCompactEntry ? 'mx-auto max-w-[360px] space-y-2' : 'flex-1 space-y-1.5'}`}>
+                    {tomorrowParagraphs.map((paragraph, index) => (
+                      <p
+                        key={`${record.id}-tomorrow-${index}`}
+                        className={[
+                          'whitespace-pre-line font-medium tracking-[-0.01em] text-mist-500',
+                          isCompactEntry ? 'text-[14px] leading-[1.8]' : 'text-[13px] leading-[1.65]',
+                        ].join(' ')}
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+              <div className="flex items-center justify-between px-6 pb-5">
+                <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">
+                  {nickname ? `— ${nickname}` : ''}
                 </span>
+                <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">
+                  pg.{String(pageNumber ?? 1).padStart(3, '0')}
+                </span>
+              </div>
+            </article>
+
+            <div className="mt-4 flex items-center justify-center gap-2">
+              {onEdit && (
+                <button
+                  onClick={onEdit}
+                  className="rounded-full border border-white bg-white/70 px-4 py-2 text-[11px] font-bold text-mist-500 transition hover:bg-white"
+                >
+                  편집
+                </button>
+              )}
+              {onShare && (
+                <button
+                  onClick={onShare}
+                  className="rounded-full border border-white bg-white/70 px-4 py-2 text-[11px] font-bold text-mist-500 transition hover:bg-white"
+                >
+                  카드 내보내기
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={onDelete}
+                  className="rounded-full border border-white bg-white/70 px-4 py-2 text-[11px] font-bold text-rose-400 transition hover:bg-rose-50"
+                >
+                  삭제하기
+                </button>
               )}
             </div>
           </div>
 
-          {/* 2) Photo (optional) */}
-          {hasPhoto && (
-            <div className="px-6">
-              <div className="aspect-[4/3] rounded-md overflow-hidden border border-mist-200/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_2px_8px_-4px_rgba(82,96,109,0.18)] bg-white">
-                <img src={record.imageUrl} alt="기록 사진" className="w-full h-full object-cover" />
+          <div aria-hidden className="pointer-events-none relative mt-5 flex justify-center pb-4">
+            <div className="relative w-full max-w-[640px]">
+              <div className="absolute -left-8 bottom-6 opacity-[0.15]">
+                <WaterDropCharacter size={132} mood={characterMood} animate={false} />
+              </div>
+              <div className="absolute -right-5 bottom-10 opacity-[0.11]">
+                <WaterDropCharacter size={78} mood="SPARKLE" animate={false} />
+              </div>
+              <div
+                className="absolute right-0 top-3 h-[96px] w-[96px] rounded-full blur-2xl"
+                style={{ background: 'rgba(167,139,250,0.18)' }}
+              />
+              <div className="mx-auto w-fit">
+                <div className="mb-2 text-center">
+                  <span className="font-mono text-[10px] font-bold tracking-[0.22em] text-mist-400">QUIET MEMORY</span>
+                </div>
+                <div className="flex items-end gap-3 rounded-[28px] border border-white/40 bg-white/28 px-5 py-4 backdrop-blur-md shadow-[0_16px_30px_-24px_rgba(82,96,109,0.3)]">
+                  {mascotRailMoods.map((railMood, index) => (
+                    <div key={`${record.id}-mascot-${railMood}-${index}`} className="flex flex-col items-center gap-2">
+                      <WaterDropCharacter
+                        size={index === 0 ? 44 : index === 2 ? 38 : 34}
+                        mood={railMood}
+                        animate={false}
+                        className={index === 0 ? '' : 'opacity-85'}
+                      />
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 text-center text-[12px] font-medium tracking-[-0.01em] text-mist-400">
+                  짧은 하루도 이렇게 남겨두면 충분해요
+                </div>
               </div>
             </div>
-          )}
-
-          {/* 3) One Word — large when no photo, small when photo exists */}
-          {hasOneWord && !hasPhoto && (
-            <div
-              className="mx-6 mb-1 mt-1 relative px-5 py-7 rounded-md text-center"
-              style={{
-                background: 'linear-gradient(180deg, rgba(255,228,230,0.5) 0%, rgba(245,243,255,0.45) 100%)',
-                border: '1px dashed rgba(154,165,177,0.35)',
-              }}
-            >
-              <p className="font-mono text-[9px] font-bold text-mist-400 tracking-[0.28em] mb-3">— ONE WORD</p>
-              <p className="text-[26px] font-bold text-slate-800 leading-tight tracking-tight">
-                "{record.oneWordText}"
-              </p>
-            </div>
-          )}
-          {hasOneWord && hasPhoto && (
-            <div className="px-6 pt-5 pb-1">
-              <p className="font-mono text-[9px] font-bold text-mist-400 tracking-[0.24em] mb-1">— ONE WORD</p>
-              <p className="text-[24px] font-bold text-slate-800 leading-tight tracking-tight">
-                "{record.oneWordText}"
-              </p>
-            </div>
-          )}
-
-          {/* 4) Body — on ruling lines */}
-          <div
-            className="px-6 pt-6 pb-7"
-            style={{
-              backgroundImage:
-                'repeating-linear-gradient(180deg, transparent 0, transparent 31px, rgba(154,165,177,0.18) 31px, rgba(154,165,177,0.18) 32px)',
-            }}
-          >
-            <p className="font-mono text-[9px] font-bold text-mist-400 tracking-[0.24em] mb-2">— TODAY'S SCENE</p>
-            <p className="text-[14.5px] text-slate-800 leading-[32px] font-medium whitespace-pre-line">
-              {record.action}
-            </p>
           </div>
-
-          {/* 5) Tomorrow (optional) */}
-          {hasTomorrow && (
-            <div className="px-6 pt-2 pb-6 text-right">
-              <p className="font-mono text-[9px] font-bold text-mist-400 tracking-[0.24em] mb-1">— TOMORROW</p>
-              <p className="text-[14px] text-mist-600 font-medium">{record.tomorrowText}</p>
-            </div>
-          )}
-
-          {/* 6) Signature */}
-          <div className="px-6 pb-6 flex items-center justify-between">
-            <span className="font-mono text-[9px] text-mist-400 tracking-[0.22em]">
-              {nickname ? `— ${nickname}` : ''}
-            </span>
-            <span className="font-mono text-[9px] text-mist-400 tracking-[0.22em]">
-              pg.{String(pageNumber ?? 1).padStart(3, '0')}
-            </span>
-          </div>
-        </article>
-
-        {/* Actions */}
-        <div className="flex items-center justify-center gap-2 mt-5">
-          {onEdit && (
-            <button
-              onClick={onEdit}
-              className="px-4 py-2 rounded-full bg-white/70 border border-white text-mist-500 text-[11px] font-bold hover:bg-white transition"
-            >
-              편집
-            </button>
-          )}
-          {onShare && (
-            <button
-              onClick={onShare}
-              className="px-4 py-2 rounded-full bg-white/70 border border-white text-mist-500 text-[11px] font-bold hover:bg-white transition"
-            >
-              공유
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={onDelete}
-              className="px-4 py-2 rounded-full bg-white/70 border border-white text-rose-400 text-[11px] font-bold hover:bg-rose-50 transition"
-            >
-              삭제하기
-            </button>
-          )}
         </div>
       </div>
     </div>

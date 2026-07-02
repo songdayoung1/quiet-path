@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Record as RecordType } from '../types';
-import { AlertTriangle, BookOpenText, Calendar, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { AlertCircle, AlertTriangle, BookOpenText, Calendar, ChevronLeft, ChevronRight, Download, Grid3X3, Image as ImageIcon } from 'lucide-react';
 import { RecordDetailDiary } from '../components/RecordDetailDiary';
 import { AlbumTab } from '../components/records/AlbumTab';
 import { RecordsListTab } from '../components/records/RecordsListTab';
@@ -11,6 +11,7 @@ import { recordApi, RecordMonthlyResponse, RecordResponse } from '../api/recordA
 import type { ApiErrorWithStatus } from '../api/apiClient';
 import { isMockAccessToken } from '../api/authApi';
 import { AppModal } from '../components/AppModal';
+import { exportRecordCard } from '../utils/exportRecordCard';
 
 interface RecordsViewProps {
   records: RecordType[];
@@ -90,11 +91,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<RecordType | null>(null);
   const [activeTab, setActiveTab] = useState<'album' | 'records' | 'calendar'>('album');
   const [selectedMonthDate, setSelectedMonthDate] = useState<Date>(() => {
-    const firstRecord = records
-      .filter((record) => !record.isHidden)
-      .sort((a, b) => b.timestamp - a.timestamp)[0];
-    const ref = firstRecord ? new Date(firstRecord.timestamp) : new Date();
-    const now = new Date(ref);
+    const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [monthlyReport, setMonthlyReport] = useState<RecordMonthlyResponse | null>(null);
@@ -102,6 +99,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const [monthlyError, setMonthlyError] = useState<string | null>(null);
   const [pendingDeleteRecord, setPendingDeleteRecord] = useState<RecordType | null>(null);
   const [deleteNotice, setDeleteNotice] = useState<{ title: string; description: string } | null>(null);
+  const [shareNotice, setShareNotice] = useState<{ title: string; description: string } | null>(null);
   const [isDeletingRecord, setIsDeletingRecord] = useState(false);
 
   const targetMonth = selectedMonthDate.getMonth();
@@ -334,6 +332,37 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     }
   };
 
+  const handleExportRecord = async (record: RecordType) => {
+    try {
+      const result = await exportRecordCard(record);
+      setShareNotice({
+        title: result.mode === 'share' ? '카드를 공유했어요' : '카드를 저장했어요',
+        description:
+          result.mode === 'share'
+            ? '기기 공유 시트를 통해 기록 카드를 전달했어요.'
+            : '기록 카드 이미지를 기기에 저장했어요.',
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return;
+      }
+      setShareNotice({
+        title: '카드를 내보내지 못했어요',
+        description: buildApiErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    }
+  };
+
+  const handleMonthlyExportNotice = (type: 'heatmap' | 'records') => {
+    setShareNotice({
+      title: type === 'heatmap' ? '히트맵 저장 준비 중이에요' : '전체 기록 저장 준비 중이에요',
+      description:
+        type === 'heatmap'
+          ? '이번 달 히트맵 카드는 상단 공용 액션으로 붙일 예정이에요. 웹 저장 흐름에 맞춰 곧 연결할게요.'
+          : '이번 달 전체 기록 카드는 한 번에 저장할 수 있게 이어서 연결할 예정이에요.',
+    });
+  };
+
   if (selectedRecordForDetail) {
     const record = selectedRecordForDetail;
     const pageNumber = monthlyRecords.findIndex((item) => item.id === record.id) + 1;
@@ -343,6 +372,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           record={record}
           pageNumber={pageNumber > 0 ? pageNumber : 1}
           onClose={() => setSelectedRecordForDetail(null)}
+          onShare={() => void handleExportRecord(record)}
           onDelete={() => requestDeleteRecord(record)}
         />
         <AppModal
@@ -367,6 +397,16 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           onConfirm={() => setDeleteNotice(null)}
           onClose={() => setDeleteNotice(null)}
         />
+        <AppModal
+          open={shareNotice !== null}
+          icon={<AlertTriangle size={24} />}
+          title={shareNotice?.title ?? ''}
+          description={shareNotice?.description ?? ''}
+          confirmLabel="확인"
+          hideCancel={true}
+          onConfirm={() => setShareNotice(null)}
+          onClose={() => setShareNotice(null)}
+        />
       </div>
     );
   }
@@ -379,7 +419,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             <h1 className="text-2xl font-bold tracking-tight" style={{ color: palette.strongText }}>
               {targetYear}년 {targetMonth + 1}월의 궤적
             </h1>
-            <p className="text-sm mt-1" style={{ color: palette.mutedText }}>한 달 동안 남긴 장면들을 모아 보여줍니다.</p>
+            <p className="text-sm mt-1" style={{ color: palette.mutedText }}>한 달 동안 남긴 기록들을 모아 보여줍니다.</p>
           </div>
           <div className="flex items-center gap-1 rounded-full px-2 py-2 shadow-sm border" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
             <button
@@ -470,6 +510,28 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             </button>
           ))}
         </div>
+        <div className="mt-3 flex items-center justify-end gap-2 flex-wrap">
+          <button
+            onClick={() => handleMonthlyExportNotice('heatmap')}
+            title="이번 달 활동 흐름을 한 장의 카드로 저장하는 기능이에요."
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors"
+            style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
+          >
+            <Grid3X3 size={13} />
+            히트맵 저장
+            <AlertCircle size={12} style={{ color: palette.mutedText }} />
+          </button>
+          <button
+            onClick={() => handleMonthlyExportNotice('records')}
+            title="이번 달 기록들을 한 번에 묶어 저장하는 기능이에요."
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors"
+            style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
+          >
+            <Download size={13} />
+            전체 기록 저장
+            <AlertCircle size={12} style={{ color: palette.mutedText }} />
+          </button>
+        </div>
       </div>
 
       {activeTab === 'album' && (
@@ -519,6 +581,16 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         hideCancel={true}
         onConfirm={() => setDeleteNotice(null)}
         onClose={() => setDeleteNotice(null)}
+      />
+      <AppModal
+        open={shareNotice !== null}
+        icon={<AlertTriangle size={24} />}
+        title={shareNotice?.title ?? ''}
+        description={shareNotice?.description ?? ''}
+        confirmLabel="확인"
+        hideCancel={true}
+        onConfirm={() => setShareNotice(null)}
+        onClose={() => setShareNotice(null)}
       />
     </div>
   );
