@@ -4,9 +4,9 @@ export interface Record {
   date: string; // ISO String
   timestamp: number;
   directionQuestion: string; // The question active at the time
-  action: string; // 오늘의 장면 (Scene)
-  oneWordText?: string; // 오늘을 한 단어로
-  tomorrowText?: string; // 내일의 한 걸음
+  action: string; // 오늘의 기록
+  oneWordText?: string; // 오늘의 한 단어
+  tomorrowText?: string; // 내일의 메모
   reflection?: string; // Legacy
   plan?: string; // Legacy
   isHidden?: boolean; // Soft delete

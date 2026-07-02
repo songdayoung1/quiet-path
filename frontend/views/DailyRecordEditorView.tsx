@@ -157,6 +157,8 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
   };
 
   const isSaving = saveState !== 'idle';
+  const hasRecordText = action.trim().length > 0;
+  const hasMoodAndRecord = hasRecordText && moodCode.length > 0;
   const mascotTone: CharacterTone = (MOOD_STICKERS.some((s) => s.code === moodCode) ? moodCode : 'default') as CharacterTone;
 
   const cardStyle = theme === 'dark'
@@ -253,7 +255,7 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 px-5 py-4 max-w-md mx-auto w-full flex flex-col gap-4 overflow-y-auto no-scrollbar">
+        <div className="flex-1 min-h-0 px-5 pt-4 pb-6 max-w-md mx-auto w-full flex flex-col gap-4 overflow-y-auto no-scrollbar">
 
           {/* 01 · MOOD */}
           <div className="animate-slide-up rounded-[24px] p-5 border" style={{ ...cardStyle, animationDelay: '0.05s' }}>
@@ -294,20 +296,21 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
               <div className="flex items-center gap-2.5">
                 <span className="w-[3px] h-3.5 rounded-full flex-shrink-0" style={{ background: 'linear-gradient(180deg, #C4B5FD, #A78BFA)' }} />
                 <span className="text-[14px] font-bold text-mist-600">
-                  {isEditing ? '오늘의 장면을 다듬어볼까요?' : '오늘의 장면을 남겨볼까요?'}
+                  오늘의 기록
                 </span>
               </div>
-              <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">02 · SCENE</span>
+              <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">02 · RECORD</span>
             </div>
             <AutoTextArea
               rows={3}
-              placeholder="기억에 남는 순간이나 한 일을 편하게 적어주세요."
+              placeholder={'기억에 남는 순간이나 오늘의 흐름을 편하게 적어주세요.\n엔터로 문단을 나누면 그대로 보여줘요.'}
               value={action}
               onChange={(e) => setAction(e.target.value)}
               autoFocus
               className="w-full min-h-[88px] resize-none leading-[1.7] rounded-[14px] !p-4 focus:!ring-1 focus:!ring-point-200 text-sm transition-shadow outline-none"
               style={inputStyle}
             />
+            <p className="text-[11px] text-mist-400 mt-3 pl-[13px]">줄을 나누면 카드와 상세 화면에서도 그대로 보여줘요.</p>
           </div>
 
           {/* 03 · WORD */}
@@ -315,7 +318,7 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <span className="w-[3px] h-3.5 rounded-full flex-shrink-0" style={{ background: 'linear-gradient(180deg, #C4B5FD, #A78BFA)' }} />
-                <span className="text-[14px] font-bold text-mist-600">오늘을 한 단어로 표현한다면?</span>
+                <span className="text-[14px] font-bold text-mist-600">오늘의 한 단어</span>
               </div>
               <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">03 · WORD</span>
             </div>
@@ -334,14 +337,14 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2.5">
                 <span className="w-[3px] h-3.5 rounded-full flex-shrink-0" style={{ background: 'linear-gradient(180deg, #C4B5FD, #A78BFA)' }} />
-                <span className="text-[13px] font-bold text-mist-600">내일은 무엇을 해볼까요?</span>
+                <span className="text-[13px] font-bold text-mist-600">내일의 메모</span>
               </div>
-              <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">04 · OPTIONAL</span>
+              <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">04 · MEMO</span>
             </div>
             <p className="text-[11px] text-mist-400 mb-3 pl-[13px]">선택 사항이에요. 부담 없이 적어보세요.</p>
             <input
               type="text"
-              placeholder="내일의 작은 목표나 계획을 적어보세요."
+              placeholder="내일의 작은 목표나 기억하고 싶은 메모를 적어보세요."
               value={tomorrowText}
               onChange={(e) => setTomorrowText(e.target.value)}
               className="w-full rounded-[14px] !p-4 focus:ring-1 focus:ring-mist-200 text-sm outline-none transition-shadow mb-4"
@@ -372,12 +375,11 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
             <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
           </div>
 
-          <div className="h-28" />
         </div>
 
         {/* Floating CTA */}
         <div
-          className="absolute bottom-0 left-0 w-full z-20 pb-[env(safe-area-inset-bottom)]"
+          className="shrink-0 w-full z-20 pb-[env(safe-area-inset-bottom)]"
           style={{
             background:
               theme === 'dark'
@@ -388,11 +390,15 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
           <div className="w-full max-w-md mx-auto px-6 pb-8 pt-8">
             <button
               onClick={handleSubmit}
-              disabled={!action.trim() || isSaving}
+              disabled={!hasRecordText || isSaving}
               className="w-full h-14 rounded-full font-bold text-[15px] flex items-center justify-center gap-2 text-white transition-all disabled:opacity-50"
               style={{
-                background: 'linear-gradient(135deg, #C4B5FD 0%, #A78BFA 100%)',
-                boxShadow: '0 10px 24px -8px rgba(139,92,246,0.4)',
+                background: hasMoodAndRecord
+                  ? 'linear-gradient(135deg, #A78BFA 0%, #8B5CF6 100%)'
+                  : 'linear-gradient(135deg, #D8CCFE 0%, #B79AF9 100%)',
+                boxShadow: hasMoodAndRecord
+                  ? '0 12px 28px -8px rgba(139,92,246,0.52)'
+                  : '0 10px 24px -8px rgba(139,92,246,0.32)',
               }}
             >
               <Check size={18} />
