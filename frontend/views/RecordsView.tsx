@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Record as RecordType } from '../types';
-import { AlertCircle, AlertTriangle, BookOpenText, Calendar, ChevronLeft, ChevronRight, Download, Grid3X3, Image as ImageIcon } from 'lucide-react';
+import { Record as RecordType, type RecordCardDisplayMode } from '../types';
+import { AlertTriangle, BookOpenText, Calendar, ChevronLeft, ChevronRight, Download, Grid3X3, Image as ImageIcon } from 'lucide-react';
 import { RecordDetailDiary } from '../components/RecordDetailDiary';
 import { AlbumTab } from '../components/records/AlbumTab';
 import { RecordsListTab } from '../components/records/RecordsListTab';
@@ -11,7 +11,7 @@ import { recordApi, RecordMonthlyResponse, RecordResponse } from '../api/recordA
 import type { ApiErrorWithStatus } from '../api/apiClient';
 import { isMockAccessToken } from '../api/authApi';
 import { AppModal } from '../components/AppModal';
-import { exportRecordCard } from '../utils/exportRecordCard';
+import { exportRecordCard, exportMonthlyActivityBoard, exportMonthlyCollage } from '../utils/exportRecordCard';
 
 interface RecordsViewProps {
   records: RecordType[];
@@ -89,6 +89,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<RecordType | null>(null);
+  const [detailDisplayMode, setDetailDisplayMode] = useState<RecordCardDisplayMode>('diary');
   const [activeTab, setActiveTab] = useState<'album' | 'records' | 'calendar'>('album');
   const [selectedMonthDate, setSelectedMonthDate] = useState<Date>(() => {
     const now = new Date();
@@ -101,6 +102,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const [deleteNotice, setDeleteNotice] = useState<{ title: string; description: string } | null>(null);
   const [shareNotice, setShareNotice] = useState<{ title: string; description: string } | null>(null);
   const [isDeletingRecord, setIsDeletingRecord] = useState(false);
+  const [isExportingActivityBoard, setIsExportingActivityBoard] = useState(false);
+  const [isExportingCollage, setIsExportingCollage] = useState(false);
 
   const targetMonth = selectedMonthDate.getMonth();
   const targetYear = selectedMonthDate.getFullYear();
@@ -150,6 +153,12 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   useEffect(() => {
     setSelectedRecordForDetail(null);
   }, [targetYear, targetMonth]);
+
+  useEffect(() => {
+    if (selectedRecordForDetail?.imageUrl) {
+      setDetailDisplayMode('diary');
+    }
+  }, [selectedRecordForDetail?.id, selectedRecordForDetail?.imageUrl]);
 
   useEffect(() => {
     setPendingDeleteRecord(null);
@@ -332,9 +341,9 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     }
   };
 
-  const handleExportRecord = async (record: RecordType) => {
+  const handleExportRecord = async (record: RecordType, mode?: RecordCardDisplayMode) => {
     try {
-      const result = await exportRecordCard(record);
+      const result = await exportRecordCard(record, mode ? { mode } : undefined);
       setShareNotice({
         title: result.mode === 'share' ? '카드를 공유했어요' : '카드를 저장했어요',
         description:
@@ -353,14 +362,47 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     }
   };
 
-  const handleMonthlyExportNotice = (type: 'heatmap' | 'records') => {
-    setShareNotice({
-      title: type === 'heatmap' ? '히트맵 저장 준비 중이에요' : '전체 기록 저장 준비 중이에요',
-      description:
-        type === 'heatmap'
-          ? '이번 달 히트맵 카드는 상단 공용 액션으로 붙일 예정이에요. 웹 저장 흐름에 맞춰 곧 연결할게요.'
-          : '이번 달 전체 기록 카드는 한 번에 저장할 수 있게 이어서 연결할 예정이에요.',
-    });
+  const handleActivityBoardExport = async () => {
+    if (isExportingActivityBoard || monthlyRecords.length === 0) return;
+    setIsExportingActivityBoard(true);
+    try {
+      const result = await exportMonthlyActivityBoard(monthlyRecords, targetYear, targetMonth + 1);
+      setShareNotice({
+        title: result.mode === 'share' ? '활동판을 공유했어요' : '활동판을 저장했어요',
+        description: `${targetMonth + 1}월 활동판을 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setShareNotice({
+        title: '활동판을 내보내지 못했어요',
+        description: buildApiErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsExportingActivityBoard(false);
+    }
+  };
+
+  const handleCollageExport = async () => {
+    if (isExportingCollage || monthlyRecords.length === 0) return;
+    setIsExportingCollage(true);
+    try {
+      const result = await exportMonthlyCollage(monthlyRecords, targetYear, targetMonth + 1);
+      setShareNotice({
+        title: result.mode === 'share' ? '콜라주를 공유했어요' : '콜라주를 저장했어요',
+        description:
+          result.pages > 1
+            ? `${result.pages}장으로 나눠 ${result.mode === 'share' ? '공유' : '저장'}했어요.`
+            : `${targetMonth + 1}월 기록 콜라주를 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setShareNotice({
+        title: '콜라주를 내보내지 못했어요',
+        description: buildApiErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsExportingCollage(false);
+    }
   };
 
   if (selectedRecordForDetail) {
@@ -371,8 +413,10 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         <RecordDetailDiary
           record={record}
           pageNumber={pageNumber > 0 ? pageNumber : 1}
+          displayMode={detailDisplayMode}
+          onDisplayModeChange={setDetailDisplayMode}
           onClose={() => setSelectedRecordForDetail(null)}
-          onShare={() => void handleExportRecord(record)}
+          onShare={() => void handleExportRecord(record, record.imageUrl ? detailDisplayMode : undefined)}
           onDelete={() => requestDeleteRecord(record)}
         />
         <AppModal
@@ -512,24 +556,24 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         </div>
         <div className="mt-3 flex items-center justify-end gap-2 flex-wrap">
           <button
-            onClick={() => handleMonthlyExportNotice('heatmap')}
-            title="이번 달 활동 흐름을 한 장의 카드로 저장하는 기능이에요."
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors"
+            onClick={() => void handleActivityBoardExport()}
+            disabled={isExportingActivityBoard || monthlyRecords.length === 0}
+            title="이번 달 활동 흐름을 한 장의 카드로 저장해요."
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
           >
             <Grid3X3 size={13} />
-            히트맵 저장
-            <AlertCircle size={12} style={{ color: palette.mutedText }} />
+            {isExportingActivityBoard ? '저장 중...' : '활동판 저장'}
           </button>
           <button
-            onClick={() => handleMonthlyExportNotice('records')}
-            title="이번 달 기록들을 한 번에 묶어 저장하는 기능이에요."
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors"
+            onClick={() => void handleCollageExport()}
+            disabled={isExportingCollage || monthlyRecords.length === 0}
+            title="이번 달 기록들을 콜라주 카드로 저장해요."
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
           >
             <Download size={13} />
-            전체 기록 저장
-            <AlertCircle size={12} style={{ color: palette.mutedText }} />
+            {isExportingCollage ? '저장 중...' : '전체 기록 저장'}
           </button>
         </div>
       </div>

@@ -29,6 +29,8 @@ export interface RecordSummary {
   imageUrl?: string;
 }
 
+export type RecordCardDisplayMode = 'poster' | 'diary';
+
 export interface MonthlyReportResponse {
   year: number;
   month: number;

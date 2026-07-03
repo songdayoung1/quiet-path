@@ -1,5 +1,5 @@
 import React from 'react';
-import { Record as RecordType } from '../types';
+import { Record as RecordType, type RecordCardDisplayMode } from '../types';
 import { getRecordParagraphs } from '../utils/recordText';
 import { WaterDropCharacter, type CharacterMood } from './WaterDropCharacter';
 
@@ -7,6 +7,8 @@ interface Props {
   record: RecordType;
   nickname?: string;
   pageNumber?: number;
+  displayMode?: RecordCardDisplayMode;
+  onDisplayModeChange?: (mode: RecordCardDisplayMode) => void;
   onClose?: () => void;
   onEdit?: () => void;
   onShare?: () => void;
@@ -46,7 +48,7 @@ const resolveCharacterMood = (mood?: string): CharacterMood => {
 };
 
 export const RecordDetailDiary: React.FC<Props> = ({
-  record, nickname, pageNumber, onClose, onEdit, onShare, onDelete,
+  record, nickname, pageNumber, displayMode = 'diary', onDisplayModeChange, onClose, onEdit, onShare, onDelete,
 }) => {
   const date = new Date(record.timestamp);
   const mood = record.moodCode;
@@ -58,9 +60,13 @@ export const RecordDetailDiary: React.FC<Props> = ({
   const actionParagraphs = getRecordParagraphs(record.action);
   const tomorrowParagraphs = hasTomorrow ? getRecordParagraphs(record.tomorrowText!) : [];
   const actionCharacterCount = actionParagraphs.join(' ').replace(/\s+/g, '').length;
-  const isCompactEntry = !hasPhoto && actionParagraphs.length <= 2 && actionCharacterCount <= 42;
+  const isCompactEntry = actionParagraphs.length <= 2 && actionCharacterCount <= 42;
   const characterMood = resolveCharacterMood(mood);
   const mascotRailMoods: CharacterMood[] = [characterMood, 'COZY', 'SPARKLE', 'CALM', 'HOLDING'];
+  const detailDisplayMode: RecordCardDisplayMode = hasPhoto ? displayMode : 'diary';
+  const isPosterMode = detailDisplayMode === 'poster';
+  const posterActionText = actionParagraphs.join(' ');
+  const directionSummary = record.directionQuestion || '오늘의 방향';
   const cardSurfaceStyle: React.CSSProperties = {
     background: 'linear-gradient(160deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.74) 100%)',
     boxShadow:
@@ -91,9 +97,38 @@ export const RecordDetailDiary: React.FC<Props> = ({
         </span>
       </header>
 
-      <div className="relative flex min-h-[calc(100dvh-64px)] flex-col justify-center px-5 pt-16">
+      <div
+        className={[
+          'relative flex min-h-[calc(100dvh-64px)] flex-col justify-center px-5',
+          hasPhoto ? 'pt-40' : 'pt-16',
+        ].join(' ')}
+      >
         <div className="mx-auto flex w-full max-w-[640px] flex-col">
           <div className="relative mb-6 flex min-h-[48px] items-center justify-center">
+            {hasPhoto && onDisplayModeChange && (
+              <div className="absolute left-0 top-1/2 inline-flex -translate-y-1/2 items-center rounded-full border border-white/70 bg-white/62 p-1 shadow-[0_8px_18px_-14px_rgba(82,96,109,0.35)] backdrop-blur-sm">
+                <button
+                  onClick={() => onDisplayModeChange('poster')}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
+                    detailDisplayMode === 'poster'
+                      ? 'bg-point-500 text-white shadow-[0_8px_18px_-12px_rgba(139,92,246,0.35)]'
+                      : 'text-mist-500 hover:bg-white/80'
+                  }`}
+                >
+                  포스터형
+                </button>
+                <button
+                  onClick={() => onDisplayModeChange('diary')}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
+                    detailDisplayMode === 'diary'
+                      ? 'bg-point-500 text-white shadow-[0_8px_18px_-12px_rgba(139,92,246,0.35)]'
+                      : 'text-mist-500 hover:bg-white/80'
+                  }`}
+                >
+                  기록형
+                </button>
+              </div>
+            )}
             <span className="font-mono text-[11px] font-bold tracking-[0.12em] text-mist-400">
               RECORD · {String(pageNumber ?? 1).padStart(3, '0')}
             </span>
@@ -106,6 +141,89 @@ export const RecordDetailDiary: React.FC<Props> = ({
           </div>
 
           <div className="relative z-10">
+            {isPosterMode ? (
+              <article
+                className="relative overflow-hidden rounded-[30px] border border-white/80 shadow-[0_22px_42px_-28px_rgba(82,96,109,0.35)]"
+                style={{ minHeight: 860 }}
+              >
+                <img src={record.imageUrl} alt="기록 사진" className="absolute inset-0 h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.72)_0%,rgba(10,20,42,0.08)_24%,rgba(10,20,42,0.04)_56%,rgba(10,20,42,0.42)_72%,rgba(10,20,42,0.84)_100%)]" />
+                <div className="relative flex min-h-[860px] flex-col p-7 text-white">
+                  <div className="flex items-start justify-between gap-5">
+                    <div className="flex items-center gap-3">
+                      <WaterDropCharacter size={34} mood={characterMood} animate={false} />
+                      <div>
+                        <p className="text-[14px] font-black tracking-[0.02em] text-white">QUIET PATH</p>
+                      </div>
+                    </div>
+                    <div className="max-w-[180px] text-right">
+                      <p className="text-[11px] font-bold text-white/65">현재 방향</p>
+                      <p className="mt-1 line-clamp-2 text-[20px] font-bold leading-tight text-white">
+                        {directionSummary}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-12 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="mb-1 font-mono text-[12px] font-bold tracking-[0.2em] text-white/85">
+                        {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
+                      </p>
+                      <p className="text-[86px] font-extrabold leading-[0.88] tracking-[-0.05em] text-white">
+                        {String(date.getDate()).padStart(2, '0')}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 pt-1">
+                      <span className="font-mono text-[12px] font-bold tracking-[0.18em] text-white/85">{fmtTime(date)}</span>
+                      {mood && (
+                        <span
+                          className="inline-flex items-center justify-center rounded-2xl border border-white/35 bg-white/16 px-4 py-2 text-[18px] font-bold leading-none text-white backdrop-blur-sm"
+                        >
+                          {mood}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-auto flex flex-col items-center text-center">
+                    <p className="mb-4 text-[14px] font-bold tracking-[0.12em] text-white/68">오늘의 기록</p>
+                    <p className="max-w-[520px] text-[24px] font-extrabold leading-[1.5] tracking-[-0.03em] text-white drop-shadow-[0_6px_18px_rgba(0,0,0,0.28)] line-clamp-3">
+                      {posterActionText}
+                    </p>
+                    {hasOneWord && (
+                      <div className="mt-7 flex items-center gap-[10px] rounded-full border border-white/32 bg-white/14 px-5 py-3 backdrop-blur-sm">
+                        <span className="text-[12px] font-bold tracking-[0.1em] text-white/68">한 단어</span>
+                        <span className="h-px w-[16px] bg-white/28" />
+                        <span className="text-[20px] font-bold tracking-[-0.02em] text-white">
+                          "{record.oneWordText}"
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-10 flex justify-center">
+                    <div className="flex items-end gap-3 rounded-[26px] border border-white/35 bg-white/22 px-5 py-4 backdrop-blur-md shadow-[0_16px_30px_-24px_rgba(82,96,109,0.3)]">
+                      {mascotRailMoods.map((railMood, index) => (
+                        <div key={`${record.id}-poster-mascot-${railMood}-${index}`} className="flex flex-col items-center gap-2">
+                          <WaterDropCharacter
+                            size={index === 0 ? 42 : index === 2 ? 38 : 32}
+                            mood={railMood}
+                            animate={false}
+                            className={index === 0 ? '' : 'opacity-85'}
+                          />
+                          <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-8 flex items-end justify-between text-white/50">
+                    <span className="text-[12px] font-bold">quietpath.app</span>
+                    <span className="font-mono text-[11px] tracking-[0.2em]">pg.{String(pageNumber ?? 1).padStart(3, '0')}</span>
+                  </div>
+                </div>
+              </article>
+            ) : (
             <article
               className="overflow-hidden rounded-[26px] border border-white/85"
               style={cardSurfaceStyle}
@@ -161,9 +279,10 @@ export const RecordDetailDiary: React.FC<Props> = ({
 
             <div
               className={[
-                hasPhoto ? 'px-6 pt-5 pb-[22px]' : '',
-                !hasPhoto && !isCompactEntry ? 'px-6 pt-1 pb-[22px]' : '',
                 isCompactEntry ? 'relative px-8 pt-4 pb-8' : '',
+                !isCompactEntry ? 'px-6 pb-[22px]' : '',
+                hasPhoto && !isCompactEntry ? 'pt-5' : '',
+                !hasPhoto && !isCompactEntry ? 'pt-1' : '',
               ].join(' ')}
             >
               {isCompactEntry && (
@@ -246,6 +365,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
                 </span>
               </div>
             </article>
+            )}
 
             <div className="mt-4 flex items-center justify-center gap-2">
               {onEdit && (
@@ -275,6 +395,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
             </div>
           </div>
 
+          {!isPosterMode && (
           <div aria-hidden className="pointer-events-none relative mt-5 flex justify-center pb-4">
             <div className="relative w-full max-w-[640px]">
               <div className="absolute -left-8 bottom-6 opacity-[0.15]">
@@ -310,6 +431,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
