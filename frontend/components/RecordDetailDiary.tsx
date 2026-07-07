@@ -16,16 +16,16 @@ interface Props {
 }
 
 const MOOD_TONE: Record<string, { bg: string; border: string; text: string }> = {
-  '포근': { bg: 'bg-point-50',  border: 'border-point-200',  text: 'text-point-600'  },
-  '반짝': { bg: 'bg-amber-50',  border: 'border-amber-200',  text: 'text-amber-600'  },
-  '잔잔': { bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-500'   },
-  '버팀': { bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-600'  },
-  '두근': { bg: 'bg-rose-50',   border: 'border-rose-200',   text: 'text-rose-500'   },
-  '멍함': { bg: 'bg-mist-50',   border: 'border-mist-200',   text: 'text-mist-500'   },
+  포근: { bg: 'bg-point-50', border: 'border-point-200', text: 'text-point-600' },
+  반짝: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-600' },
+  잔잔: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-500' },
+  버팀: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-600' },
+  두근: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-500' },
+  멍함: { bg: 'bg-mist-50', border: 'border-mist-200', text: 'text-mist-500' },
 };
 
-const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-const WEEKDAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const fmtTime = (d: Date) => d.toTimeString().slice(0, 5);
 
 const resolveCharacterMood = (mood?: string): CharacterMood => {
@@ -48,7 +48,15 @@ const resolveCharacterMood = (mood?: string): CharacterMood => {
 };
 
 export const RecordDetailDiary: React.FC<Props> = ({
-  record, nickname, pageNumber, displayMode = 'diary', onDisplayModeChange, onClose, onEdit, onShare, onDelete,
+  record,
+  nickname,
+  pageNumber,
+  displayMode = 'diary',
+  onDisplayModeChange,
+  onClose,
+  onEdit,
+  onShare,
+  onDelete,
 }) => {
   const date = new Date(record.timestamp);
   const mood = record.moodCode;
@@ -64,15 +72,26 @@ export const RecordDetailDiary: React.FC<Props> = ({
   const characterMood = resolveCharacterMood(mood);
   const mascotRailMoods: CharacterMood[] = [characterMood, 'COZY', 'SPARKLE', 'CALM', 'HOLDING'];
   const detailDisplayMode: RecordCardDisplayMode = hasPhoto ? displayMode : 'diary';
-  const isPosterMode = detailDisplayMode === 'poster';
+  const isPosterMode = hasPhoto && detailDisplayMode === 'poster';
   const posterActionText = actionParagraphs.join(' ');
-  const directionSummary = record.directionQuestion || '오늘의 방향';
+
   const cardSurfaceStyle: React.CSSProperties = {
     background: 'linear-gradient(160deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.74) 100%)',
     boxShadow:
       'inset 0 1px 0 rgba(255,255,255,0.94), 0 2px 6px rgba(82,96,109,0.05), 0 18px 36px -22px rgba(82,96,109,0.22)',
   };
-  const sectionLabelClassName = 'text-[10px] font-bold tracking-[0.12em] text-mist-400';
+  const posterCardStyle: React.CSSProperties = {
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.74), 0 2px 6px rgba(82,96,109,0.06), 0 18px 36px -22px rgba(82,96,109,0.28)',
+  };
+  const diaryPhotoSurfaceStyle: React.CSSProperties = {
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,255,0.96) 100%)',
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.96), 0 2px 6px rgba(82,96,109,0.06), 0 18px 36px -22px rgba(82,96,109,0.22)',
+  };
+
+  const defaultSectionLabelClassName = 'text-[10px] font-bold tracking-[0.12em] text-mist-400';
+  const posterSectionLabelClassName = 'text-[10px] font-bold tracking-[0.12em] text-white/70';
 
   return (
     <div
@@ -100,7 +119,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
       <div
         className={[
           'relative flex min-h-[calc(100dvh-64px)] flex-col justify-center px-5',
-          hasPhoto ? 'pt-40' : 'pt-16',
+          hasPhoto ? 'pt-28' : 'pt-16',
         ].join(' ')}
       >
         <div className="mx-auto flex w-full max-w-[640px] flex-col">
@@ -143,209 +162,210 @@ export const RecordDetailDiary: React.FC<Props> = ({
           <div className="relative z-10">
             {isPosterMode ? (
               <article
-                className="relative overflow-hidden rounded-[30px] border border-white/80 shadow-[0_22px_42px_-28px_rgba(82,96,109,0.35)]"
-                style={{ minHeight: 860 }}
+                className="relative overflow-hidden rounded-[26px] border border-white/85"
+                style={posterCardStyle}
               >
                 <img src={record.imageUrl} alt="기록 사진" className="absolute inset-0 h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.72)_0%,rgba(10,20,42,0.08)_24%,rgba(10,20,42,0.04)_56%,rgba(10,20,42,0.42)_72%,rgba(10,20,42,0.84)_100%)]" />
-                <div className="relative flex min-h-[860px] flex-col p-7 text-white">
-                  <div className="flex items-start justify-between gap-5">
-                    <div className="flex items-center gap-3">
-                      <WaterDropCharacter size={34} mood={characterMood} animate={false} />
-                      <div>
-                        <p className="text-[14px] font-black tracking-[0.02em] text-white">QUIET PATH</p>
-                      </div>
-                    </div>
-                    <div className="max-w-[180px] text-right">
-                      <p className="text-[11px] font-bold text-white/65">현재 방향</p>
-                      <p className="mt-1 line-clamp-2 text-[20px] font-bold leading-tight text-white">
-                        {directionSummary}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-12 flex items-start justify-between gap-4">
-                    <div>
-                      <p className="mb-1 font-mono text-[12px] font-bold tracking-[0.2em] text-white/85">
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.08)_34%,rgba(10,20,42,0.12)_58%,rgba(10,20,42,0.44)_78%,rgba(10,20,42,0.82)_100%)]" />
+                <div className="relative aspect-[4/3]">
+                  <div className="absolute inset-x-0 top-0 flex items-start justify-between px-6 pb-6 pt-6">
+                    <div className="text-white">
+                      <p className="mb-1 font-mono text-[11px] font-bold tracking-[0.18em] text-white/92">
                         {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
                       </p>
-                      <p className="text-[86px] font-extrabold leading-[0.88] tracking-[-0.05em] text-white">
+                      <p className="text-[68px] font-extrabold leading-[0.88] tracking-[-0.05em] text-white">
                         {String(date.getDate()).padStart(2, '0')}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-2 pt-1">
-                      <span className="font-mono text-[12px] font-bold tracking-[0.18em] text-white/85">{fmtTime(date)}</span>
+                      <span className="font-mono text-[12px] font-bold tracking-[0.12em] text-white">{fmtTime(date)}</span>
                       {mood && (
-                        <span
-                          className="inline-flex items-center justify-center rounded-2xl border border-white/35 bg-white/16 px-4 py-2 text-[18px] font-bold leading-none text-white backdrop-blur-sm"
-                        >
+                        <span className="inline-flex items-center justify-center rounded-2xl border border-white/36 bg-white/16 px-4 py-2 text-[18px] font-bold leading-none text-white backdrop-blur-sm">
                           {mood}
                         </span>
                       )}
                     </div>
                   </div>
+                </div>
 
-                  <div className="mt-auto flex flex-col items-center text-center">
-                    <p className="mb-4 text-[14px] font-bold tracking-[0.12em] text-white/68">오늘의 기록</p>
-                    <p className="max-w-[520px] text-[24px] font-extrabold leading-[1.5] tracking-[-0.03em] text-white drop-shadow-[0_6px_18px_rgba(0,0,0,0.28)] line-clamp-3">
-                      {posterActionText}
-                    </p>
-                    {hasOneWord && (
-                      <div className="mt-7 flex items-center gap-[10px] rounded-full border border-white/32 bg-white/14 px-5 py-3 backdrop-blur-sm">
-                        <span className="text-[12px] font-bold tracking-[0.1em] text-white/68">한 단어</span>
-                        <span className="h-px w-[16px] bg-white/28" />
-                        <span className="text-[20px] font-bold tracking-[-0.02em] text-white">
+                <div className="relative px-6 pb-6 pt-9">
+                  <div aria-hidden className="pointer-events-none absolute right-8 top-7 opacity-[0.08]">
+                    <WaterDropCharacter size={74} mood={characterMood} animate={false} />
+                  </div>
+
+                  <p className={`mb-5 text-center ${posterSectionLabelClassName}`}>오늘의 기록</p>
+                  <div className="space-y-[18px] text-center">
+                    {actionParagraphs.map((paragraph, index) => (
+                      <p
+                        key={`${record.id}-poster-action-${index}`}
+                        className="whitespace-pre-line text-[20px] font-bold leading-[1.72] tracking-[-0.01em] text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.24)]"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+
+                  {hasOneWord && (
+                    <div className="mt-8 flex justify-center">
+                      <div className="flex items-center gap-[10px] rounded-full border border-white/38 bg-white/10 px-5 py-3 backdrop-blur-sm">
+                        <span className="text-[10px] font-bold tracking-[0.12em] text-white">한 단어</span>
+                        <span className="h-px w-[14px] bg-white" />
+                        <span className="text-[18px] font-semibold italic tracking-[-0.01em] text-white">
                           "{record.oneWordText}"
                         </span>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  <div className="mt-10 flex justify-center">
-                    <div className="flex items-end gap-3 rounded-[26px] border border-white/35 bg-white/22 px-5 py-4 backdrop-blur-md shadow-[0_16px_30px_-24px_rgba(82,96,109,0.3)]">
-                      {mascotRailMoods.map((railMood, index) => (
-                        <div key={`${record.id}-poster-mascot-${railMood}-${index}`} className="flex flex-col items-center gap-2">
-                          <WaterDropCharacter
-                            size={index === 0 ? 42 : index === 2 ? 38 : 32}
-                            mood={railMood}
-                            animate={false}
-                            className={index === 0 ? '' : 'opacity-85'}
-                          />
-                          <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
-                        </div>
-                      ))}
+                  {hasTomorrow && (
+                    <div className="mt-8 border-t border-white/14 pt-5 text-center">
+                      <p className="mb-3 text-[10px] font-bold tracking-[0.12em] text-white/68">내일의 메모</p>
+                      <div className="space-y-2">
+                        {tomorrowParagraphs.map((paragraph, index) => (
+                          <p
+                            key={`${record.id}-poster-tomorrow-${index}`}
+                            className="whitespace-pre-line text-[13px] font-medium leading-[1.7] tracking-[-0.01em] text-white/78"
+                          >
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-7 flex items-center justify-between">
+                    <span className="font-mono text-[9px] tracking-[0.2em] text-white/38">{nickname ? `— ${nickname}` : ''}</span>
+                    <span className="font-mono text-[9px] tracking-[0.2em] text-white/46">
+                      pg.{String(pageNumber ?? 1).padStart(3, '0')}
+                    </span>
+                  </div>
+                </div>
+              </article>
+            ) : hasPhoto ? (
+              <article className="overflow-hidden rounded-[26px] border border-white/85" style={diaryPhotoSurfaceStyle}>
+                <div className="relative aspect-[4/3] overflow-hidden">
+                  <img src={record.imageUrl} alt="기록 사진" className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.03)_60%,rgba(10,20,42,0.46)_100%)]" />
+                  <div className="absolute inset-x-0 top-0 flex items-start justify-between px-6 pb-6 pt-6">
+                    <div className="text-white">
+                      <p className="mb-1 font-mono text-[11px] font-bold tracking-[0.18em] text-white/92">
+                        {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
+                      </p>
+                      <p className="text-[68px] font-extrabold leading-[0.88] tracking-[-0.05em] text-white">
+                        {String(date.getDate()).padStart(2, '0')}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-2 pt-1">
+                      <span className="font-mono text-[12px] font-bold tracking-[0.12em] text-white/92">{fmtTime(date)}</span>
+                      {mood && (
+                        <span className="inline-flex items-center justify-center rounded-2xl border border-white/36 bg-white/16 px-4 py-2 text-[18px] font-bold leading-none text-white backdrop-blur-sm">
+                          {mood}
+                        </span>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                  <div className="mt-8 flex items-end justify-between text-white/50">
-                    <span className="text-[12px] font-bold">quietpath.app</span>
-                    <span className="font-mono text-[11px] tracking-[0.2em]">pg.{String(pageNumber ?? 1).padStart(3, '0')}</span>
+                <div className="relative px-6 pb-6 pt-9">
+                  <div aria-hidden className="pointer-events-none absolute right-8 top-7 opacity-[0.08]">
+                    <WaterDropCharacter size={74} mood={characterMood} animate={false} />
+                  </div>
+
+                  <p className="mb-5 text-center text-[10px] font-bold tracking-[0.12em] text-mist-400">오늘의 기록</p>
+                  <div className="space-y-[18px] text-center">
+                    {actionParagraphs.map((paragraph, index) => (
+                      <p
+                        key={`${record.id}-action-${index}`}
+                        className="whitespace-pre-line text-[20px] font-bold leading-[1.72] tracking-[-0.01em] text-slate-800"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+
+                  {hasOneWord && (
+                    <div className="mt-8 flex justify-center">
+                      <div className="flex items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                        <span className={defaultSectionLabelClassName}>한 단어</span>
+                        <span className="h-px w-[14px] bg-mist-200" />
+                        <span className="text-[18px] font-semibold italic tracking-[-0.01em] text-point-600">
+                          "{record.oneWordText}"
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasTomorrow && (
+                    <div className="mt-8 border-t border-mist-200/60 pt-5 text-center">
+                      <p className="mb-3 text-[10px] font-bold tracking-[0.12em] text-mist-400">내일의 메모</p>
+                      <div className="space-y-2">
+                        {tomorrowParagraphs.map((paragraph, index) => (
+                          <p
+                            key={`${record.id}-tomorrow-${index}`}
+                            className="whitespace-pre-line text-[13px] font-medium leading-[1.7] tracking-[-0.01em] text-mist-500"
+                          >
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-7 flex items-center justify-between">
+                    <span className="font-mono text-[9px] tracking-[0.2em] text-mist-300">{nickname ? `— ${nickname}` : ''}</span>
+                    <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">
+                      pg.{String(pageNumber ?? 1).padStart(3, '0')}
+                    </span>
                   </div>
                 </div>
               </article>
             ) : (
-            <article
-              className="overflow-hidden rounded-[26px] border border-white/85"
-              style={cardSurfaceStyle}
-            >
-            {hasPhoto && (
-              <div className="relative aspect-[4/3] overflow-hidden">
-                <img src={record.imageUrl} alt="기록 사진" className="h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,17,30,0.25)_0%,transparent_30%,rgba(15,17,30,0.15)_60%,rgba(15,17,30,0.55)_100%)]" />
-                <div className="absolute inset-x-0 top-0 flex items-start justify-between px-[18px] pb-6 pt-[18px]">
-                  <div className="text-white">
-                    <p className="mb-1 font-mono text-[9px] font-bold tracking-[0.2em] text-white/85">
+              <article className="overflow-hidden rounded-[26px] border border-white/85" style={cardSurfaceStyle}>
+                <div className="flex items-end justify-between px-6 pb-[18px] pt-6">
+                  <div>
+                    <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-mist-500">
                       {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
                     </p>
-                    <p className="text-[38px] font-extrabold leading-[0.9] tracking-[-0.03em] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
+                    <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-slate-800">
                       {String(date.getDate()).padStart(2, '0')}
                     </p>
                   </div>
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="font-mono text-[10px] tracking-wider text-center text-white/90">{fmtTime(date)}</span>
-                    {mood && (
-                      <span
-                        className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-white/40 px-3 py-1.5 text-xs font-bold leading-none text-white backdrop-blur-sm"
-                        style={{ background: 'rgba(255,255,255,0.24)' }}
-                      >
-                        {mood}
+                  <div className="flex flex-col items-center gap-2.5">
+                    <span className="font-mono text-[10px] tracking-wider text-center text-mist-400">{fmtTime(date)}</span>
+                    {moodTone && mood && (
+                      <span className={`inline-flex items-center justify-center rounded-xl border-[1.5px] px-3 py-1.5 ${moodTone.bg} ${moodTone.border}`}>
+                        <span className={`text-xs font-bold leading-none ${moodTone.text}`}>{mood}</span>
                       </span>
                     )}
                   </div>
                 </div>
-              </div>
-            )}
 
-            {!hasPhoto && (
-              <div className="flex items-end justify-between px-6 pb-[18px] pt-6">
-                <div>
-                  <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-mist-500">
-                    {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
-                  </p>
-                  <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-slate-800">
-                    {String(date.getDate()).padStart(2, '0')}
-                  </p>
-                </div>
-                <div className="flex flex-col items-center gap-2.5">
-                  <span className="font-mono text-[10px] tracking-wider text-center text-mist-400">{fmtTime(date)}</span>
-                  {moodTone && mood && (
-                    <span className={`inline-flex items-center justify-center rounded-xl border-[1.5px] px-3 py-1.5 ${moodTone.bg} ${moodTone.border}`}>
-                      <span className={`text-xs font-bold leading-none ${moodTone.text}`}>{mood}</span>
-                    </span>
+                <div
+                  className={[
+                    isCompactEntry ? 'relative px-8 pb-8 pt-4' : '',
+                    !isCompactEntry ? 'px-6 pb-[22px] pt-1' : '',
+                  ].join(' ')}
+                >
+                  {isCompactEntry && (
+                    <>
+                      <div
+                        aria-hidden
+                        className="absolute left-1/2 top-6 h-[180px] w-[180px] -translate-x-1/2 rounded-full blur-3xl"
+                        style={{ background: 'rgba(196,181,253,0.18)' }}
+                      />
+                      <div aria-hidden className="absolute right-5 top-0 opacity-[0.08]">
+                        <WaterDropCharacter size={68} mood={characterMood} animate={false} />
+                      </div>
+                    </>
                   )}
-                </div>
-              </div>
-            )}
-
-            <div
-              className={[
-                isCompactEntry ? 'relative px-8 pt-4 pb-8' : '',
-                !isCompactEntry ? 'px-6 pb-[22px]' : '',
-                hasPhoto && !isCompactEntry ? 'pt-5' : '',
-                !hasPhoto && !isCompactEntry ? 'pt-1' : '',
-              ].join(' ')}
-            >
-              {isCompactEntry && (
-                <>
-                  <div
-                    aria-hidden
-                    className="absolute left-1/2 top-6 h-[180px] w-[180px] -translate-x-1/2 rounded-full blur-3xl"
-                    style={{ background: 'rgba(196,181,253,0.18)' }}
-                  />
-                  <div aria-hidden className="absolute right-5 top-0 opacity-[0.08]">
-                    <WaterDropCharacter size={68} mood={characterMood} animate={false} />
-                  </div>
-                </>
-              )}
-              <p className={`${sectionLabelClassName} ${isCompactEntry ? 'mb-4 text-center' : 'mb-3'}`}>오늘의 기록</p>
-              <div className={`space-y-[18px] ${isCompactEntry ? 'relative mx-auto max-w-[420px] text-center' : ''}`}>
-                {actionParagraphs.map((paragraph, index) => (
-                  <p
-                    key={`${record.id}-action-${index}`}
-                    className={[
-                      'whitespace-pre-line font-bold tracking-[-0.01em] text-slate-800',
-                      isCompactEntry ? 'text-[22px] leading-[1.85]' : 'text-[20px] leading-[1.72]',
-                    ].join(' ')}
-                  >
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
-            </div>
-
-            {hasOneWord && (
-              <div className={`px-6 pb-5 ${isCompactEntry ? '' : 'flex items-center gap-[9px]'}`}>
-                {isCompactEntry ? (
-                  <div className="mx-auto flex w-fit items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                    <span className={sectionLabelClassName}>한 단어</span>
-                    <span className="h-px w-[14px] bg-mist-200" />
-                    <span className="text-[15px] font-semibold italic tracking-[-0.01em] text-point-600">
-                      "{record.oneWordText}"
-                    </span>
-                  </div>
-                ) : (
-                  <>
-                    <span className={sectionLabelClassName}>한 단어</span>
-                    <span className="h-px w-[14px] bg-mist-200" />
-                    <span className="text-[14px] font-semibold italic tracking-[-0.01em] text-point-600">
-                      "{record.oneWordText}"
-                    </span>
-                  </>
-                )}
-              </div>
-            )}
-
-            {hasTomorrow && (
-              <div className="border-t border-mist-200/60 px-6 pb-[18px] pt-4">
-                <div className={isCompactEntry ? 'space-y-2 text-center' : 'flex gap-[10px]'}>
-                  <span className={`${sectionLabelClassName} ${isCompactEntry ? 'block' : 'shrink-0 pt-[2px]'}`}>내일의 메모</span>
-                  <div className={`min-w-0 ${isCompactEntry ? 'mx-auto max-w-[360px] space-y-2' : 'flex-1 space-y-1.5'}`}>
-                    {tomorrowParagraphs.map((paragraph, index) => (
+                  <p className={`${defaultSectionLabelClassName} ${isCompactEntry ? 'mb-4 text-center' : 'mb-3'}`}>오늘의 기록</p>
+                  <div className={`space-y-[18px] ${isCompactEntry ? 'relative mx-auto max-w-[420px] text-center' : ''}`}>
+                    {actionParagraphs.map((paragraph, index) => (
                       <p
-                        key={`${record.id}-tomorrow-${index}`}
+                        key={`${record.id}-action-${index}`}
                         className={[
-                          'whitespace-pre-line font-medium tracking-[-0.01em] text-mist-500',
-                          isCompactEntry ? 'text-[14px] leading-[1.8]' : 'text-[13px] leading-[1.65]',
+                          'whitespace-pre-line font-bold tracking-[-0.01em] text-slate-800',
+                          isCompactEntry ? 'text-[22px] leading-[1.85]' : 'text-[20px] leading-[1.72]',
                         ].join(' ')}
                       >
                         {paragraph}
@@ -353,18 +373,57 @@ export const RecordDetailDiary: React.FC<Props> = ({
                     ))}
                   </div>
                 </div>
-              </div>
-            )}
 
-              <div className="flex items-center justify-between px-6 pb-5">
-                <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">
-                  {nickname ? `— ${nickname}` : ''}
-                </span>
-                <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">
-                  pg.{String(pageNumber ?? 1).padStart(3, '0')}
-                </span>
-              </div>
-            </article>
+                {hasOneWord && (
+                  <div className={`px-6 pb-5 ${isCompactEntry ? '' : 'flex items-center gap-[9px]'}`}>
+                    {isCompactEntry ? (
+                      <div className="mx-auto flex w-fit items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                        <span className={defaultSectionLabelClassName}>한 단어</span>
+                        <span className="h-px w-[14px] bg-mist-200" />
+                        <span className="text-[15px] font-semibold italic tracking-[-0.01em] text-point-600">
+                          "{record.oneWordText}"
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <span className={defaultSectionLabelClassName}>한 단어</span>
+                        <span className="h-px w-[14px] bg-mist-200" />
+                        <span className="text-[14px] font-semibold italic tracking-[-0.01em] text-point-600">
+                          "{record.oneWordText}"
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {hasTomorrow && (
+                  <div className="border-t border-mist-200/60 px-6 pb-[18px] pt-4">
+                    <div className={isCompactEntry ? 'space-y-2 text-center' : 'flex gap-[10px]'}>
+                      <span className={`${defaultSectionLabelClassName} ${isCompactEntry ? 'block' : 'shrink-0 pt-[2px]'}`}>내일의 메모</span>
+                      <div className={`min-w-0 ${isCompactEntry ? 'mx-auto max-w-[360px] space-y-2' : 'flex-1 space-y-1.5'}`}>
+                        {tomorrowParagraphs.map((paragraph, index) => (
+                          <p
+                            key={`${record.id}-tomorrow-${index}`}
+                            className={[
+                              'whitespace-pre-line font-medium tracking-[-0.01em] text-mist-500',
+                              isCompactEntry ? 'text-[14px] leading-[1.8]' : 'text-[13px] leading-[1.65]',
+                            ].join(' ')}
+                          >
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between px-6 pb-5">
+                  <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">{nickname ? `— ${nickname}` : ''}</span>
+                  <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">
+                    pg.{String(pageNumber ?? 1).padStart(3, '0')}
+                  </span>
+                </div>
+              </article>
             )}
 
             <div className="mt-4 flex items-center justify-center gap-2">
@@ -395,7 +454,6 @@ export const RecordDetailDiary: React.FC<Props> = ({
             </div>
           </div>
 
-          {!isPosterMode && (
           <div aria-hidden className="pointer-events-none relative mt-5 flex justify-center pb-4">
             <div className="relative w-full max-w-[640px]">
               <div className="absolute -left-8 bottom-6 opacity-[0.15]">
@@ -431,7 +489,6 @@ export const RecordDetailDiary: React.FC<Props> = ({
               </div>
             </div>
           </div>
-          )}
         </div>
       </div>
     </div>

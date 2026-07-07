@@ -50,18 +50,49 @@ const buildRecordFromMonthlyItem = (record: RecordResponse): RecordType => {
   };
 };
 
+const compareMonthlyItems = (
+  a: RecordResponse,
+  b: RecordResponse,
+  prioritizedRecordId?: string,
+): number => {
+  const aPriority = prioritizedRecordId && String(a.id) === prioritizedRecordId && a.isPinned ? 1 : 0;
+  const bPriority = prioritizedRecordId && String(b.id) === prioritizedRecordId && b.isPinned ? 1 : 0;
+  if (aPriority !== bPriority) {
+    return bPriority - aPriority;
+  }
+
+  const pinDiff = Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned));
+  if (pinDiff !== 0) {
+    return pinDiff;
+  }
+
+  const dateDiff = new Date(b.recordDate).getTime() - new Date(a.recordDate).getTime();
+  if (dateDiff !== 0) {
+    return dateDiff;
+  }
+
+  return b.id - a.id;
+};
+
+const sortMonthlyItems = (
+  items: RecordResponse[],
+  prioritizedRecordId?: string,
+): RecordResponse[] => [...items].sort((a, b) => compareMonthlyItems(a, b, prioritizedRecordId));
+
 const rebuildMonthlyReport = (
   report: RecordMonthlyResponse,
-  items: RecordResponse[]
+  items: RecordResponse[],
+  prioritizedRecordId?: string,
 ): RecordMonthlyResponse => {
-  const recordsCount = items.length;
-  const photoCount = items.filter((item) => item.imageUrl).length;
+  const sortedItems = sortMonthlyItems(items, prioritizedRecordId);
+  const recordsCount = sortedItems.length;
+  const photoCount = sortedItems.filter((item) => item.imageUrl).length;
   return {
     ...report,
     recordsCount,
     photoCount,
     photoCoverage: recordsCount > 0 ? Math.round((photoCount / recordsCount) * 100) : 0,
-    items,
+    items: sortedItems,
   };
 };
 
@@ -118,7 +149,6 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         const date = new Date(record.timestamp);
         return date.getFullYear() === targetYear && date.getMonth() === targetMonth;
       })
-      .sort((a, b) => b.timestamp - a.timestamp)
       .map((record) => ({
         id: Number(record.id),
         pathId: Number(record.pathId ?? 0),
@@ -136,7 +166,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         sharedAt: null,
         createdAt: record.date,
         updatedAt: undefined,
-      }));
+      }))
+      .sort((a, b) => compareMonthlyItems(a, b));
   }, [records, targetMonth, targetYear]);
 
   const guestFirstRecordMonth = useMemo(() => {
@@ -146,7 +177,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     if (visibleRecords.length === 0) {
       return null;
     }
-    const first = new Date(visibleRecords[visibleRecords.length - 1].timestamp);
+    const first = new Date(visibleRecords[0].timestamp);
     return new Date(first.getFullYear(), first.getMonth(), 1);
   }, [records]);
 
@@ -155,10 +186,10 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   }, [targetYear, targetMonth]);
 
   useEffect(() => {
-    if (selectedRecordForDetail?.imageUrl) {
+    if (selectedRecordForDetail) {
       setDetailDisplayMode('diary');
     }
-  }, [selectedRecordForDetail?.id, selectedRecordForDetail?.imageUrl]);
+  }, [selectedRecordForDetail?.id]);
 
   useEffect(() => {
     setPendingDeleteRecord(null);
@@ -283,7 +314,11 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             String(item.id) === updatedRecord.id ? updateMonthlyItem(item, updatedRecord) : item
           );
 
-      return rebuildMonthlyReport(prev, nextItems);
+      return rebuildMonthlyReport(
+        prev,
+        nextItems,
+        updatedRecord.isPinned ? updatedRecord.id : undefined,
+      );
     });
 
     onUpdateRecord(updatedRecord);
@@ -515,16 +550,9 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               <span className="text-[10px] font-bold uppercase tracking-widest text-center" style={{ color: palette.faintText }}>Photos</span>
             </div>
             <div className="flex-1 flex items-center justify-center w-full">
-              <div className="relative flex items-baseline">
-                <span className="text-4xl font-bold leading-none" style={{ color: palette.strongText }}>
-                  {isMonthlyLoading && !monthlyReport ? '...' : monthlyReport?.photoCount ?? 0}
-                </span>
-                {(monthlyReport?.photoCoverage ?? 0) > 0 && (
-                  <span className="absolute left-full ml-1 bottom-0.5 text-[10px] font-bold whitespace-nowrap" style={{ color: palette.faintText }}>
-                    {monthlyReport?.photoCoverage}%
-                  </span>
-                )}
-              </div>
+              <span className="text-4xl font-bold leading-none" style={{ color: palette.strongText }}>
+                {isMonthlyLoading && !monthlyReport ? '...' : monthlyReport?.photoCount ?? 0}
+              </span>
             </div>
           </div>
         </div>

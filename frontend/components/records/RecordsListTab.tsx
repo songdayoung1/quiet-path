@@ -5,6 +5,7 @@ import { Globe2, Pin, EyeOff, MoreHorizontal, AlertCircle, CheckCircle2, ImageDo
 import { WaterDropCharacter } from '../WaterDropCharacter';
 import { getThemePalette, useResolvedTheme } from '../../theme';
 import { recordApi } from '../../api/recordApi';
+import { isMockAccessToken } from '../../api/authApi';
 import { AppModal } from '../AppModal';
 import { exportRecordCard } from '../../utils/exportRecordCard';
 import { RecordPreviewLine } from '../RecordPreviewLine';
@@ -45,6 +46,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
+  const isServerBacked = !!accessToken && !isMockAccessToken(accessToken);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [noticeModal, setNoticeModal] = useState<{
     title: string;
@@ -57,9 +59,57 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
     setNoticeModal({ title, description, variant });
   };
 
-  const handlePin = (record: RecordType) => {
-    onUpdateRecord({ ...record, isPinned: !record.isPinned });
+  const isUnauthorizedError = (error: unknown) =>
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    (error as { status?: number }).status === 401;
+
+  const handlePin = async (record: RecordType) => {
+    const nextPinned = !record.isPinned;
+    const optimisticRecord = { ...record, isPinned: nextPinned };
+    onUpdateRecord(optimisticRecord);
     setActiveMenuId(null);
+
+    if (!isServerBacked) {
+      return;
+    }
+
+    const token = accessToken;
+    if (!token) {
+      onUpdateRecord(record);
+      onLoginRequired();
+      return;
+    }
+
+    const recordId = Number(record.id);
+    if (!Number.isInteger(recordId)) {
+      onUpdateRecord(record);
+      openNoticeModal(
+        '고정 상태를 바꾸지 못했어요',
+        '이 기록은 아직 서버에 저장되지 않아 고정할 수 없어요.',
+        'danger'
+      );
+      return;
+    }
+
+    try {
+      const response = await recordApi.updatePin(token, recordId, nextPinned);
+      if (response.isPinned !== nextPinned) {
+        onUpdateRecord({ ...record, isPinned: response.isPinned });
+      }
+    } catch (err) {
+      onUpdateRecord(record);
+      if (isUnauthorizedError(err)) {
+        onLoginRequired();
+        return;
+      }
+      openNoticeModal(
+        '고정 상태를 바꾸지 못했어요',
+        err instanceof Error ? err.message : '잠시 후 다시 시도해 주세요.',
+        'danger'
+      );
+    }
   };
   const handleVisibilityChange = async (record: RecordType, isShared: boolean) => {
     if (!accessToken) {
@@ -88,6 +138,10 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
           : '이 기록은 다시 나만 볼 수 있게 바뀌었습니다.'
       );
     } catch (err) {
+      if (isUnauthorizedError(err)) {
+        onLoginRequired();
+        return;
+      }
       openNoticeModal(
         '공개 상태를 바꾸지 못했어요',
         err instanceof Error ? err.message : '공개 상태 변경에 실패했습니다.',
@@ -100,7 +154,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
 
   const handleExportRecord = async (record: RecordType) => {
     try {
-      const result = await exportRecordCard(record);
+      const result = await exportRecordCard(record, record.imageUrl ? { mode: 'poster' } : undefined);
       openNoticeModal(
         result.mode === 'share' ? '카드를 공유했어요' : '카드를 저장했어요',
         result.mode === 'share'
@@ -153,116 +207,134 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
             >
               <div className="flex h-full flex-col">
                 {/* Header */}
-                <div className="flex justify-between items-start mb-2.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[11px] font-bold tracking-wider" style={{ color: palette.faintText }}>
-                      {new Date(record.timestamp).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        weekday: 'short',
-                      })}
-                    </span>
-                    {record.isShared && (
-                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-point-500 border" style={{ background: theme === 'dark' ? 'rgba(76,29,149,0.28)' : undefined, borderColor: theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'transparent' }}>
-                        <Globe2 size={10} />
-                        공유됨
-                      </span>
-                    )}
-                    {record.isPinned && (
-                      <span className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-amber-500 border" style={{ background: theme === 'dark' ? 'rgba(120,53,15,0.30)' : undefined, borderColor: theme === 'dark' ? 'rgba(251,191,36,0.24)' : 'transparent' }}>
-                        <Pin size={10} />
-                        고정됨
-                      </span>
-                    )}
-                  </div>
-                  <div className="relative">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuId(activeMenuId === record.id ? null : record.id);
-                      }}
-                      className="transition-colors p-2 -mr-2 -mt-2"
-                      style={{ color: palette.faintText }}
-                    >
-                      <MoreHorizontal size={16} />
-                    </button>
+                <div className="mb-2.5 flex items-start justify-between gap-3">
+                  <span className="shrink-0 text-[11px] font-bold tracking-wider" style={{ color: palette.faintText }}>
+                    {new Date(record.timestamp).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      weekday: 'short',
+                    })}
+                  </span>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 pt-0.5">
+                      {record.imageUrl && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full border px-1.5 py-1"
+                          style={{
+                            background: theme === 'dark' ? 'rgba(15,23,42,0.48)' : 'rgba(248,250,252,0.9)',
+                            borderColor: palette.border,
+                          }}
+                        >
+                          <span className="h-4 w-4 overflow-hidden rounded-full">
+                            <img src={record.imageUrl} alt="기록 사진 썸네일" className="h-full w-full object-cover" />
+                          </span>
+                          <span className="text-[9px] font-bold tracking-[0.12em]" style={{ color: palette.faintText }}>
+                            사진
+                          </span>
+                        </span>
+                      )}
+                      {record.isShared && (
+                        <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold text-point-500" style={{ background: theme === 'dark' ? 'rgba(76,29,149,0.28)' : undefined, borderColor: theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'transparent' }}>
+                          <Globe2 size={10} />
+                          공유됨
+                        </span>
+                      )}
+                      {record.isPinned && (
+                        <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold text-amber-500" style={{ background: theme === 'dark' ? 'rgba(120,53,15,0.30)' : undefined, borderColor: theme === 'dark' ? 'rgba(251,191,36,0.24)' : 'transparent' }}>
+                          <Pin size={10} />
+                          고정됨
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuId(activeMenuId === record.id ? null : record.id);
+                        }}
+                        className="transition-colors p-2 -mr-2 -mt-2"
+                        style={{ color: palette.faintText }}
+                      >
+                        <MoreHorizontal size={16} />
+                      </button>
 
-                    {/* Context Menu */}
-                    {activeMenuId === record.id && (
-                      <div className="absolute right-0 top-full mt-1.5 backdrop-blur-xl rounded-[1.25rem] shadow-xl p-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200 min-w-[160px]" style={{ background: palette.cardBgStrong, border: `1px solid ${palette.border}` }}>
-                        <div className="flex flex-col gap-0.5">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handlePin(record); }}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors"
-                          >
-                            <div className="rounded-md p-1 transition-colors" style={{ background: record.isPinned ? (theme === 'dark' ? 'rgba(120,53,15,0.30)' : 'rgba(254,243,199,0.88)') : palette.cardBgSoft }}>
-                              <Pin size={14} className={record.isPinned ? 'text-amber-500 fill-amber-500' : 'text-mist-400'} />
-                            </div>
-                            <span className="text-[11px] font-bold" style={{ color: palette.strongText }}>
-                              {record.isPinned ? '고정 해제' : '고정하기'}
-                            </span>
-                          </button>
+                      {/* Context Menu */}
+                      {activeMenuId === record.id && (
+                        <div className="absolute right-0 top-full mt-1.5 min-w-[160px] animate-in fade-in slide-in-from-top-2 rounded-[1.25rem] border p-1.5 shadow-xl backdrop-blur-xl duration-200 z-50" style={{ background: palette.cardBgStrong, borderColor: palette.border }}>
+                          <div className="flex flex-col gap-0.5">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void handlePin(record); }}
+                              className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors"
+                            >
+                              <div className="rounded-md p-1 transition-colors" style={{ background: record.isPinned ? (theme === 'dark' ? 'rgba(120,53,15,0.30)' : 'rgba(254,243,199,0.88)') : palette.cardBgSoft }}>
+                                <Pin size={14} className={record.isPinned ? 'text-amber-500 fill-amber-500' : 'text-mist-400'} />
+                              </div>
+                              <span className="text-[11px] font-bold" style={{ color: palette.strongText }}>
+                                {record.isPinned ? '고정 해제' : '고정하기'}
+                              </span>
+                            </button>
 
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleVisibilityChange(record, !record.isShared);
-                            }}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors group/btn"
-                          >
-                            <div
-                              className="rounded-md p-1 transition-colors"
-                              style={{
-                                background: record.isShared
-                                  ? (theme === 'dark' ? 'rgba(15,23,42,0.48)' : 'rgba(241,245,249,0.9)')
-                                  : (theme === 'dark' ? 'rgba(76,29,149,0.24)' : 'rgba(243,232,255,0.8)'),
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleVisibilityChange(record, !record.isShared);
                               }}
+                              className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors group/btn"
                             >
-                              {record.isShared ? (
-                                <EyeOff size={14} className="text-mist-400" />
-                              ) : (
-                                <Globe2 size={14} className="text-point-500" />
-                              )}
-                            </div>
-                            <span
-                              className="text-[11px] font-bold"
-                              style={{ color: record.isShared ? palette.mutedText : '#8B5CF6' }}
+                              <div
+                                className="rounded-md p-1 transition-colors"
+                                style={{
+                                  background: record.isShared
+                                    ? (theme === 'dark' ? 'rgba(15,23,42,0.48)' : 'rgba(241,245,249,0.9)')
+                                    : (theme === 'dark' ? 'rgba(76,29,149,0.24)' : 'rgba(243,232,255,0.8)'),
+                                }}
+                              >
+                                {record.isShared ? (
+                                  <EyeOff size={14} className="text-mist-400" />
+                                ) : (
+                                  <Globe2 size={14} className="text-point-500" />
+                                )}
+                              </div>
+                              <span
+                                className="text-[11px] font-bold"
+                                style={{ color: record.isShared ? palette.mutedText : '#8B5CF6' }}
+                              >
+                                {record.isShared ? '커뮤니티 비공개' : '커뮤니티 공유'}
+                              </span>
+                            </button>
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleExportRecord(record);
+                              }}
+                              className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors group/btn"
                             >
-                              {record.isShared ? '커뮤니티 비공개' : '커뮤니티 공유'}
-                            </span>
-                          </button>
+                              <div className="rounded-md p-1 transition-colors" style={{ background: palette.cardBgSoft }}>
+                                <ImageDown size={14} className="text-point-500" />
+                              </div>
+                              <span className="text-[11px] font-bold" style={{ color: palette.strongText }}>카드 내보내기</span>
+                            </button>
 
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleExportRecord(record);
-                            }}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors group/btn"
-                          >
-                            <div className="rounded-md p-1 transition-colors" style={{ background: palette.cardBgSoft }}>
-                              <ImageDown size={14} className="text-point-500" />
-                            </div>
-                            <span className="text-[11px] font-bold" style={{ color: palette.strongText }}>카드 내보내기</span>
-                          </button>
+                            <div className="my-1 border-t" style={{ borderColor: palette.divider }} />
 
-                          <div className="my-1 border-t" style={{ borderColor: palette.divider }} />
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRequestDeleteRecord(record);
-                              setActiveMenuId(null);
-                            }}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors text-red-500"
-                          >
-                            <div className="rounded-md p-1 transition-colors" style={{ background: theme === 'dark' ? 'rgba(127,29,29,0.28)' : 'rgba(254,242,242,0.9)' }}>
-                              <Trash2 size={14} className="text-red-400" />
-                            </div>
-                            <span className="text-[11px] font-bold">삭제하기</span>
-                          </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRequestDeleteRecord(record);
+                                setActiveMenuId(null);
+                              }}
+                              className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors text-red-500"
+                            >
+                              <div className="rounded-md p-1 transition-colors" style={{ background: theme === 'dark' ? 'rgba(127,29,29,0.28)' : 'rgba(254,242,242,0.9)' }}>
+                                <Trash2 size={14} className="text-red-400" />
+                              </div>
+                              <span className="text-[11px] font-bold">삭제하기</span>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -305,22 +377,6 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                           </p>
                         </div>
                       </>
-                    )}
-                    {record.imageUrl && (
-                      <div
-                        className={`col-start-2 inline-flex items-center gap-3 rounded-2xl p-2 pr-3 ${
-                          record.oneWordText ? 'row-start-3 mt-2.5' : 'row-start-2 mt-3'
-                        }`}
-                        style={{ background: palette.cardBgSoft }}
-                      >
-                        <div className="w-11 h-11 rounded-xl overflow-hidden border shadow-sm" style={{ borderColor: palette.border }}>
-                          <img src={record.imageUrl} alt="Thumbnail" className="w-full h-full object-cover" />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Photo Moment</p>
-                          <p className="text-xs mt-1" style={{ color: palette.mutedText }}>이 날의 장면이 함께 남아 있어요</p>
-                        </div>
-                      </div>
                     )}
                   </div>
                 </div>
