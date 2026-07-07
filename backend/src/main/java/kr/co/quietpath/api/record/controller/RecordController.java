@@ -1,16 +1,19 @@
 package kr.co.quietpath.api.record.controller;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import kr.co.quietpath.api.auth.UserPrincipal;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.record.dto.request.RecordCreateRequest;
+import kr.co.quietpath.api.record.dto.request.RecordPinRequest;
 import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
 import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
 import kr.co.quietpath.api.record.dto.response.RecordListResponse;
 import kr.co.quietpath.api.record.dto.response.RecordMonthlyResponse;
+import kr.co.quietpath.api.record.dto.response.RecordPinResponse;
 import kr.co.quietpath.api.record.dto.response.RecordShareResponse;
 import kr.co.quietpath.api.record.dto.response.RecordTodayResponse;
 import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
@@ -22,7 +25,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.constraints.Positive;
 
 @RestController
 @RequiredArgsConstructor
@@ -118,6 +120,16 @@ public class RecordController {
     ) {
         Long userId = extractUserId(principal);
         return recordService.updateVisibility(userId, recordId, request);
+    }
+
+    @PatchMapping("/{recordId}/pin")
+    public RecordPinResponse updatePin(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable @Positive Long recordId,
+        @Valid @RequestBody RecordPinRequest request
+    ) {
+        Long userId = extractUserId(principal);
+        return recordService.updatePin(userId, recordId, request.getPinned());
     }
 
     private Long extractUserId(UserPrincipal principal) {

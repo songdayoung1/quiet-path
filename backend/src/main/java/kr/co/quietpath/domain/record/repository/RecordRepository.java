@@ -36,11 +36,11 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
 
     List<Record> findByUser_IdOrderByRecordDateDesc(Long userId);
 
-    List<Record> findByUser_IdAndIsHiddenFalseOrderByRecordDateDescIdDesc(Long userId);
+    List<Record> findByUser_IdAndIsHiddenFalseOrderByPinnedAtDescRecordDateDescIdDesc(Long userId);
 
     Optional<Record> findTopByUser_IdAndIsHiddenFalseOrderByRecordDateAscIdAsc(Long userId);
 
-    List<Record> findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByRecordDateDescIdDesc(
+    List<Record> findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByPinnedAtDescRecordDateDescIdDesc(
         Long userId,
         LocalDate from,
         LocalDate to
