@@ -135,6 +135,9 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const [isDeletingRecord, setIsDeletingRecord] = useState(false);
   const [isExportingActivityBoard, setIsExportingActivityBoard] = useState(false);
   const [isExportingCollage, setIsExportingCollage] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
+  const [isExportingSelectedRecords, setIsExportingSelectedRecords] = useState(false);
 
   const targetMonth = selectedMonthDate.getMonth();
   const targetYear = selectedMonthDate.getFullYear();
@@ -194,6 +197,18 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   useEffect(() => {
     setPendingDeleteRecord(null);
   }, [targetYear, targetMonth]);
+
+  useEffect(() => {
+    setIsSelectionMode(false);
+    setSelectedRecordIds([]);
+  }, [targetYear, targetMonth]);
+
+  useEffect(() => {
+    if (activeTab !== 'records' && isSelectionMode) {
+      setIsSelectionMode(false);
+      setSelectedRecordIds([]);
+    }
+  }, [activeTab, isSelectionMode]);
 
   useEffect(() => {
     if (isServerBacked) {
@@ -265,6 +280,14 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     [monthlyRecords],
   );
   const displayedPhotoRecords = photoRecords.length > 12 ? photoRecords.slice(-12) : photoRecords;
+  const selectedRecords = useMemo(
+    () => monthlyRecords.filter((record) => selectedRecordIds.includes(record.id)),
+    [monthlyRecords, selectedRecordIds],
+  );
+
+  useEffect(() => {
+    setSelectedRecordIds((prev) => prev.filter((id) => monthlyRecords.some((record) => record.id === id)));
+  }, [monthlyRecords]);
 
   const todayMonth = useMemo(() => {
     const now = new Date();
@@ -423,20 +446,83 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     try {
       const result = await exportMonthlyCollage(monthlyRecords, targetYear, targetMonth + 1);
       setShareNotice({
-        title: result.mode === 'share' ? '콜라주를 공유했어요' : '콜라주를 저장했어요',
+        title: result.mode === 'share' ? '전체 기록을 공유했어요' : '전체 기록 저장이 완료되었어요',
         description:
           result.pages > 1
             ? `${result.pages}장으로 나눠 ${result.mode === 'share' ? '공유' : '저장'}했어요.`
-            : `${targetMonth + 1}월 기록 콜라주를 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
+            : `${targetMonth + 1}월 전체 기록을 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       setShareNotice({
-        title: '콜라주를 내보내지 못했어요',
+        title: '전체 기록을 내보내지 못했어요',
         description: buildApiErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
       });
     } finally {
       setIsExportingCollage(false);
+    }
+  };
+
+  const startSelectionMode = () => {
+    setIsSelectionMode(true);
+    setSelectedRecordIds([]);
+  };
+
+  const cancelSelectionMode = () => {
+    setIsSelectionMode(false);
+    setSelectedRecordIds([]);
+  };
+
+  const toggleRecordSelection = (recordId: string) => {
+    setSelectedRecordIds((prev) =>
+      prev.includes(recordId)
+        ? prev.filter((id) => id !== recordId)
+        : [...prev, recordId]
+    );
+  };
+
+  const handleSelectedRecordsExport = async () => {
+    if (isExportingSelectedRecords || selectedRecords.length === 0) return;
+
+    setIsExportingSelectedRecords(true);
+    try {
+      if (selectedRecords.length === 1) {
+        const targetRecord = selectedRecords[0];
+        const result = await exportRecordCard(
+          targetRecord,
+          targetRecord.imageUrl ? { mode: 'poster' } : undefined,
+        );
+        setShareNotice({
+          title: result.mode === 'share' ? '선택 기록을 공유했어요' : '선택 기록 저장이 완료되었어요',
+          description:
+            result.mode === 'share'
+              ? '선택한 기록 카드를 기기 공유 시트로 전달했어요.'
+              : '선택한 기록 카드를 기기에 저장했어요.',
+        });
+      } else {
+        const result = await exportMonthlyCollage(monthlyRecords, targetYear, targetMonth + 1, {
+          records: selectedRecords,
+          subtitle: `선택한 ${selectedRecords.length}개의 장면을 담았어요.`,
+        });
+        setShareNotice({
+          title: result.mode === 'share' ? '선택 기록을 공유했어요' : '선택 기록 저장이 완료되었어요',
+          description:
+            result.pages > 1
+              ? `${result.pages}장으로 나눠 ${result.mode === 'share' ? '공유' : '저장'}했어요.`
+              : `선택한 ${selectedRecords.length}개의 장면을 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
+        });
+      }
+
+      setIsSelectionMode(false);
+      setSelectedRecordIds([]);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setShareNotice({
+        title: '선택 기록을 내보내지 못했어요',
+        description: buildApiErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
+      });
+    } finally {
+      setIsExportingSelectedRecords(false);
     }
   };
 
@@ -582,28 +668,72 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             </button>
           ))}
         </div>
-        <div className="mt-3 flex items-center justify-end gap-2 flex-wrap">
-          <button
-            onClick={() => void handleActivityBoardExport()}
-            disabled={isExportingActivityBoard || monthlyRecords.length === 0}
-            title="이번 달 활동 흐름을 한 장의 카드로 저장해요."
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
+        {activeTab === 'records' && isSelectionMode ? (
+          <div
+            className="mt-3 flex items-center gap-2 rounded-[1.6rem] border px-3 py-2.5 shadow-sm"
+            style={{ background: palette.cardBgSoft, borderColor: palette.border }}
           >
-            <Grid3X3 size={13} />
-            {isExportingActivityBoard ? '저장 중...' : '활동판 저장'}
-          </button>
-          <button
-            onClick={() => void handleCollageExport()}
-            disabled={isExportingCollage || monthlyRecords.length === 0}
-            title="이번 달 기록들을 콜라주 카드로 저장해요."
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
-          >
-            <Download size={13} />
-            {isExportingCollage ? '저장 중...' : '전체 기록 저장'}
-          </button>
-        </div>
+            <button
+              onClick={cancelSelectionMode}
+              className="rounded-full px-3 py-2 text-[11px] font-bold transition-colors"
+              style={{ color: palette.mutedText }}
+            >
+              취소
+            </button>
+            <div className="flex-1 text-center">
+              <p className="text-[11px] font-bold" style={{ color: palette.strongText }}>
+                {selectedRecordIds.length}개 선택됨
+              </p>
+              <p className="mt-0.5 text-[10px]" style={{ color: palette.faintText }}>
+                저장할 기록을 눌러 선택하세요
+              </p>
+            </div>
+            <button
+              onClick={() => void handleSelectedRecordsExport()}
+              disabled={isExportingSelectedRecords || selectedRecordIds.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: palette.activeTabBg, color: palette.activeTabText }}
+            >
+              <Download size={13} />
+              {isExportingSelectedRecords ? '저장 중...' : '저장'}
+            </button>
+          </div>
+        ) : (
+          <div className="mt-3 flex items-center justify-end gap-2 flex-wrap">
+            <button
+              onClick={() => void handleActivityBoardExport()}
+              disabled={isExportingActivityBoard || monthlyRecords.length === 0}
+              title="이번 달 활동 흐름을 한 장의 카드로 저장해요."
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
+            >
+              <Grid3X3 size={13} />
+              {isExportingActivityBoard ? '저장 중...' : '활동판 저장'}
+            </button>
+            <button
+              onClick={() => void handleCollageExport()}
+              disabled={isExportingCollage || monthlyRecords.length === 0}
+              title="이번 달 기록들을 콜라주 카드로 저장해요."
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
+            >
+              <Download size={13} />
+              {isExportingCollage ? '저장 중...' : '전체 기록 저장'}
+            </button>
+            {activeTab === 'records' && (
+              <button
+                onClick={startSelectionMode}
+                disabled={monthlyRecords.length === 0}
+                title="여러 기록을 골라 한 번에 저장할 수 있어요."
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
+              >
+                <Download size={13} />
+                선택 기록 저장
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {activeTab === 'album' && (
@@ -622,6 +752,9 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           accessToken={accessToken}
           onLoginRequired={onLoginRequired}
           emptyMonthLabel={monthLabel}
+          selectionMode={isSelectionMode}
+          selectedRecordIds={selectedRecordIds}
+          onToggleSelectRecord={toggleRecordSelection}
         />
       )}
       {activeTab === 'calendar' && (

@@ -18,6 +18,9 @@ interface RecordsListTabProps {
   accessToken?: string | null;
   onLoginRequired: () => void;
   emptyMonthLabel?: string;
+  selectionMode?: boolean;
+  selectedRecordIds?: string[];
+  onToggleSelectRecord?: (recordId: string) => void;
 }
 
 const EmptyRecords: React.FC<{ emptyMonthLabel?: string }> = ({ emptyMonthLabel = '이번 달' }) => {
@@ -43,6 +46,9 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   accessToken,
   onLoginRequired,
   emptyMonthLabel,
+  selectionMode = false,
+  selectedRecordIds = [],
+  onToggleSelectRecord,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
@@ -189,6 +195,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
       <div className="px-4 flex flex-col gap-5" onClick={() => setActiveMenuId(null)}>
         {records.map((record) => {
           const isExpanded = !!expandedRecordIds[record.id];
+          const isSelected = selectedRecordIds.includes(record.id);
           return (
             <Card
               key={record.id}
@@ -199,11 +206,21 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                 activeMenuId === record.id ? 'z-50' : 'z-10'
               }`}
               style={{
-                background: record.isPinned ? palette.cardBgStrong : palette.cardBg,
-                borderColor: record.isPinned ? 'rgba(139,92,246,0.34)' : palette.border,
-                boxShadow: record.isPinned ? `0 18px 34px rgba(139,92,246,${theme === 'dark' ? '0.18' : '0.10'})` : undefined,
+                background: isSelected ? palette.cardBgStrong : record.isPinned ? palette.cardBgStrong : palette.cardBg,
+                borderColor: isSelected ? 'rgba(139,92,246,0.42)' : record.isPinned ? 'rgba(139,92,246,0.34)' : palette.border,
+                boxShadow: isSelected
+                  ? `0 20px 36px rgba(139,92,246,${theme === 'dark' ? '0.20' : '0.12'})`
+                  : record.isPinned
+                    ? `0 18px 34px rgba(139,92,246,${theme === 'dark' ? '0.18' : '0.10'})`
+                    : undefined,
               }}
-              onClick={() => onSelectRecord(record)}
+              onClick={() => {
+                if (selectionMode) {
+                  onToggleSelectRecord?.(record.id);
+                  return;
+                }
+                onSelectRecord(record);
+              }}
             >
               <div className="flex h-full flex-col">
                 {/* Header */}
@@ -247,19 +264,38 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                       )}
                     </div>
                     <div className="relative shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveMenuId(activeMenuId === record.id ? null : record.id);
-                        }}
-                        className="transition-colors p-2 -mr-2 -mt-2"
-                        style={{ color: palette.faintText }}
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
+                      {selectionMode ? (
+                        <div
+                          className="flex h-7 w-7 items-center justify-center rounded-full border"
+                          style={{
+                            background: isSelected ? (theme === 'dark' ? 'rgba(76,29,149,0.30)' : 'rgba(243,232,255,0.9)') : palette.cardBgSoft,
+                            borderColor: isSelected ? 'rgba(139,92,246,0.34)' : palette.border,
+                          }}
+                        >
+                          {isSelected ? (
+                            <CheckCircle2 size={16} className="text-point-500" />
+                          ) : (
+                            <div
+                              className="h-3.5 w-3.5 rounded-full border"
+                              style={{ borderColor: palette.faintText }}
+                            />
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuId(activeMenuId === record.id ? null : record.id);
+                          }}
+                          className="transition-colors p-2 -mr-2 -mt-2"
+                          style={{ color: palette.faintText }}
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
+                      )}
 
                       {/* Context Menu */}
-                      {activeMenuId === record.id && (
+                      {!selectionMode && activeMenuId === record.id && (
                         <div className="absolute right-0 top-full mt-1.5 min-w-[160px] animate-in fade-in slide-in-from-top-2 rounded-[1.25rem] border p-1.5 shadow-xl backdrop-blur-xl duration-200 z-50" style={{ background: palette.cardBgStrong, borderColor: palette.border }}>
                           <div className="flex flex-col gap-0.5">
                             <button

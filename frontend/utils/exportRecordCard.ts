@@ -3,6 +3,7 @@ import { getRecordParagraphs } from './recordText';
 
 const CANVAS_WIDTH = 1080;
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const MONTHS_FULL = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const fmtTime = (d: Date) => d.toTimeString().slice(0, 5);
 
@@ -207,7 +208,7 @@ const wrapParagraphBlocks = (
   maxWidth: number,
   maxLines: number
 ) => {
-  const paragraphBlocks = getRecordParagraphs(text)
+  const paragraphBlocks = getRecordParagraphs(text, { splitSingleNewline: true })
     .map((paragraph) => wrapTextLines(ctx, paragraph, maxWidth))
     .filter((lines) => lines.length > 0);
 
@@ -463,6 +464,100 @@ const drawMonthlyExportHeader = (
     innerRight,
     innerWidth,
     bodyStartY: cursorY + s(18),
+  };
+};
+
+const drawMonthlyCollageHeader = (
+  ctx: CanvasRenderingContext2D,
+  {
+    mascotImage,
+    cardX,
+    cardY,
+    cardWidth,
+    scale,
+    year,
+    month,
+    records,
+    subtitle,
+  }: {
+    mascotImage: HTMLImageElement | null;
+    cardX: number;
+    cardY: number;
+    cardWidth: number;
+    scale: number;
+    year: number;
+    month: number;
+    records: RecordType[];
+    subtitle?: string;
+  }
+) => {
+  const s = (value: number) => value * scale;
+  const innerX = cardX + s(32);
+  const innerRight = cardX + cardWidth - s(32);
+  const innerWidth = innerRight - innerX;
+  const headerTop = cardY + s(28);
+
+  drawExportWordmark(ctx, {
+    mascotImage,
+    x: innerX,
+    y: headerTop + s(18),
+    mascotSize: s(22),
+    textColor: '#616E7C',
+    fontSize: s(11),
+    letterSpacing: s(3.6),
+    gap: s(8),
+  });
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#9AA5B1';
+  ctx.font = `500 ${s(9)}px "JetBrains Mono", ui-monospace, monospace`;
+  ctx.fillText(`${year}. ${MONTHS_FULL[month - 1]}`, innerRight, headerTop + s(18));
+
+  let cursorY = headerTop + s(68);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#1E293B';
+  ctx.font = `800 ${s(30)}px "SF Pro Display", "Pretendard", sans-serif`;
+  const titlePrefix = '이 달의 ';
+  ctx.fillText(titlePrefix, innerX, cursorY);
+  const titlePrefixWidth = ctx.measureText(titlePrefix).width;
+  ctx.fillStyle = '#7C3AED';
+  ctx.fillText('기록', innerX + titlePrefixWidth, cursorY);
+
+  cursorY += s(22);
+  ctx.font = `500 ${s(12)}px "SF Pro Display", "Pretendard", sans-serif`;
+
+  if (subtitle) {
+    ctx.fillStyle = '#64748B';
+    ctx.fillText(subtitle, innerX, cursorY);
+  } else {
+    const dominantMood = getMostFrequentMood(records);
+
+    if (!dominantMood) {
+      ctx.fillStyle = '#64748B';
+      ctx.fillText(`${records.length}개의 장면을 담았어요.`, innerX, cursorY);
+    } else {
+      const beforeText = `${records.length}개의 장면 · 가장 많이 느낀 건 `;
+      const afterText = '이에요.';
+      const moodColor = getMoodExportColor(dominantMood).text;
+
+      ctx.fillStyle = '#64748B';
+      ctx.fillText(beforeText, innerX, cursorY);
+      const beforeWidth = ctx.measureText(beforeText).width;
+
+      ctx.fillStyle = moodColor;
+      ctx.fillText(dominantMood, innerX + beforeWidth, cursorY);
+      const moodWidth = ctx.measureText(dominantMood).width;
+
+      ctx.fillStyle = '#64748B';
+      ctx.fillText(afterText, innerX + beforeWidth + moodWidth, cursorY);
+    }
+  }
+
+  return {
+    innerX,
+    innerRight,
+    innerWidth,
+    bodyStartY: cursorY + s(24),
   };
 };
 
@@ -912,211 +1007,213 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
 const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   const image = await loadImage(record.imageUrl!);
   const simCtx = document.createElement('canvas').getContext('2d');
-  const cardX = 56;
-  const cardY = 56;
+  const CANVAS_HEIGHT = 1440;
+  const cardX = 72;
+  const cardY = 72;
   const cardWidth = CANVAS_WIDTH - cardX * 2;
-  const imageHeight = Math.round(cardWidth * 0.72);
-  const contentWidth = cardWidth - 148;
-  const contentX = cardX + cardWidth / 2;
+  const cardHeight = CANVAS_HEIGHT - cardY * 2;
+  const imageHeight = 590;
+  const contentWidth = cardWidth - 144;
+  const contentX = CANVAS_WIDTH / 2;
+  const contentLeftX = cardX + 72;
+  const date = new Date(record.timestamp);
+  const directionText = record.directionQuestion || '오늘의 방향';
   const characterMood = resolveCharacterMood(record.moodCode);
   const mascotRailMoods: CharacterMood[] = [characterMood, 'COZY', 'SPARKLE', 'CALM', 'HOLDING'];
   const loadedMascots = await Promise.all(
     mascotRailMoods.map((mood) => loadImage(MASCOT_URLS[mood]))
   ).catch(() => []);
   const mainMascotImg = loadedMascots[0] ?? null;
+  const wordmarkMascotImg = loadedMascots[1] ?? null;
   const actionBlocks = simCtx
     ? (() => {
-        simCtx.font = '700 42px "SF Pro Display", "Pretendard", sans-serif';
-        return wrapParagraphBlocks(simCtx, record.action, contentWidth, 100);
+        simCtx.font = '700 50px "SF Pro Display", "Pretendard", sans-serif';
+        return wrapParagraphBlocks(
+          simCtx,
+          record.action,
+          contentWidth - 40,
+          record.tomorrowText?.trim() ? 4 : 5
+        );
       })()
     : [];
   const tomorrowBlocks = simCtx && record.tomorrowText?.trim()
     ? (() => {
-        simCtx.font = '600 26px "SF Pro Display", "Pretendard", sans-serif';
-        return wrapParagraphBlocks(simCtx, record.tomorrowText.trim(), contentWidth - 40, 100);
+        simCtx.font = '600 28px "SF Pro Display", "Pretendard", sans-serif';
+        return wrapParagraphBlocks(simCtx, record.tomorrowText.trim(), contentWidth - 56, 2);
       })()
     : [];
-
-  let contentHeight = 74;
-  contentHeight += 28 + 48;
-  if (actionBlocks.length > 0) {
-    actionBlocks.forEach((lines, index) => {
-      contentHeight += lines.length * 56;
-      if (index < actionBlocks.length - 1) contentHeight += 14;
-    });
-  } else {
-    contentHeight += 56;
-  }
-
-  if (record.oneWordText?.trim()) {
-    contentHeight += 30 + 86;
-  }
-
-  if (tomorrowBlocks.length > 0) {
-    contentHeight += 28;
-    contentHeight += 24;
-    tomorrowBlocks.forEach((lines, index) => {
-      contentHeight += lines.length * 38;
-      if (index < tomorrowBlocks.length - 1) contentHeight += 10;
-    });
-  }
-
-  contentHeight += 72 + 74 + 62;
-  const cardHeight = imageHeight + contentHeight;
-  const canvasHeight = cardY * 2 + cardHeight;
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_WIDTH;
-  canvas.height = canvasHeight;
+  canvas.height = CANVAS_HEIGHT;
   const ctx = canvas.getContext('2d');
 
   if (!ctx) {
     throw new Error('이미지 캔버스를 준비하지 못했어요.');
   }
 
-  const background = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+  const background = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
   background.addColorStop(0, '#EEF1FF');
   background.addColorStop(1, '#E4F2F0');
   ctx.fillStyle = background;
-  ctx.fillRect(0, 0, CANVAS_WIDTH, canvasHeight);
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   const topGlow = ctx.createRadialGradient(116, 0, 0, 116, 0, 520);
   topGlow.addColorStop(0, 'rgba(196,181,253,0.4)');
   topGlow.addColorStop(1, 'rgba(196,181,253,0)');
   ctx.fillStyle = topGlow;
-  ctx.fillRect(0, 0, CANVAS_WIDTH, canvasHeight);
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  const bottomGlow = ctx.createRadialGradient(CANVAS_WIDTH, canvasHeight, 0, CANVAS_WIDTH, canvasHeight, 560);
+  const bottomGlow = ctx.createRadialGradient(CANVAS_WIDTH, CANVAS_HEIGHT, 0, CANVAS_WIDTH, CANVAS_HEIGHT, 560);
   bottomGlow.addColorStop(0, 'rgba(178,223,219,0.42)');
   bottomGlow.addColorStop(1, 'rgba(178,223,219,0)');
   ctx.fillStyle = bottomGlow;
-  ctx.fillRect(0, 0, CANVAS_WIDTH, canvasHeight);
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
   ctx.save();
   ctx.shadowColor = 'rgba(82,96,109,0.16)';
   ctx.shadowBlur = 26;
   ctx.shadowOffsetY = 16;
-  roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 42);
+  roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
   ctx.fillStyle = 'rgba(255,255,255,0.88)';
   ctx.fill();
   ctx.restore();
 
   ctx.save();
-  roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 42);
+  roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
   ctx.clip();
   clipImageCover(ctx, image, cardX, cardY, cardWidth, imageHeight, 0);
   ctx.fillStyle = 'rgba(255,255,255,0.96)';
   ctx.fillRect(cardX, cardY + imageHeight, cardWidth, cardHeight - imageHeight);
   const imageOverlay = ctx.createLinearGradient(0, cardY, 0, cardY + imageHeight);
-  imageOverlay.addColorStop(0, 'rgba(10,20,42,0.22)');
-  imageOverlay.addColorStop(0.66, 'rgba(10,20,42,0.02)');
-  imageOverlay.addColorStop(1, 'rgba(10,20,42,0.52)');
+  imageOverlay.addColorStop(0, 'rgba(10,20,42,0.72)');
+  imageOverlay.addColorStop(0.22, 'rgba(10,20,42,0.08)');
+  imageOverlay.addColorStop(0.48, 'rgba(10,20,42,0.08)');
+  imageOverlay.addColorStop(0.7, 'rgba(10,20,42,0.04)');
+  imageOverlay.addColorStop(1, 'rgba(10,20,42,0.46)');
   ctx.fillStyle = imageOverlay;
   ctx.fillRect(cardX, cardY, cardWidth, imageHeight);
   ctx.restore();
 
-  roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 42);
+  roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
   ctx.strokeStyle = 'rgba(255,255,255,0.92)';
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  ctx.fillStyle = '#FFFFFF';
+  drawExportWordmark(ctx, {
+    mascotImage: wordmarkMascotImg,
+    x: contentLeftX - 6,
+    y: cardY + 78,
+    mascotSize: 36,
+    textColor: 'rgba(255,255,255,0.95)',
+    fontSize: 22,
+    letterSpacing: 3.5,
+    gap: 8,
+  });
+
+  const dirRightX = cardX + cardWidth - 72;
+  ctx.textAlign = 'right';
+  drawDirectionSummaryWithText(
+    ctx,
+    dirRightX,
+    cardY + 83,
+    340,
+    directionText,
+    '#FFFFFF',
+    'rgba(255,255,255,0.6)',
+  );
+
   ctx.textAlign = 'left';
-  ctx.font = '800 17px "SF Pro Display", "Pretendard", sans-serif';
-  ctx.fillText(`${WEEKDAYS[new Date(record.timestamp).getDay()]} · ${MONTHS[new Date(record.timestamp).getMonth()]}`, cardX + 34, cardY + 48);
-  ctx.font = '800 70px "SF Pro Display", "Pretendard", sans-serif';
-  ctx.fillText(String(new Date(record.timestamp).getDate()).padStart(2, '0'), cardX + 30, cardY + 138);
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.font = '800 18px "SF Pro Display", "Pretendard", sans-serif';
+  ctx.fillText(`${WEEKDAYS[date.getDay()]} · ${MONTHS[date.getMonth()]}`, contentLeftX, cardY + 224);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '800 110px "SF Pro Display", "Pretendard", sans-serif';
+  ctx.fillText(String(date.getDate()).padStart(2, '0'), contentLeftX - 4, cardY + 322);
 
   ctx.textAlign = 'right';
-  ctx.font = '700 18px "SF Pro Display", "Pretendard", sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
-  ctx.fillText(new Date(record.timestamp).toTimeString().slice(0, 5), cardX + cardWidth - 34, cardY + 48);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
+  ctx.fillText(fmtTime(date), cardX + cardWidth - 72, cardY + 224);
 
   if (record.moodCode) {
-    drawMoodChip(ctx, cardX + cardWidth - 166, cardY + 72, record.moodCode, 'photo');
+    ctx.font = '700 24px "SF Pro Display", "Pretendard", sans-serif';
+    const moodWidth = Math.max(ctx.measureText(record.moodCode).width + 60, 120);
+    roundedRect(ctx, cardX + cardWidth - 72 - moodWidth, cardY + 270, moodWidth, 52, 26);
+    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.fillText(record.moodCode, cardX + cardWidth - 72 - moodWidth / 2, cardY + 302);
   }
 
   if (mainMascotImg) {
-    drawMascotImage(ctx, mainMascotImg, cardX + cardWidth - 90, cardY + imageHeight + 172, 116, 0.17);
+    drawMascotImage(ctx, mainMascotImg, cardX + cardWidth - 98, cardY + imageHeight + 188, 124, 0.15);
   }
 
-  let cursorY = cardY + imageHeight + 54;
+  let cursorY = cardY + imageHeight + 60;
   ctx.textAlign = 'center';
   ctx.fillStyle = '#94A3B8';
   ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText('오늘의 기록', contentX, cursorY);
-  cursorY += 58;
+  cursorY += 72;
 
   ctx.fillStyle = '#1E293B';
-  ctx.font = '700 42px "SF Pro Display", "Pretendard", sans-serif';
+  ctx.font = '700 50px "SF Pro Display", "Pretendard", sans-serif';
   if (actionBlocks.length === 0) {
     ctx.fillText(record.action, contentX, cursorY);
-    cursorY += 56;
+    cursorY += 64;
   } else {
-    actionBlocks.forEach((lines, blockIndex) => {
-      lines.forEach((line) => {
-        ctx.fillText(line, contentX, cursorY);
-        cursorY += 56;
-      });
-      if (blockIndex < actionBlocks.length - 1) {
-        cursorY += 14;
-      }
-    });
+    cursorY = drawParagraphBlocks(ctx, actionBlocks, contentX, cursorY, 64, 16);
   }
 
   if (record.oneWordText?.trim()) {
-    cursorY += 28;
+    cursorY += 34;
     const quoteText = `"${record.oneWordText.trim()}"`;
-    ctx.font = '700 26px "SF Pro Display", "Pretendard", sans-serif';
+    ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
     const textWidth = ctx.measureText(quoteText).width;
-    const pillWidth = Math.min(contentWidth, textWidth + 176);
-    roundedRect(ctx, contentX - pillWidth / 2, cursorY, pillWidth, 74, 37);
+    const pillWidth = Math.min(contentWidth - 20, textWidth + 180);
+    roundedRect(ctx, contentX - pillWidth / 2, cursorY, pillWidth, 82, 41);
     ctx.fillStyle = 'rgba(245,243,255,0.92)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(221,214,254,0.82)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(196,181,253,0.6)';
+    ctx.lineWidth = 2.5;
     ctx.stroke();
     ctx.fillStyle = '#94A3B8';
-    ctx.font = '700 20px "SF Pro Display", "Pretendard", sans-serif';
-    ctx.fillText('한 단어', contentX - textWidth / 2 - 24, cursorY + 46);
-    ctx.fillStyle = '#CBD5E1';
-    ctx.fillRect(contentX - textWidth / 2 + 18, cursorY + 37, 20, 2);
+    ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
+    ctx.fillText('한 단어', contentX - textWidth / 2 - 28, cursorY + 50);
+    ctx.fillStyle = '#CBD2D9';
+    ctx.fillRect(contentX - textWidth / 2 + 14, cursorY + 41, 26, 2);
     ctx.fillStyle = '#7C3AED';
-    ctx.font = '700 26px "SF Pro Display", "Pretendard", sans-serif';
-    ctx.fillText(quoteText, contentX + 44, cursorY + 48);
-    cursorY += 94;
+    ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
+    ctx.fillText(quoteText, contentX + 50, cursorY + 52);
+    cursorY += 106;
   }
 
   if (tomorrowBlocks.length > 0) {
-    cursorY += 24;
+    cursorY += 26;
     ctx.fillStyle = '#94A3B8';
     ctx.font = '700 18px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText('내일의 메모', contentX, cursorY);
-    cursorY += 34;
+    cursorY += 38;
     ctx.fillStyle = '#64748B';
-    ctx.font = '600 26px "SF Pro Display", "Pretendard", sans-serif';
-    tomorrowBlocks.forEach((lines, blockIndex) => {
-      lines.forEach((line) => {
-        ctx.fillText(line, contentX, cursorY);
-        cursorY += 38;
-      });
-      if (blockIndex < tomorrowBlocks.length - 1) {
-        cursorY += 10;
-      }
-    });
+    ctx.font = '600 28px "SF Pro Display", "Pretendard", sans-serif';
+    cursorY = drawParagraphBlocks(ctx, tomorrowBlocks, contentX, cursorY, 40, 10);
   }
 
-  const railY = cursorY + 56;
   if (loadedMascots.length > 0) {
-    drawMascotRail(ctx, CANVAS_WIDTH / 2, railY, loadedMascots);
+    drawMascotRail(ctx, CANVAS_WIDTH / 2, cardY + cardHeight - 160, loadedMascots);
   }
 
   drawExportFooterText(ctx, {
     text: 'quietpath.app',
-    x: cardX + cardWidth - 34,
-    y: cardY + cardHeight - 32,
-    color: 'rgba(148,163,184,0.9)',
-    fontSize: 16,
-    align: 'right',
+    x: cardX + 44,
+    y: cardY + cardHeight - 44,
+    color: 'rgba(148,163,184,0.6)',
+    fontSize: 15,
+    align: 'left',
   });
 
   return await new Promise<Blob>((resolve, reject) => {
@@ -1178,69 +1275,94 @@ const drawCollageTile = (
   const radius = 28;
 
   if (!record) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(148,163,184,0.12)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 10;
     roundedRect(ctx, x, y, width, height, radius);
-    ctx.fillStyle = 'rgba(203,213,225,0.12)';
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(203,213,225,0.22)';
+    ctx.restore();
+    roundedRect(ctx, x, y, width, height, radius);
+    ctx.fillStyle = 'rgba(226,232,240,0.28)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.78)';
     ctx.lineWidth = 2;
     ctx.stroke();
     return;
   }
 
   const moodColors = record.moodCode
-    ? (MOOD_CHIP_COLORS[record.moodCode] ?? MOOD_CHIP_COLORS['포근'])
-    : MOOD_CHIP_COLORS['포근'];
+    ? getMoodExportColor(record.moodCode)
+    : getMoodExportColor('멍함');
+  const accentColor = moodColors.border;
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(148,163,184,0.14)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 10;
+  roundedRect(ctx, x, y, width, height, radius);
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fill();
+  ctx.restore();
+
+  const tileBackground = ctx.createLinearGradient(x, y, x + width, y + height);
+  tileBackground.addColorStop(0, 'rgba(255,255,255,0.98)');
+  tileBackground.addColorStop(1, 'rgba(248,250,252,0.94)');
+
+  roundedRect(ctx, x, y, width, height, radius);
+  ctx.fillStyle = tileBackground;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.82)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
 
   ctx.save();
   roundedRect(ctx, x, y, width, height, radius);
-  ctx.fillStyle = moodColors.bg;
-  ctx.fill();
-  ctx.strokeStyle = moodColors.border;
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  ctx.clip();
+  ctx.fillStyle = accentColor;
+  ctx.fillRect(x, y, width, Math.max(6, height * 0.028));
   ctx.restore();
 
-  const pad = 26;
+  const padX = height >= 280 ? 34 : 28;
+  const dateY = y + (height >= 280 ? 50 : 42);
+  const dateFontSize = height >= 280 ? 19 : 17;
+  const bodyFontSize = height >= 280 ? 28 : 24;
+  const bodyLineHeight = height >= 280 ? 38 : 34;
+  const bodyMaxLines = allowParagraphBlocks ? (height >= 280 ? 4 : 3) : 3;
+  const oneWordFontSize = height >= 280 ? 18 : 16;
+
+  ctx.fillStyle = moodColors.text;
+  ctx.beginPath();
+  ctx.arc(x + padX + 8, dateY - 8, height >= 280 ? 7 : 6, 0, Math.PI * 2);
+  ctx.fill();
+
   const d = new Date(record.timestamp);
   const dateStr = `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
-
-  ctx.save();
-  ctx.globalAlpha = 0.65;
-  ctx.fillStyle = moodColors.text;
-  ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = `700 ${dateFontSize}px "JetBrains Mono", ui-monospace, monospace`;
   ctx.textAlign = 'left';
-  ctx.fillText(dateStr, x + pad, y + pad + 18);
-  ctx.restore();
+  ctx.fillText(dateStr, x + padX + 24, dateY);
 
   ctx.fillStyle = '#334155';
-  ctx.font = `700 ${allowParagraphBlocks ? 24 : 28}px "SF Pro Display", "Pretendard", sans-serif`;
-  ctx.textAlign = 'center';
-  const centerY = y + height / 2 + 4;
-
-  if (allowParagraphBlocks) {
-    const paragraphBlocks = limitParagraphBlocks(
-      wrapParagraphBlocks(ctx, record.action, width - pad * 2, 6),
-      3
-    );
-    const lineH = 34;
-    const paragraphGap = 10;
-    const blockH = getParagraphBlocksHeight(paragraphBlocks, lineH, paragraphGap);
-    const startY = centerY - blockH / 2 + lineH - 4;
-    drawParagraphBlocks(ctx, paragraphBlocks, x + width / 2, startY, lineH, paragraphGap);
-  } else {
-    const bodyLines = wrapText(ctx, record.action, width - pad * 2, 3);
-    const lineH = 42;
-    const blockH = bodyLines.length * lineH;
-    bodyLines.forEach((line, i) => {
-      ctx.fillText(line, x + width / 2, centerY - blockH / 2 + lineH * (i + 1) - 4);
-    });
-  }
+  ctx.font = `700 ${bodyFontSize}px "SF Pro Display", "Pretendard", sans-serif`;
+  ctx.textAlign = 'left';
+  const paragraphBlocks = limitParagraphBlocks(
+    wrapParagraphBlocks(ctx, record.action, width - padX * 2, bodyMaxLines),
+    3
+  );
+  const blockHeight = getParagraphBlocksHeight(paragraphBlocks, bodyLineHeight, 14);
+  const contentTop = y + (height >= 280 ? 110 : 92);
+  const contentBottom = y + height - (height >= 280 ? 76 : 64);
+  const availableHeight = Math.max(contentBottom - contentTop, blockHeight);
+  const startY = contentTop + Math.max((availableHeight - blockHeight) / 2, 0) + bodyLineHeight - 6;
+  drawParagraphBlocks(ctx, paragraphBlocks, x + padX, startY, bodyLineHeight, 14);
 
   if (record.oneWordText?.trim()) {
     ctx.fillStyle = moodColors.text;
-    ctx.font = '700 20px "SF Pro Display", "Pretendard", sans-serif';
+    ctx.font = `700 ${oneWordFontSize}px "SF Pro Display", "Pretendard", sans-serif`;
     ctx.textAlign = 'right';
-    ctx.fillText(`"${record.oneWordText.trim()}"`, x + width - pad, y + height - pad);
+    ctx.fillText(record.oneWordText.trim(), x + width - padX, y + height - padX);
   }
 };
 
@@ -1251,7 +1373,8 @@ const createMonthlyCollageBlob = async (
   pageIndex: number,
   totalPages: number,
   tileRows: number,
-  wordmarkMascotImg: HTMLImageElement | null
+  wordmarkMascotImg: HTMLImageElement | null,
+  subtitle?: string
 ): Promise<Blob> => {
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_WIDTH;
@@ -1281,10 +1404,8 @@ const createMonthlyCollageBlob = async (
   const cardY = 56;
   const cardWidth = CANVAS_WIDTH - cardX * 2;
   const scale = cardWidth / 452;
-  const s = (value: number) => value * scale;
-  const cardHeight = COLLAGE_CANVAS_HEIGHT - cardY * 2;
 
-  const { innerX, innerWidth, bodyStartY } = drawMonthlyExportHeader(ctx, {
+  const { innerX, innerWidth, bodyStartY } = drawMonthlyCollageHeader(ctx, {
     mascotImage: wordmarkMascotImg,
     cardX,
     cardY,
@@ -1292,8 +1413,8 @@ const createMonthlyCollageBlob = async (
     scale,
     year,
     month,
-    recordsCount: records.length,
-    subtitle: `한 달간 ${records.length}개의 장면을 남겼어요.`,
+    records,
+    subtitle,
   });
 
   const tilesPerPage = COLLAGE_TILE_COLS * tileRows;
@@ -1304,7 +1425,7 @@ const createMonthlyCollageBlob = async (
   const tileWidth = (innerWidth - 16 * (COLLAGE_TILE_COLS - 1)) / COLLAGE_TILE_COLS;
   const tileHeight = (gridHeight - 16 * (tileRows - 1)) / tileRows;
   const pageRecords = records.slice(pageIndex * tilesPerPage, (pageIndex + 1) * tilesPerPage);
-  const allowParagraphBlocks = tileRows <= 3;
+  const allowParagraphBlocks = true;
 
   for (let i = 0; i < pageRecords.length; i++) {
     const col = i % COLLAGE_TILE_COLS;
@@ -1343,9 +1464,14 @@ const createMonthlyCollageBlob = async (
 export const exportMonthlyCollage = async (
   allRecords: RecordType[],
   year: number,
-  month: number
+  month: number,
+  options: {
+    records?: RecordType[];
+    subtitle?: string;
+  } = {}
 ) => {
-  const monthRecords = allRecords
+  const sourceRecords = options.records ?? allRecords;
+  const monthRecords = sourceRecords
     .filter(r => {
       const d = new Date(r.timestamp);
       return d.getFullYear() === year && d.getMonth() + 1 === month;
@@ -1359,9 +1485,10 @@ export const exportMonthlyCollage = async (
   const tilesPerPage = COLLAGE_TILE_COLS * tileRows;
   const totalPages = Math.ceil(monthRecords.length / tilesPerPage);
   const blobs: Blob[] = [];
+  const subtitle = options.subtitle;
 
   for (let p = 0; p < totalPages; p++) {
-    blobs.push(await createMonthlyCollageBlob(monthRecords, year, month, p, totalPages, tileRows, wordmarkMascotImg));
+    blobs.push(await createMonthlyCollageBlob(monthRecords, year, month, p, totalPages, tileRows, wordmarkMascotImg, subtitle));
   }
 
   const fileDate = `${year}-${String(month).padStart(2, '0')}`;

@@ -63,6 +63,7 @@ interface RecordParagraphOptions {
   maxSentencesPerParagraph?: number;
   maxCharsPerParagraph?: number;
   maxWordsPerParagraph?: number;
+  splitSingleNewline?: boolean;
 }
 
 export const getRecordParagraphs = (
@@ -72,6 +73,7 @@ export const getRecordParagraphs = (
     maxSentencesPerParagraph = 2,
     maxCharsPerParagraph = 58,
     maxWordsPerParagraph = 14,
+    splitSingleNewline = false,
   }: RecordParagraphOptions = {}
 ) => {
   const normalized = normalizeText(text);
@@ -81,7 +83,7 @@ export const getRecordParagraphs = (
 
   if (normalized.includes('\n')) {
     return normalized
-      .split(/\n{2,}/)
+      .split(splitSingleNewline ? /\n+/ : /\n{2,}/)
       .map((paragraph) => paragraph.trim())
       .filter(Boolean);
   }
