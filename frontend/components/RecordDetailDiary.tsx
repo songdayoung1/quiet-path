@@ -67,8 +67,6 @@ export const RecordDetailDiary: React.FC<Props> = ({
   const hasTomorrow = !!record.tomorrowText?.trim();
   const actionParagraphs = getRecordParagraphs(record.action);
   const tomorrowParagraphs = hasTomorrow ? getRecordParagraphs(record.tomorrowText!) : [];
-  const actionCharacterCount = actionParagraphs.join(' ').replace(/\s+/g, '').length;
-  const isCompactEntry = actionParagraphs.length <= 2 && actionCharacterCount <= 42;
   const characterMood = resolveCharacterMood(mood);
   const mascotRailMoods: CharacterMood[] = [characterMood, 'COZY', 'SPARKLE', 'CALM', 'HOLDING'];
   const detailDisplayMode: RecordCardDisplayMode = hasPhoto ? displayMode : 'diary';
@@ -118,11 +116,11 @@ export const RecordDetailDiary: React.FC<Props> = ({
 
       <div
         className={[
-          'relative flex min-h-[calc(100dvh-64px)] flex-col justify-center px-5',
-          hasPhoto ? 'pt-28' : 'pt-16',
+          'relative flex min-h-[calc(100dvh-64px)] flex-col px-5 pb-8',
+          hasPhoto ? 'pt-4' : 'pt-16',
         ].join(' ')}
       >
-        <div className="mx-auto flex w-full max-w-[640px] flex-col">
+        <div className="mx-auto my-auto flex w-full max-w-[640px] flex-col">
           <div className="relative mb-6 flex min-h-[48px] items-center justify-center">
             {hasPhoto && onDisplayModeChange && (
               <div className="absolute left-0 top-1/2 inline-flex -translate-y-1/2 items-center rounded-full border border-white/70 bg-white/62 p-1 shadow-[0_8px_18px_-14px_rgba(82,96,109,0.35)] backdrop-blur-sm">
@@ -168,20 +166,20 @@ export const RecordDetailDiary: React.FC<Props> = ({
                 <img src={record.imageUrl} alt="기록 사진" className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.08)_34%,rgba(10,20,42,0.12)_58%,rgba(10,20,42,0.44)_78%,rgba(10,20,42,0.82)_100%)]" />
                 <div className="relative aspect-[4/3]">
-                  <div className="absolute inset-x-0 top-0 flex items-start justify-between px-6 pb-6 pt-6">
+                  <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
                     <div className="text-white">
-                      <p className="mb-1 font-mono text-[11px] font-bold tracking-[0.18em] text-white/92">
+                      <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-white/92">
                         {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
                       </p>
-                      <p className="text-[68px] font-extrabold leading-[0.88] tracking-[-0.05em] text-white">
+                      <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-white">
                         {String(date.getDate()).padStart(2, '0')}
                       </p>
                     </div>
-                    <div className="flex flex-col items-end gap-2 pt-1">
-                      <span className="font-mono text-[12px] font-bold tracking-[0.12em] text-white">{fmtTime(date)}</span>
+                    <div className="flex flex-col items-center gap-2.5">
+                      <span className="font-mono text-[10px] tracking-wider text-center text-white">{fmtTime(date)}</span>
                       {mood && (
-                        <span className="inline-flex items-center justify-center rounded-2xl border border-white/36 bg-white/16 px-4 py-2 text-[18px] font-bold leading-none text-white backdrop-blur-sm">
-                          {mood}
+                        <span className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-white/42 bg-white/14 px-3 py-1.5 backdrop-blur-sm">
+                          <span className="text-xs font-bold leading-none text-white">{mood}</span>
                         </span>
                       )}
                     </div>
@@ -246,20 +244,20 @@ export const RecordDetailDiary: React.FC<Props> = ({
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <img src={record.imageUrl} alt="기록 사진" className="h-full w-full object-cover" />
                   <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.03)_60%,rgba(10,20,42,0.46)_100%)]" />
-                  <div className="absolute inset-x-0 top-0 flex items-start justify-between px-6 pb-6 pt-6">
+                  <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
                     <div className="text-white">
-                      <p className="mb-1 font-mono text-[11px] font-bold tracking-[0.18em] text-white/92">
+                      <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-white/92">
                         {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
                       </p>
-                      <p className="text-[68px] font-extrabold leading-[0.88] tracking-[-0.05em] text-white">
+                      <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-white">
                         {String(date.getDate()).padStart(2, '0')}
                       </p>
                     </div>
-                    <div className="flex flex-col items-end gap-2 pt-1">
-                      <span className="font-mono text-[12px] font-bold tracking-[0.12em] text-white/92">{fmtTime(date)}</span>
+                    <div className="flex flex-col items-center gap-2.5">
+                      <span className="font-mono text-[10px] tracking-wider text-center text-white">{fmtTime(date)}</span>
                       {mood && (
-                        <span className="inline-flex items-center justify-center rounded-2xl border border-white/36 bg-white/16 px-4 py-2 text-[18px] font-bold leading-none text-white backdrop-blur-sm">
-                          {mood}
+                        <span className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-white/42 bg-white/14 px-3 py-1.5 backdrop-blur-sm">
+                          <span className="text-xs font-bold leading-none text-white">{mood}</span>
                         </span>
                       )}
                     </div>
@@ -340,33 +338,21 @@ export const RecordDetailDiary: React.FC<Props> = ({
                   </div>
                 </div>
 
-                <div
-                  className={[
-                    isCompactEntry ? 'relative px-8 pb-8 pt-4' : '',
-                    !isCompactEntry ? 'px-6 pb-[22px] pt-1' : '',
-                  ].join(' ')}
-                >
-                  {isCompactEntry && (
-                    <>
-                      <div
-                        aria-hidden
-                        className="absolute left-1/2 top-6 h-[180px] w-[180px] -translate-x-1/2 rounded-full blur-3xl"
-                        style={{ background: 'rgba(196,181,253,0.18)' }}
-                      />
-                      <div aria-hidden className="absolute right-5 top-0 opacity-[0.08]">
-                        <WaterDropCharacter size={68} mood={characterMood} animate={false} />
-                      </div>
-                    </>
-                  )}
-                  <p className={`${defaultSectionLabelClassName} ${isCompactEntry ? 'mb-4 text-center' : 'mb-3'}`}>오늘의 기록</p>
-                  <div className={`space-y-[18px] ${isCompactEntry ? 'relative mx-auto max-w-[420px] text-center' : ''}`}>
+                <div className="relative px-8 pb-8 pt-4">
+                  <div
+                    aria-hidden
+                    className="absolute left-1/2 top-6 h-[180px] w-[180px] -translate-x-1/2 rounded-full blur-3xl"
+                    style={{ background: 'rgba(196,181,253,0.18)' }}
+                  />
+                  <div aria-hidden className="absolute right-5 top-0 opacity-[0.08]">
+                    <WaterDropCharacter size={68} mood={characterMood} animate={false} />
+                  </div>
+                  <p className={`${defaultSectionLabelClassName} mb-4 text-center`}>오늘의 기록</p>
+                  <div className="relative mx-auto max-w-[420px] space-y-[18px] text-center">
                     {actionParagraphs.map((paragraph, index) => (
                       <p
                         key={`${record.id}-action-${index}`}
-                        className={[
-                          'whitespace-pre-line font-bold tracking-[-0.01em] text-slate-800',
-                          isCompactEntry ? 'text-[22px] leading-[1.85]' : 'text-[20px] leading-[1.72]',
-                        ].join(' ')}
+                        className="whitespace-pre-line text-[22px] font-bold leading-[1.85] tracking-[-0.01em] text-slate-800"
                       >
                         {paragraph}
                       </p>
@@ -375,39 +361,26 @@ export const RecordDetailDiary: React.FC<Props> = ({
                 </div>
 
                 {hasOneWord && (
-                  <div className={`px-6 pb-5 ${isCompactEntry ? '' : 'flex items-center gap-[9px]'}`}>
-                    {isCompactEntry ? (
-                      <div className="mx-auto flex w-fit items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
-                        <span className={defaultSectionLabelClassName}>한 단어</span>
-                        <span className="h-px w-[14px] bg-mist-200" />
-                        <span className="text-[15px] font-semibold italic tracking-[-0.01em] text-point-600">
-                          "{record.oneWordText}"
-                        </span>
-                      </div>
-                    ) : (
-                      <>
-                        <span className={defaultSectionLabelClassName}>한 단어</span>
-                        <span className="h-px w-[14px] bg-mist-200" />
-                        <span className="text-[14px] font-semibold italic tracking-[-0.01em] text-point-600">
-                          "{record.oneWordText}"
-                        </span>
-                      </>
-                    )}
+                  <div className="px-6 pb-5">
+                    <div className="mx-auto flex w-fit items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                      <span className={defaultSectionLabelClassName}>한 단어</span>
+                      <span className="h-px w-[14px] bg-mist-200" />
+                      <span className="text-[15px] font-semibold italic tracking-[-0.01em] text-point-600">
+                        "{record.oneWordText}"
+                      </span>
+                    </div>
                   </div>
                 )}
 
                 {hasTomorrow && (
                   <div className="border-t border-mist-200/60 px-6 pb-[18px] pt-4">
-                    <div className={isCompactEntry ? 'space-y-2 text-center' : 'flex gap-[10px]'}>
-                      <span className={`${defaultSectionLabelClassName} ${isCompactEntry ? 'block' : 'shrink-0 pt-[2px]'}`}>내일의 메모</span>
-                      <div className={`min-w-0 ${isCompactEntry ? 'mx-auto max-w-[360px] space-y-2' : 'flex-1 space-y-1.5'}`}>
+                    <div className="space-y-2 text-center">
+                      <span className={`${defaultSectionLabelClassName} block`}>내일의 메모</span>
+                      <div className="mx-auto max-w-[360px] space-y-2">
                         {tomorrowParagraphs.map((paragraph, index) => (
                           <p
                             key={`${record.id}-tomorrow-${index}`}
-                            className={[
-                              'whitespace-pre-line font-medium tracking-[-0.01em] text-mist-500',
-                              isCompactEntry ? 'text-[14px] leading-[1.8]' : 'text-[13px] leading-[1.65]',
-                            ].join(' ')}
+                            className="whitespace-pre-line text-[14px] font-medium leading-[1.8] tracking-[-0.01em] text-mist-500"
                           >
                             {paragraph}
                           </p>
