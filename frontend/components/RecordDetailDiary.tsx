@@ -1,4 +1,5 @@
 import React from 'react';
+import { Download, PencilLine, Trash2, X } from 'lucide-react';
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
 import { getRecordParagraphs } from '../utils/recordText';
 import { WaterDropCharacter, type CharacterMood } from './WaterDropCharacter';
@@ -46,6 +47,13 @@ const resolveCharacterMood = (mood?: string): CharacterMood => {
       return 'COZY';
   }
 };
+
+const toolbarButtonBaseClassName =
+  'inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-[0_10px_20px_-18px_rgba(82,96,109,0.45)] transition active:scale-[0.97]';
+const toolbarIconClassName = 'h-[15px] w-[15px] shrink-0';
+const toolbarPrimaryButtonClassName = `${toolbarButtonBaseClassName} border-point-100 bg-point-50/72 text-point-500 hover:border-point-200 hover:bg-point-50 hover:text-point-600`;
+const toolbarSecondaryButtonClassName = `${toolbarButtonBaseClassName} border-white/80 bg-white/62 text-mist-500 hover:bg-white hover:text-slate-700`;
+const toolbarDangerButtonClassName = `${toolbarButtonBaseClassName} border-rose-100 bg-rose-50/70 text-rose-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600`;
 
 export const RecordDetailDiary: React.FC<Props> = ({
   record,
@@ -102,33 +110,76 @@ export const RecordDetailDiary: React.FC<Props> = ({
       }}
     >
       <header
-        className="sticky top-0 z-30 px-5 pb-4 pt-5"
+        className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-2 px-5 py-3"
         style={{
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          background: 'linear-gradient(180deg, rgba(236,239,254,0.92) 0%, rgba(236,239,254,0.72) 72%, rgba(236,239,254,0))',
+          background: 'linear-gradient(180deg, rgba(236,239,254,0.95) 0%, rgba(236,239,254,0.85) 100%)',
+          borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
         }}
       >
-        <span className="block text-center text-[10px] font-bold tracking-[0.3em] uppercase text-mist-400 opacity-85">
-          Quiet Path
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {onShare && (
+            <button
+              onClick={onShare}
+              className={toolbarPrimaryButtonClassName}
+              title="카드 저장"
+              aria-label="카드 저장"
+            >
+              <Download className={toolbarIconClassName} strokeWidth={2.2} />
+            </button>
+          )}
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className={toolbarSecondaryButtonClassName}
+              title="편집"
+              aria-label="편집"
+            >
+              <PencilLine className={toolbarIconClassName} strokeWidth={2.2} />
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              className={toolbarDangerButtonClassName}
+              title="삭제하기"
+              aria-label="삭제하기"
+            >
+              <Trash2 className={toolbarIconClassName} strokeWidth={2.2} />
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className={toolbarSecondaryButtonClassName}
+            title="닫기"
+            aria-label="닫기"
+          >
+            <X className={toolbarIconClassName} strokeWidth={2.2} />
+          </button>
+        </div>
       </header>
 
       <div
         className={[
-          'relative flex min-h-[calc(100dvh-64px)] flex-col px-5 pb-8',
-          hasPhoto ? 'pt-4' : 'pt-16',
+          'relative flex flex-1 flex-col justify-start overflow-x-hidden px-5 pb-8',
+          hasPhoto ? 'pt-4' : 'pt-10',
         ].join(' ')}
       >
-        <div className="mx-auto my-auto flex w-full max-w-[640px] flex-col">
-          <div className="relative mb-6 flex min-h-[48px] items-center justify-center">
+        <div className="mx-auto mt-6 flex w-full max-w-[640px] flex-col">
+          <div className="relative mb-5 flex items-center justify-between min-h-[36px]">
+            <span className="font-mono text-[11px] font-bold tracking-[0.12em] text-mist-400">
+              RECORD · {String(pageNumber ?? 1).padStart(3, '0')}
+            </span>
             {hasPhoto && onDisplayModeChange && (
-              <div className="absolute left-0 top-1/2 inline-flex -translate-y-1/2 items-center rounded-full border border-white/70 bg-white/62 p-1 shadow-[0_8px_18px_-14px_rgba(82,96,109,0.35)] backdrop-blur-sm">
+              <div className="inline-flex items-center rounded-full border border-white/70 bg-white/62 p-0.5 shadow-[0_8px_18px_-14px_rgba(82,96,109,0.35)] backdrop-blur-sm">
                 <button
                   onClick={() => onDisplayModeChange('poster')}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
                     detailDisplayMode === 'poster'
-                      ? 'bg-point-500 text-white shadow-[0_8px_18px_-12px_rgba(139,92,246,0.35)]'
+                      ? 'bg-point-500 text-white shadow-[0_4px_10px_-4px_rgba(139,92,246,0.35)]'
                       : 'text-mist-500 hover:bg-white/80'
                   }`}
                 >
@@ -136,9 +187,9 @@ export const RecordDetailDiary: React.FC<Props> = ({
                 </button>
                 <button
                   onClick={() => onDisplayModeChange('diary')}
-                  className={`rounded-full px-3 py-1.5 text-[11px] font-bold transition-all ${
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
                     detailDisplayMode === 'diary'
-                      ? 'bg-point-500 text-white shadow-[0_8px_18px_-12px_rgba(139,92,246,0.35)]'
+                      ? 'bg-point-500 text-white shadow-[0_4px_10px_-4px_rgba(139,92,246,0.35)]'
                       : 'text-mist-500 hover:bg-white/80'
                   }`}
                 >
@@ -146,15 +197,6 @@ export const RecordDetailDiary: React.FC<Props> = ({
                 </button>
               </div>
             )}
-            <span className="font-mono text-[11px] font-bold tracking-[0.12em] text-mist-400">
-              RECORD · {String(pageNumber ?? 1).padStart(3, '0')}
-            </span>
-            <button
-              onClick={onClose}
-              className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full border border-white/70 bg-white/62 px-3 py-2 text-[13px] font-bold text-mist-500 shadow-[0_8px_18px_-14px_rgba(82,96,109,0.35)] backdrop-blur-sm transition-all duration-200 hover:border-white hover:bg-white hover:text-slate-700 hover:shadow-[0_14px_28px_-16px_rgba(82,96,109,0.45)] active:scale-[0.97]"
-            >
-              닫기
-            </button>
           </div>
 
           <div className="relative z-10">
@@ -399,35 +441,9 @@ export const RecordDetailDiary: React.FC<Props> = ({
               </article>
             )}
 
-            <div className="mt-4 flex items-center justify-center gap-2">
-              {onEdit && (
-                <button
-                  onClick={onEdit}
-                  className="rounded-full border border-white bg-white/70 px-4 py-2 text-[11px] font-bold text-mist-500 transition hover:bg-white"
-                >
-                  편집
-                </button>
-              )}
-              {onShare && (
-                <button
-                  onClick={onShare}
-                  className="rounded-full border border-white bg-white/70 px-4 py-2 text-[11px] font-bold text-mist-500 transition hover:bg-white"
-                >
-                  카드 내보내기
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  onClick={onDelete}
-                  className="rounded-full border border-white bg-white/70 px-4 py-2 text-[11px] font-bold text-rose-400 transition hover:bg-rose-50"
-                >
-                  삭제하기
-                </button>
-              )}
-            </div>
           </div>
 
-          <div aria-hidden className="pointer-events-none relative mt-5 flex justify-center pb-4">
+          <div aria-hidden className="pointer-events-none relative mt-16 flex justify-center pb-12">
             <div className="relative w-full max-w-[640px]">
               <div className="absolute -left-8 bottom-6 opacity-[0.15]">
                 <WaterDropCharacter size={132} mood={characterMood} animate={false} />

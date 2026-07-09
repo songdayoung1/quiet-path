@@ -59,6 +59,8 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
     description: string;
     variant: 'primary' | 'danger';
   } | null>(null);
+  const [pendingRecordExport, setPendingRecordExport] = useState<RecordType | null>(null);
+  const [isExportingRecordCard, setIsExportingRecordCard] = useState(false);
   const [expandedRecordIds, setExpandedRecordIds] = useState<Record<string, boolean>>({});
 
   const openNoticeModal = (title: string, description: string, variant: 'primary' | 'danger' = 'primary') => {
@@ -159,6 +161,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   };
 
   const handleExportRecord = async (record: RecordType) => {
+    setIsExportingRecordCard(true);
     try {
       const result = await exportRecordCard(record, record.imageUrl ? { mode: 'poster' } : undefined);
       openNoticeModal(
@@ -177,8 +180,24 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
         'danger'
       );
     } finally {
+      setIsExportingRecordCard(false);
       setActiveMenuId(null);
     }
+  };
+
+  const openRecordExportModal = (record: RecordType) => {
+    setPendingRecordExport(record);
+    setActiveMenuId(null);
+  };
+
+  const confirmRecordExport = async () => {
+    if (!pendingRecordExport || isExportingRecordCard) {
+      return;
+    }
+
+    const targetRecord = pendingRecordExport;
+    setPendingRecordExport(null);
+    await handleExportRecord(targetRecord);
   };
 
   const toggleRecordExpansion = (recordId: string) => {
@@ -342,14 +361,14 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                void handleExportRecord(record);
+                                openRecordExportModal(record);
                               }}
                               className="flex items-center gap-2.5 px-3 py-2 rounded-xl w-full text-left transition-colors group/btn"
                             >
                               <div className="rounded-md p-1 transition-colors" style={{ background: palette.cardBgSoft }}>
                                 <ImageDown size={14} className="text-point-500" />
                               </div>
-                              <span className="text-[11px] font-bold" style={{ color: palette.strongText }}>카드 내보내기</span>
+                              <span className="text-[11px] font-bold" style={{ color: palette.strongText }}>카드 저장</span>
                             </button>
 
                             <div className="my-1 border-t" style={{ borderColor: palette.divider }} />
@@ -422,6 +441,35 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
         })}
       </div>
 
+      <AppModal
+        open={pendingRecordExport !== null}
+        icon={<ImageDown size={22} />}
+        title="카드 저장 안내"
+        description={
+          pendingRecordExport ? (
+            <>
+              {pendingRecordExport.imageUrl ? (
+                <>
+                  이 기록은 <strong>포스터형 카드</strong>로 저장돼요.
+                </>
+              ) : (
+                <>
+                  이 기록은 <strong>기록 상세 카드</strong>로 저장돼요.
+                </>
+              )}
+              <br />
+              앱 전체가 아니라 카드 이미지 한 장만 저장됩니다.
+            </>
+          ) : (
+            ''
+          )
+        }
+        confirmLabel={isExportingRecordCard ? '저장 중...' : '이 화면으로 저장'}
+        confirmDisabled={isExportingRecordCard}
+        cancelDisabled={isExportingRecordCard}
+        onClose={() => setPendingRecordExport(null)}
+        onConfirm={() => void confirmRecordExport()}
+      />
       <AppModal
         open={noticeModal !== null}
         icon={
