@@ -5,6 +5,7 @@ const CANVAS_WIDTH = 1080;
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const MONTHS_FULL = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+const WEEKDAY_LABELS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 const fmtTime = (d: Date) => d.toTimeString().slice(0, 5);
 
 const MOOD_CHIP_COLORS: Record<string, { bg: string; border: string; text: string }> = {
@@ -51,6 +52,20 @@ const getMoodExportColor = (mood?: string) =>
 
 const getMoodActivityCellColor = (mood?: string) =>
   (mood && MOOD_ACTIVITY_CELL_COLORS[mood]) || MOOD_ACTIVITY_CELL_COLORS['멍함'];
+
+const CALENDAR_EXPORT_MOOD_ORDER = ['포근', '반짝', '잔잔', '버팀', '두근', '멍함'] as const;
+
+const hexToRgba = (hex: string, alpha: number) => {
+  const normalized = hex.replace('#', '');
+  const full = normalized.length === 3
+    ? normalized.split('').map((char) => char + char).join('')
+    : normalized;
+
+  const r = Number.parseInt(full.slice(0, 2), 16);
+  const g = Number.parseInt(full.slice(2, 4), 16);
+  const b = Number.parseInt(full.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
 const resolveCharacterMood = (mood?: string): CharacterMood => {
   switch (mood) {
@@ -734,7 +749,10 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
 
   ctx.save();
   roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  const cardGrad = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardHeight);
+  cardGrad.addColorStop(0, '#ECEFFE');
+  cardGrad.addColorStop(1, '#E2EEEC');
+  ctx.fillStyle = cardGrad;
   ctx.fill();
   ctx.strokeStyle = 'rgba(255,255,255,0.92)';
   ctx.lineWidth = 3;
@@ -770,13 +788,13 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       gap: 8,
     });
 
-    const dirRightX = cardX + cardWidth - 72;
-    ctx.textAlign = 'right';
+    const dirLeftX = cardX + cardWidth - 340;
+    ctx.textAlign = 'left';
     drawDirectionSummaryWithText(
       ctx,
-      dirRightX,
+      dirLeftX,
       cardY + 83,
-      340,
+      268,
       directionText,
       '#FFFFFF',
       'rgba(255,255,255,0.6)',
@@ -810,7 +828,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     }
 
     if (mainMascotImg) {
-      drawMascotImage(ctx, mainMascotImg, cardX + cardWidth - 100, cardY + cardHeight - 470, 92, 0.08);
+      drawMascotImage(ctx, mainMascotImg, cardX + cardWidth - 100, cardY + cardHeight - 470, 92, 0.15);
     }
 
     const actionBlocks = wrapParagraphBlocks(ctx, record.action, contentWidth - 80, 4);
@@ -881,8 +899,8 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
   }
 
   const paperGlow = ctx.createRadialGradient(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 40, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 600);
-  paperGlow.addColorStop(0, 'rgba(191,219,254,0.15)');
-  paperGlow.addColorStop(1, 'rgba(191,219,254,0)');
+  paperGlow.addColorStop(0, 'rgba(255,255,255,0.4)');
+  paperGlow.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = paperGlow;
   ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
 
@@ -900,15 +918,15 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     gap: 8,
   });
 
-  const noDirRightX = cardX + cardWidth - 72;
-  ctx.textAlign = 'right';
+  const dirLeftX = cardX + cardWidth - 340;
+  ctx.textAlign = 'left';
   ctx.fillStyle = '#94A3B8';
   ctx.font = '700 13px "SF Pro Display", "Pretendard", sans-serif';
-  ctx.fillText('현재 방향', noDirRightX, cardY + 83);
+  ctx.fillText('현재 방향', dirLeftX, cardY + 83);
   ctx.fillStyle = '#7C3AED';
   ctx.font = '700 26px "SF Pro Display", "Pretendard", sans-serif';
-  const noDirLines = wrapText(ctx, directionText, 340, 2);
-  noDirLines.forEach((line, i) => ctx.fillText(line, noDirRightX, cardY + 116 + i * 38));
+  const noDirLines = wrapText(ctx, directionText, 268, 2);
+  noDirLines.forEach((line, i) => ctx.fillText(line, dirLeftX, cardY + 116 + i * 38));
 
   ctx.textAlign = 'left';
   ctx.fillStyle = '#1E293B';
@@ -1110,13 +1128,13 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
     gap: 8,
   });
 
-  const dirRightX = cardX + cardWidth - 72;
-  ctx.textAlign = 'right';
+  const dirLeftX = cardX + cardWidth - 340;
+  ctx.textAlign = 'left';
   drawDirectionSummaryWithText(
     ctx,
-    dirRightX,
+    dirLeftX,
     cardY + 83,
-    340,
+    268,
     directionText,
     '#FFFFFF',
     'rgba(255,255,255,0.6)',
@@ -1238,6 +1256,11 @@ const downloadBlob = (blob: Blob, fileName: string) => {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
+const isDesktopEnvironment = () => {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(pointer:fine)').matches;
+};
+
 // ─── Monthly Collage ────────────────────────────────────────────────────────
 
 const COLLAGE_CANVAS_HEIGHT = 1350;
@@ -1272,7 +1295,7 @@ const drawCollageTile = (
   height: number,
   allowParagraphBlocks = false
 ) => {
-  const radius = 28;
+  const radius = 40;
 
   if (!record) {
     ctx.save();
@@ -1295,6 +1318,9 @@ const drawCollageTile = (
   const moodColors = record.moodCode
     ? getMoodExportColor(record.moodCode)
     : getMoodExportColor('멍함');
+  const moodChipColors = record.moodCode
+    ? (MOOD_CHIP_COLORS[record.moodCode] ?? MOOD_CHIP_COLORS['멍함'])
+    : MOOD_CHIP_COLORS['멍함'];
   const accentColor = moodColors.border;
 
   ctx.save();
@@ -1332,7 +1358,7 @@ const drawCollageTile = (
   const bodyMaxLines = allowParagraphBlocks ? (height >= 280 ? 4 : 3) : 3;
   const oneWordFontSize = height >= 280 ? 18 : 16;
 
-  ctx.fillStyle = moodColors.text;
+  ctx.fillStyle = moodChipColors.text;
   ctx.beginPath();
   ctx.arc(x + padX + 8, dateY - 8, height >= 280 ? 7 : 6, 0, Math.PI * 2);
   ctx.fill();
@@ -1346,20 +1372,30 @@ const drawCollageTile = (
 
   ctx.fillStyle = '#334155';
   ctx.font = `700 ${bodyFontSize}px "SF Pro Display", "Pretendard", sans-serif`;
-  ctx.textAlign = 'left';
+  ctx.textAlign = 'center';
   const paragraphBlocks = limitParagraphBlocks(
     wrapParagraphBlocks(ctx, record.action, width - padX * 2, bodyMaxLines),
     3
   );
   const blockHeight = getParagraphBlocksHeight(paragraphBlocks, bodyLineHeight, 14);
-  const contentTop = y + (height >= 280 ? 110 : 92);
+  const bodyLineCount = paragraphBlocks.reduce((count, lines) => count + lines.length, 0);
+  const paragraphCount = paragraphBlocks.length;
+  const contentLift = Math.min(
+    Math.max(bodyLineCount - 1, 0) * 12 + Math.max(paragraphCount - 1, 0) * 6,
+    height >= 280 ? 36 : 28
+  );
+  const contentTop = y + (height >= 280 ? 110 : 92) - contentLift;
   const contentBottom = y + height - (height >= 280 ? 76 : 64);
   const availableHeight = Math.max(contentBottom - contentTop, blockHeight);
-  const startY = contentTop + Math.max((availableHeight - blockHeight) / 2, 0) + bodyLineHeight - 6;
-  drawParagraphBlocks(ctx, paragraphBlocks, x + padX, startY, bodyLineHeight, 14);
+  const startY =
+    contentTop +
+    Math.max((availableHeight - blockHeight) / 2, 0) +
+    bodyLineHeight -
+    6;
+  drawParagraphBlocks(ctx, paragraphBlocks, x + width / 2, startY, bodyLineHeight, 14);
 
   if (record.oneWordText?.trim()) {
-    ctx.fillStyle = moodColors.text;
+    ctx.fillStyle = moodChipColors.text;
     ctx.font = `700 ${oneWordFontSize}px "SF Pro Display", "Pretendard", sans-serif`;
     ctx.textAlign = 'right';
     ctx.fillText(record.oneWordText.trim(), x + width - padX, y + height - padX);
@@ -1503,6 +1539,14 @@ export const exportMonthlyCollage = async (
     typeof navigator.canShare === 'function' &&
     navigator.canShare({ files });
 
+  if (isDesktopEnvironment()) {
+    for (let i = 0; i < blobs.length; i++) {
+      const suffix = totalPages > 1 ? `-${i + 1}of${totalPages}` : '';
+      downloadBlob(blobs[i], `quiet-path-collage-${fileDate}${suffix}.png`);
+    }
+    return { mode: 'download' as const, pages: totalPages };
+  }
+
   if (canNativeShare) {
     await navigator.share({
       files,
@@ -1590,33 +1634,33 @@ const createMonthlyActivityBoardBlob = async (
 ): Promise<Blob> => {
   const canvas = document.createElement('canvas');
   canvas.width = CANVAS_WIDTH;
-  canvas.height = ACTIVITY_BOARD_CANVAS_HEIGHT;
+  canvas.height = CALENDAR_EXPORT_CANVAS_HEIGHT;
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('활동판 캔버스를 준비하지 못했어요.');
+  if (!ctx) throw new Error('캘린더 이미지를 준비하지 못했어요.');
 
-  const bg = ctx.createLinearGradient(0, 0, 0, ACTIVITY_BOARD_CANVAS_HEIGHT);
+  const bg = ctx.createLinearGradient(0, 0, 0, CALENDAR_EXPORT_CANVAS_HEIGHT);
   bg.addColorStop(0, '#EEF1FF');
   bg.addColorStop(0.58, '#EDF5F6');
   bg.addColorStop(1, '#DFF2EF');
   ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, CANVAS_WIDTH, ACTIVITY_BOARD_CANVAS_HEIGHT);
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CALENDAR_EXPORT_CANVAS_HEIGHT);
 
   const topGlow = ctx.createRadialGradient(130, 30, 0, 130, 30, 560);
   topGlow.addColorStop(0, 'rgba(196,181,253,0.58)');
   topGlow.addColorStop(1, 'rgba(196,181,253,0)');
   ctx.fillStyle = topGlow;
-  ctx.fillRect(0, 0, CANVAS_WIDTH, ACTIVITY_BOARD_CANVAS_HEIGHT);
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CALENDAR_EXPORT_CANVAS_HEIGHT);
 
-  const bottomGlow = ctx.createRadialGradient(CANVAS_WIDTH, ACTIVITY_BOARD_CANVAS_HEIGHT, 0, CANVAS_WIDTH, ACTIVITY_BOARD_CANVAS_HEIGHT, 620);
+  const bottomGlow = ctx.createRadialGradient(CANVAS_WIDTH, CALENDAR_EXPORT_CANVAS_HEIGHT, 0, CANVAS_WIDTH, CALENDAR_EXPORT_CANVAS_HEIGHT, 620);
   bottomGlow.addColorStop(0, 'rgba(178,223,219,0.56)');
   bottomGlow.addColorStop(1, 'rgba(178,223,219,0)');
   ctx.fillStyle = bottomGlow;
-  ctx.fillRect(0, 0, CANVAS_WIDTH, ACTIVITY_BOARD_CANVAS_HEIGHT);
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CALENDAR_EXPORT_CANVAS_HEIGHT);
 
   const cardX = 44;
   const cardY = 40;
   const cardWidth = CANVAS_WIDTH - cardX * 2;
-  const cardHeight = ACTIVITY_BOARD_CANVAS_HEIGHT - cardY * 2;
+  const cardHeight = CALENDAR_EXPORT_CANVAS_HEIGHT - cardY * 2;
   const scale = cardWidth / 452;
   const s = (value: number) => value * scale;
 
@@ -1635,146 +1679,173 @@ const createMonthlyActivityBoardBlob = async (
   const boardX = innerX;
   const boardY = bodyStartY;
   const boardWidth = innerWidth;
-  const boardHeight = s(205);
+  const boardHeight = s(250);
+
+  ctx.save();
   roundedRect(ctx, boardX, boardY, boardWidth, boardHeight, s(20));
-  ctx.fillStyle = 'rgba(255,255,255,0.50)';
+  ctx.fillStyle = 'rgba(255,255,255,0.56)';
   ctx.fill();
+  ctx.restore();
 
-  ctx.fillStyle = '#616E7C';
-  ctx.font = `700 ${s(10.5)}px "SF Pro Display", "Pretendard", sans-serif`;
-  ctx.textAlign = 'left';
-  ctx.fillText('이번 달 활동판', boardX + s(16), boardY + s(18));
-
+  const cells = buildMonthlyCalendarCells(records, year, month);
+  const rowCount = cells.length / 7;
+  const headerHeight = s(44);
+  const gridTop = boardY + headerHeight;
+  const cellWidth = boardWidth / 7;
+  const cellHeight = (boardHeight - headerHeight) / rowCount;
   const daysInMonth = new Date(year, month, 0).getDate();
-  ctx.textAlign = 'right';
-  ctx.fillStyle = '#B8C0C9';
-  ctx.font = `500 ${s(9)}px "JetBrains Mono", ui-monospace, monospace`;
-  ctx.fillText(`${MONTHS[month - 1]}  1 - ${daysInMonth}`, boardX + boardWidth - s(16), boardY + s(18));
-
-  const recordByDay = new Map<number, RecordType>();
-  records.forEach((record) => {
-    const d = new Date(record.timestamp);
-    const day = d.getDate();
-    const previous = recordByDay.get(day);
-    if (!previous || record.timestamp > previous.timestamp) {
-      recordByDay.set(day, record);
-    }
-  });
 
   const now = new Date();
-  const isCurrentMonth =
-    now.getFullYear() === year &&
-    now.getMonth() + 1 === month;
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
   const todayDay = isCurrentMonth ? now.getDate() : -1;
 
-  const cellSize = s(29.8);
-  const cellGap = s(5);
-  const gridWidth = cellSize * 7 + cellGap * 6;
-  const gridX = boardX + (boardWidth - gridWidth) / 2;
-  const gridY = boardY + s(31);
+  const moodImageEntries = await Promise.all(
+    CALENDAR_EXPORT_MOOD_ORDER.map(async (mood) => {
+      const moodKey = resolveCharacterMood(mood);
+      const image = await loadImage(MASCOT_URLS[moodKey]).catch(() => null);
+      return [mood, image] as const;
+    })
+  );
+  const moodImageMap = new Map<string, HTMLImageElement | null>(moodImageEntries);
 
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const index = day - 1;
+  ctx.save();
+  roundedRect(ctx, boardX, boardY, boardWidth, boardHeight, s(20));
+  ctx.clip();
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = `700 ${s(10)}px "SF Pro Display", "Pretendard", sans-serif`;
+  WEEKDAY_LABELS_KO.forEach((label, index) => {
+    ctx.fillStyle = index === 0 ? '#F87171' : index === 6 ? '#60A5FA' : '#94A3B8';
+    ctx.fillText(label, boardX + cellWidth * index + cellWidth / 2, boardY + s(28));
+  });
+
+  ctx.strokeStyle = 'rgba(226,232,240,0.9)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(boardX, gridTop);
+  ctx.lineTo(boardX + boardWidth, gridTop);
+  for (let col = 1; col < 7; col += 1) {
+    const x = boardX + cellWidth * col;
+    ctx.moveTo(x, gridTop);
+    ctx.lineTo(x, boardY + boardHeight);
+  }
+  for (let row = 1; row < rowCount; row += 1) {
+    const y = gridTop + cellHeight * row;
+    ctx.moveTo(boardX, y);
+    ctx.lineTo(boardX + boardWidth, y);
+  }
+  ctx.stroke();
+
+  ctx.textAlign = 'left';
+  cells.forEach((cell, index) => {
+    if (cell.type === 'empty') return;
+
     const col = index % 7;
     const row = Math.floor(index / 7);
-    const record = recordByDay.get(day);
-    const isToday = isCurrentMonth && day === todayDay;
-    const isFuture = isCurrentMonth && day > todayDay;
-    drawActivityBoardCell(
-      ctx,
-      day,
-      record,
-      isToday,
-      isFuture,
-      isCurrentMonth,
-      gridX + col * (cellSize + cellGap),
-      gridY + row * (cellSize + cellGap),
-      cellSize
+    const cellX = boardX + col * cellWidth;
+    const cellY = gridTop + row * cellHeight;
+    const isToday = isCurrentMonth && cell.day === todayDay;
+    const moodCode = cell.record?.moodCode;
+
+    if (isToday) {
+      ctx.save();
+      ctx.strokeStyle = moodCode ? getMoodActivityCellColor(moodCode) : '#7C3AED';
+      ctx.lineWidth = 1.8;
+      ctx.strokeRect(cellX + 1, cellY + 1, cellWidth - 2, cellHeight - 2);
+      ctx.restore();
+    }
+
+    ctx.fillStyle = cell.record ? '#475569' : '#94A3B8';
+    if (isToday) {
+      ctx.fillStyle = '#334155';
+    }
+    ctx.font = `700 ${s(9)}px "JetBrains Mono", ui-monospace, monospace`;
+    ctx.fillText(String(cell.day), cellX + s(9), cellY + s(14));
+
+    if (!cell.record || !moodCode) return;
+
+    const bubbleColor = getMoodActivityCellColor(moodCode);
+    const centerX = cellX + cellWidth / 2;
+    const centerY = cellY + cellHeight / 2 + s(2);
+    const bubbleRadius = s(17.5);
+    const bubble = ctx.createRadialGradient(
+      centerX - bubbleRadius * 0.35,
+      centerY - bubbleRadius * 0.45,
+      bubbleRadius * 0.18,
+      centerX,
+      centerY,
+      bubbleRadius
     );
-  }
+    bubble.addColorStop(0, 'rgba(255,255,255,0.94)');
+    bubble.addColorStop(0.62, hexToRgba(bubbleColor, 0.20));
+    bubble.addColorStop(1, hexToRgba(bubbleColor, 0.08));
+    ctx.fillStyle = bubble;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, bubbleRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    const mascotImage = moodImageMap.get(moodCode);
+    if (mascotImage) {
+      const mascotSize = s(isToday ? 25 : 24);
+      ctx.drawImage(mascotImage, centerX - mascotSize / 2, centerY - mascotSize / 2, mascotSize, mascotSize);
+    }
+  });
+  ctx.restore();
 
   const moodCounts = records.reduce((acc, record) => {
     if (record.moodCode) acc[record.moodCode] = (acc[record.moodCode] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-  const moodEntries = Object.entries(moodCounts).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const moodEntries = CALENDAR_EXPORT_MOOD_ORDER
+    .map((mood) => ({ mood, count: moodCounts[mood] || 0 }))
+    .filter(({ count }) => count > 0);
+
+  const summaryTop = boardY + boardHeight + s(28);
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = `700 ${s(10.5)}px "SF Pro Display", "Pretendard", sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText('이번 달 무드', innerX, summaryTop);
 
   let chipX = innerX;
-  const chipY = boardY + boardHeight + s(14);
-  moodEntries.forEach(([mood, count]) => {
-    const colors = getMoodExportColor(mood);
+  let chipY = summaryTop + s(14);
+  const chipGap = s(10);
+  const chipHeight = s(34);
+
+  moodEntries.forEach(({ mood, count }) => {
+    const mascotImage = moodImageMap.get(mood);
+    const moodColors = getMoodExportColor(mood);
     ctx.font = `700 ${s(11)}px "SF Pro Display", "Pretendard", sans-serif`;
     const label = `${mood} ×${count}`;
-    const chipWidth = Math.max(ctx.measureText(label).width + s(22), s(58));
-    roundedRect(ctx, chipX, chipY, chipWidth, s(26), s(13));
-    ctx.fillStyle = colors.bg;
+    const chipWidth = Math.max(ctx.measureText(label).width + s(54), s(92));
+
+    if (chipX + chipWidth > innerX + innerWidth) {
+      chipX = innerX;
+      chipY += chipHeight + chipGap;
+    }
+
+    roundedRect(ctx, chipX, chipY, chipWidth, chipHeight, chipHeight / 2);
+    ctx.fillStyle = moodColors.bg;
     ctx.fill();
-    ctx.strokeStyle = colors.border;
-    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = moodColors.border;
+    ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.fillStyle = colors.text;
-    ctx.textAlign = 'center';
-    ctx.fillText(label, chipX + chipWidth / 2, chipY + s(17.5));
-    chipX += chipWidth + s(8);
+
+    if (mascotImage) {
+      const mascotSize = s(20);
+      ctx.drawImage(mascotImage, chipX + s(12), chipY + chipHeight / 2 - mascotSize / 2, mascotSize, mascotSize);
+    }
+
+    ctx.fillStyle = moodColors.text;
+    ctx.textAlign = 'left';
+    ctx.fillText(label, chipX + s(36), chipY + s(22));
+    chipX += chipWidth + chipGap;
   });
-
-  const latestRecord = [...records].sort((a, b) => b.timestamp - a.timestamp)[0];
-  const latestDate = new Date(latestRecord.timestamp);
-  const latestColors = getMoodExportColor(latestRecord.moodCode);
-  const highlightX = innerX;
-  const highlightY = chipY + s(38);
-  const footerY = cardY + cardHeight - s(18);
-  const highlightHeight = footerY - s(14) - highlightY;
-
-  roundedRect(ctx, highlightX, highlightY, innerWidth, highlightHeight, s(20));
-  const highlightBg = ctx.createLinearGradient(highlightX, highlightY, highlightX + innerWidth, highlightY + highlightHeight);
-  highlightBg.addColorStop(0, 'rgba(196,181,253,0.28)');
-  highlightBg.addColorStop(1, 'rgba(178,223,219,0.24)');
-  ctx.fillStyle = highlightBg;
-  ctx.fill();
-
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#7C3AED';
-  ctx.font = `600 ${s(9)}px "JetBrains Mono", ui-monospace, monospace`;
-  ctx.fillText(
-    `최근 기록 · ${String(latestDate.getMonth() + 1).padStart(2, '0')}.${String(latestDate.getDate()).padStart(2, '0')}`,
-    highlightX + s(20),
-    highlightY + s(28)
-  );
-
-  if (latestRecord.moodCode) {
-    ctx.font = `700 ${s(10)}px "SF Pro Display", "Pretendard", sans-serif`;
-    const moodChipWidth = Math.max(ctx.measureText(latestRecord.moodCode).width + s(18), s(52));
-    roundedRect(ctx, highlightX + innerWidth - s(20) - moodChipWidth, highlightY + s(14), moodChipWidth, s(24), s(12));
-    ctx.fillStyle = latestColors.bg;
-    ctx.fill();
-    ctx.strokeStyle = latestColors.border;
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-    ctx.fillStyle = latestColors.text;
-    ctx.textAlign = 'center';
-    ctx.fillText(latestRecord.moodCode, highlightX + innerWidth - s(20) - moodChipWidth / 2, highlightY + s(30));
-  }
-
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#1E293B';
-  ctx.font = `700 ${s(16)}px "SF Pro Display", "Pretendard", sans-serif`;
-  const actionLines = wrapText(ctx, latestRecord.action, innerWidth - s(44), 2);
-  actionLines.forEach((line, index) => {
-    ctx.fillText(line, highlightX + s(20), highlightY + s(62) + index * s(26));
-  });
-
-  if (latestRecord.oneWordText?.trim()) {
-    ctx.fillStyle = '#7C3AED';
-    ctx.font = `700 italic ${s(12)}px "SF Pro Display", "Pretendard", sans-serif`;
-    ctx.textAlign = 'right';
-    ctx.fillText(`"${latestRecord.oneWordText.trim()}"`, highlightX + innerWidth - s(20), highlightY + highlightHeight - s(18));
-  }
 
   drawExportFooterText(ctx, {
     text: 'quietpath.app',
     x: CANVAS_WIDTH / 2,
-    y: footerY,
+    y: cardY + cardHeight - s(18),
     color: '#B8C0C9',
     fontSize: s(9),
     align: 'center',
@@ -1783,7 +1854,7 @@ const createMonthlyActivityBoardBlob = async (
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (!blob) {
-        reject(new Error('활동판 이미지를 만들지 못했어요.'));
+        reject(new Error('캘린더 이미지를 만들지 못했어요.'));
         return;
       }
       resolve(blob);
@@ -1791,7 +1862,7 @@ const createMonthlyActivityBoardBlob = async (
   });
 };
 
-export const exportMonthlyActivityBoard = async (
+export const exportMonthlyCalendar = async (
   allRecords: RecordType[],
   year: number,
   month: number
@@ -1806,9 +1877,9 @@ export const exportMonthlyActivityBoard = async (
   if (monthRecords.length === 0) throw new Error('내보낼 기록이 없어요.');
 
   const wordmarkMascotImg = await loadImage(MASCOT_URLS.COZY).catch(() => null);
-  const blob = await createMonthlyActivityBoardBlob(monthRecords, year, month, wordmarkMascotImg);
+  const blob = await createMonthlyCalendarBlob(monthRecords, year, month, wordmarkMascotImg);
   const fileDate = `${year}-${String(month).padStart(2, '0')}`;
-  const fileName = `quiet-path-activity-board-${fileDate}.png`;
+  const fileName = `quiet-path-monthly-calendar-${fileDate}.png`;
   const file = new File([blob], fileName, { type: 'image/png' });
 
   const canNativeShare =
@@ -1817,11 +1888,21 @@ export const exportMonthlyActivityBoard = async (
     typeof navigator.canShare === 'function' &&
     navigator.canShare({ files: [file] });
 
+  if (isDesktopEnvironment()) {
+    downloadBlob(blob, fileName);
+    return { mode: 'download' as const };
+  }
+
+  if (isDesktopEnvironment()) {
+    downloadBlob(blob, fileName);
+    return { mode: 'download' as const };
+  }
+
   if (canNativeShare) {
     await navigator.share({
       files: [file],
-      title: 'Quiet Path 활동판',
-      text: `${year}년 ${month}월 활동판을 내보냈어요.`,
+      title: 'Quiet Path 월간 캘린더',
+      text: `${year}년 ${month}월 무드 캘린더를 내보냈어요.`,
     });
     return { mode: 'share' as const };
   }

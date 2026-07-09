@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
-import { AlertTriangle, BookOpenText, Calendar, ChevronLeft, ChevronRight, Download, Grid3X3, Image as ImageIcon } from 'lucide-react';
+import { AlertTriangle, BookOpenText, Calendar, ChevronLeft, ChevronRight, Download, Image as ImageIcon } from 'lucide-react';
 import { RecordDetailDiary } from '../components/RecordDetailDiary';
 import { AlbumTab } from '../components/records/AlbumTab';
 import { RecordsListTab } from '../components/records/RecordsListTab';
@@ -11,7 +11,7 @@ import { recordApi, RecordMonthlyResponse, RecordResponse } from '../api/recordA
 import type { ApiErrorWithStatus } from '../api/apiClient';
 import { isMockAccessToken } from '../api/authApi';
 import { AppModal } from '../components/AppModal';
-import { exportRecordCard, exportMonthlyActivityBoard, exportMonthlyCollage } from '../utils/exportRecordCard';
+import { exportRecordCard, exportMonthlyCalendar, exportMonthlyCollage } from '../utils/exportRecordCard';
 
 interface RecordsViewProps {
   records: RecordType[];
@@ -133,11 +133,17 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const [deleteNotice, setDeleteNotice] = useState<{ title: string; description: string } | null>(null);
   const [shareNotice, setShareNotice] = useState<{ title: string; description: string } | null>(null);
   const [isDeletingRecord, setIsDeletingRecord] = useState(false);
+  const [isExportingRecordCard, setIsExportingRecordCard] = useState(false);
   const [isExportingActivityBoard, setIsExportingActivityBoard] = useState(false);
   const [isExportingCollage, setIsExportingCollage] = useState(false);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
   const [isExportingSelectedRecords, setIsExportingSelectedRecords] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [pendingRecordExport, setPendingRecordExport] = useState<{
+    record: RecordType;
+    mode?: RecordCardDisplayMode;
+  } | null>(null);
 
   const targetMonth = selectedMonthDate.getMonth();
   const targetYear = selectedMonthDate.getFullYear();
@@ -284,6 +290,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     () => monthlyRecords.filter((record) => selectedRecordIds.includes(record.id)),
     [monthlyRecords, selectedRecordIds],
   );
+  const isAnyExporting = isExportingActivityBoard || isExportingCollage || isExportingSelectedRecords;
 
   useEffect(() => {
     setSelectedRecordIds((prev) => prev.filter((id) => monthlyRecords.some((record) => record.id === id)));
@@ -400,6 +407,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   };
 
   const handleExportRecord = async (record: RecordType, mode?: RecordCardDisplayMode) => {
+    setIsExportingRecordCard(true);
     try {
       const result = await exportRecordCard(record, mode ? { mode } : undefined);
       setShareNotice({
@@ -417,22 +425,38 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         title: '카드를 내보내지 못했어요',
         description: buildApiErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
       });
+    } finally {
+      setIsExportingRecordCard(false);
     }
   };
 
-  const handleActivityBoardExport = async () => {
+  const openRecordExportModal = (record: RecordType, mode?: RecordCardDisplayMode) => {
+    setPendingRecordExport({ record, mode });
+  };
+
+  const confirmRecordExport = async () => {
+    if (!pendingRecordExport || isExportingRecordCard) {
+      return;
+    }
+
+    const target = pendingRecordExport;
+    setPendingRecordExport(null);
+    await handleExportRecord(target.record, target.mode);
+  };
+
+  const handleCalendarExport = async () => {
     if (isExportingActivityBoard || monthlyRecords.length === 0) return;
     setIsExportingActivityBoard(true);
     try {
-      const result = await exportMonthlyActivityBoard(monthlyRecords, targetYear, targetMonth + 1);
+      const result = await exportMonthlyCalendar(monthlyRecords, targetYear, targetMonth + 1);
       setShareNotice({
-        title: result.mode === 'share' ? '활동판을 공유했어요' : '활동판을 저장했어요',
-        description: `${targetMonth + 1}월 활동판을 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
+        title: result.mode === 'share' ? '캘린더를 공유했어요' : '캘린더를 저장했어요',
+        description: `${targetMonth + 1}월 무드 캘린더를 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
       setShareNotice({
-        title: '활동판을 내보내지 못했어요',
+        title: '캘린더를 내보내지 못했어요',
         description: buildApiErrorMessage(error, '잠시 후 다시 시도해 주세요.'),
       });
     } finally {
@@ -461,6 +485,17 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     } finally {
       setIsExportingCollage(false);
     }
+  };
+
+  const openExportModal = () => {
+    setIsExportModalOpen(true);
+  };
+
+  const closeExportModal = () => {
+    if (isAnyExporting) {
+      return;
+    }
+    setIsExportModalOpen(false);
   };
 
   const startSelectionMode = () => {
@@ -502,7 +537,6 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
       } else {
         const result = await exportMonthlyCollage(monthlyRecords, targetYear, targetMonth + 1, {
           records: selectedRecords,
-          subtitle: `선택한 ${selectedRecords.length}개의 장면을 담았어요.`,
         });
         setShareNotice({
           title: result.mode === 'share' ? '선택 기록을 공유했어요' : '선택 기록 저장이 완료되었어요',
@@ -526,9 +560,36 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     }
   };
 
+  const handleExportOptionClick = async (option: 'calendar' | 'collage' | 'select') => {
+    if (isAnyExporting) {
+      return;
+    }
+
+    setIsExportModalOpen(false);
+
+    if (option === 'calendar') {
+      await handleCalendarExport();
+      return;
+    }
+
+    if (option === 'collage') {
+      await handleCollageExport();
+      return;
+    }
+
+    setActiveTab('records');
+    startSelectionMode();
+  };
+
   if (selectedRecordForDetail) {
     const record = selectedRecordForDetail;
     const pageNumber = monthlyRecords.findIndex((item) => item.id === record.id) + 1;
+    const exportViewLabel = record.imageUrl
+      ? detailDisplayMode === 'poster'
+        ? '포스터형 카드'
+        : '기록형 카드'
+      : '기록 상세 카드';
+
     return (
       <div className="relative min-h-screen">
         <RecordDetailDiary
@@ -536,9 +597,29 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           pageNumber={pageNumber > 0 ? pageNumber : 1}
           displayMode={detailDisplayMode}
           onDisplayModeChange={setDetailDisplayMode}
-          onClose={() => setSelectedRecordForDetail(null)}
-          onShare={() => void handleExportRecord(record, record.imageUrl ? detailDisplayMode : undefined)}
+          onClose={() => {
+            setPendingRecordExport(null);
+            setSelectedRecordForDetail(null);
+          }}
+          onShare={() => openRecordExportModal(record, record.imageUrl ? detailDisplayMode : undefined)}
           onDelete={() => requestDeleteRecord(record)}
+        />
+        <AppModal
+          open={pendingRecordExport !== null}
+          icon={<Download size={24} />}
+          title="카드 저장 안내"
+          description={
+            <>
+              지금 보고 있는 <strong>{exportViewLabel}</strong> 화면으로 저장돼요.
+              <br />
+              앱 전체가 아니라 카드 이미지 한 장만 저장됩니다.
+            </>
+          }
+          confirmLabel={isExportingRecordCard ? '저장 중...' : '이 화면으로 저장'}
+          confirmDisabled={isExportingRecordCard}
+          cancelDisabled={isExportingRecordCard}
+          onConfirm={() => void confirmRecordExport()}
+          onClose={() => setPendingRecordExport(null)}
         />
         <AppModal
           open={pendingDeleteRecord !== null}
@@ -699,39 +780,17 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
             </button>
           </div>
         ) : (
-          <div className="mt-3 flex items-center justify-end gap-2 flex-wrap">
+          <div className="mt-3 flex items-center justify-end gap-1.5">
             <button
-              onClick={() => void handleActivityBoardExport()}
-              disabled={isExportingActivityBoard || monthlyRecords.length === 0}
-              title="이번 달 활동 흐름을 한 장의 카드로 저장해요."
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
-            >
-              <Grid3X3 size={13} />
-              {isExportingActivityBoard ? '저장 중...' : '활동판 저장'}
-            </button>
-            <button
-              onClick={() => void handleCollageExport()}
-              disabled={isExportingCollage || monthlyRecords.length === 0}
-              title="이번 달 기록들을 콜라주 카드로 저장해요."
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
+              onClick={openExportModal}
+              disabled={isAnyExporting || monthlyRecords.length === 0}
+              title="캘린더, 전체 기록, 선택 기록 저장 옵션을 고를 수 있어요."
+              aria-label="기록 내보내기 옵션"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all hover:scale-[1.03] hover:bg-black/5 dark:hover:bg-white/5 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ color: palette.mutedText }}
             >
               <Download size={13} />
-              {isExportingCollage ? '저장 중...' : '전체 기록 저장'}
             </button>
-            {activeTab === 'records' && (
-              <button
-                onClick={startSelectionMode}
-                disabled={monthlyRecords.length === 0}
-                title="여러 기록을 골라 한 번에 저장할 수 있어요."
-                className="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: palette.cardBgSoft, color: palette.strongText, border: `1px solid ${palette.border}` }}
-              >
-                <Download size={13} />
-                선택 기록 저장
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -786,6 +845,114 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
         hideCancel={true}
         onConfirm={() => setDeleteNotice(null)}
         onClose={() => setDeleteNotice(null)}
+      />
+      <AppModal
+        open={isExportModalOpen}
+        icon={<Download size={24} />}
+        title="기록 내보내기"
+        description={
+          <div className="mt-1 text-left">
+            <div className="mb-5 text-center text-[12px] leading-[1.7]" style={{ color: palette.faintText }}>
+              <p>이번 달 기록을 이미지로 저장해요</p>
+              <p>카드를 누르면 바로 저장돼요</p>
+            </div>
+
+            <div className="space-y-2">
+              <p className="px-1 text-[11px] font-bold tracking-[0.18em]" style={{ color: palette.faintText }}>
+                바로 저장
+              </p>
+
+              {(
+                [
+                  {
+                    id: 'calendar',
+                    icon: <Calendar size={15} />,
+                    title: '캘린더 저장',
+                    desc: '이번 달 무드 흐름을 한 장으로',
+                  },
+                  {
+                    id: 'collage',
+                    icon: <Download size={15} />,
+                    title: '전체 기록 저장',
+                    desc: '이번 달 기록 전체를 콜라주로',
+                  },
+                ] as const
+              ).map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => void handleExportOptionClick(option.id)}
+                  disabled={isAnyExporting}
+                  className="w-full rounded-[20px] border px-4 py-3 text-left transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={{
+                    background: palette.cardBgSoft,
+                    borderColor: palette.border,
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px]"
+                      style={{ background: 'rgba(139,92,246,0.10)', color: '#7C3AED' }}
+                    >
+                      {option.icon}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold" style={{ color: palette.strongText }}>
+                        {option.title}
+                      </p>
+                      <p className="mt-0.5 text-[11px]" style={{ color: palette.mutedText }}>
+                        {option.desc}
+                      </p>
+                    </div>
+                    <Download size={14} style={{ color: palette.faintText }} />
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px flex-1" style={{ background: palette.border }} />
+              <span className="text-[10px] font-bold tracking-[0.18em]" style={{ color: palette.faintText }}>
+                직접 고르기
+              </span>
+              <div className="h-px flex-1" style={{ background: palette.border }} />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void handleExportOptionClick('select')}
+              disabled={isAnyExporting}
+              className="w-full rounded-[20px] border border-dashed px-4 py-3 text-left transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{
+                background: palette.cardBgSoft,
+                borderColor: 'rgba(139,92,246,0.28)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px]"
+                  style={{ background: 'rgba(139,92,246,0.10)', color: '#7C3AED' }}
+                >
+                  <BookOpenText size={15} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-bold" style={{ color: palette.strongText }}>
+                    기록 골라서 저장
+                  </p>
+                  <p className="mt-0.5 text-[11px]" style={{ color: palette.mutedText }}>
+                    저장할 장면만 직접 선택해요
+                  </p>
+                </div>
+                <ChevronRight size={16} style={{ color: palette.faintText }} />
+              </div>
+            </button>
+          </div>
+        }
+        confirmLabel="닫기"
+        confirmDisabled={isAnyExporting}
+        hideCancel={true}
+        onConfirm={closeExportModal}
+        onClose={closeExportModal}
       />
       <AppModal
         open={shareNotice !== null}
