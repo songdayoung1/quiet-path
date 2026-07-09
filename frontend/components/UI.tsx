@@ -15,8 +15,17 @@ export const Card: React.FC<{
   onClick?: () => void;
   breathe?: boolean;
   withTraces?: boolean;
+  withSurfaceOverlay?: boolean;
   style?: React.CSSProperties;
-}> = ({ children, className = '', onClick, breathe = false, withTraces = false, style }) => {
+}> = ({
+  children,
+  className = '',
+  onClick,
+  breathe = false,
+  withTraces = false,
+  withSurfaceOverlay = true,
+  style,
+}) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
 
@@ -41,15 +50,17 @@ export const Card: React.FC<{
       `}
     >
       {/* 2. Card Layer Depth: Subtle Gradient Overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-50"
-        style={{
-          background:
-            theme === 'dark'
-              ? 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 42%, rgba(129,140,248,0.08) 100%)'
-              : 'linear-gradient(to bottom right, rgba(255,255,255,0.60) 0%, transparent 52%, rgba(237,233,254,0.22) 100%)',
-        }}
-      />
+      {withSurfaceOverlay && (
+        <div
+          className="absolute inset-0 pointer-events-none opacity-50"
+          style={{
+            background:
+              theme === 'dark'
+                ? 'linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 42%, rgba(129,140,248,0.08) 100%)'
+                : 'linear-gradient(to bottom right, rgba(255,255,255,0.60) 0%, transparent 52%, rgba(237,233,254,0.22) 100%)',
+          }}
+        />
+      )}
       
       {/* 3. Abstract Background Traces */}
       {withTraces && (
@@ -451,6 +462,7 @@ export const StreakHeatmap: React.FC<{
   const firstDayOfWeek = new Date(currentYear, currentMonth, 1).getDay();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const todayDay = today.getDate();
+  const emptyCellColor = theme === 'dark' ? 'rgba(51,65,85,0.92)' : 'rgba(226,232,240,0.9)';
 
   type DayCell = null | { day: number; hasRecord: boolean; moodCode?: string; isToday: boolean; isFuture: boolean };
   const cells: DayCell[] = [];
@@ -470,29 +482,29 @@ export const StreakHeatmap: React.FC<{
   }
 
   const recordedDays = cells.filter((c): c is NonNullable<DayCell> => c !== null && (c as NonNullable<DayCell>).hasRecord).length;
-  const currentMonthRate = todayDay > 0 ? Math.round((recordedDays / todayDay) * 100) : 0;
+  const currentMonthRate = daysInMonth > 0 ? Math.round((recordedDays / daysInMonth) * 100) : 0;
 
   return (
     <div className={className}>
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 xl:mb-3">
         <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-point-500">{currentMonthRate}%</span>
+          <span className="text-2xl xl:text-xl font-bold text-point-500">{currentMonthRate}%</span>
           <span className="text-xs font-medium" style={{ color: palette.mutedText }}>{KPI_LABELS.recent21Rate}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold" style={{ color: palette.strongText }}>{recordedDays}</span>
-          <span className="text-[10px]" style={{ color: palette.faintText }}>/ {todayDay}{KPI_LABELS.recent21CountUnit}</span>
+          <span className="text-[10px]" style={{ color: palette.faintText }}>/ {daysInMonth}{KPI_LABELS.recent21CountUnit}</span>
           <div className="w-px h-4 mx-0.5" style={{ background: palette.divider }} />
           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>{KPI_LABELS.recent21Tag}</span>
         </div>
       </div>
 
-      <p className="text-[10px] font-medium mb-3" style={{ color: palette.faintText }}>
+      <p className="text-[10px] font-medium mb-3 xl:mb-2" style={{ color: palette.faintText }}>
         {KPI_LABELS.recent21Panel}
       </p>
 
       {/* Day-of-week header (always Sun→Sat) */}
-      <div className="grid grid-cols-7 gap-[5px] mb-1.5">
+      <div className="mx-auto grid grid-cols-7 gap-[5px] mb-1.5 xl:max-w-[300px] xl:gap-1">
         {HEATMAP_WEEKDAYS.map((label, i) => (
           <div key={label} className="text-center">
             <span
@@ -506,7 +518,7 @@ export const StreakHeatmap: React.FC<{
       </div>
 
       {/* Heatmap grid */}
-      <div className="grid grid-cols-7 gap-[5px]">
+      <div className="mx-auto grid grid-cols-7 gap-[5px] xl:max-w-[300px] xl:gap-1">
         {cells.map((cell, i) => {
           if (!cell) return <div key={`gap-${i}`} className="aspect-square" />;
           const colorClass = cell.hasRecord
@@ -521,7 +533,7 @@ export const StreakHeatmap: React.FC<{
                 cell.isToday ? 'ring-2 ring-point-300 ring-offset-1' : '',
               ].join(' ')}
               style={{
-                backgroundColor: cell.hasRecord ? undefined : palette.emptyCell,
+                backgroundColor: cell.hasRecord ? undefined : emptyCellColor,
                 opacity: cell.isFuture ? 0.28 : 1,
               }}
               title={`${currentMonth + 1}/${cell.day}`}
@@ -537,9 +549,9 @@ export const StreakHeatmap: React.FC<{
       </div>
 
       {/* Mood legend */}
-      <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
+      <div className="flex items-center justify-center gap-3 xl:gap-2.5 mt-4 xl:mt-3 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-sm" style={{ background: palette.emptyCell }} />
+          <div className="w-2.5 h-2.5 rounded-sm" style={{ background: emptyCellColor }} />
           <span className="text-[9px]" style={{ color: palette.faintText }}>없음</span>
         </div>
         {[
@@ -588,7 +600,7 @@ export const WaterDropOverlay: React.FC<{
 }> = ({
   leaving = false,
   mood = 'happy',
-  title = "오늘의 장면이 담겼어요",
+  title = "오늘의 기록이 담겼어요",
   subtitle = "하루를 잘 기록했어요 ✨"
 }) => {
   const theme = useResolvedTheme();

@@ -43,10 +43,17 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
 
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
+  const daysInCurrentMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const monthlyRecords = sortedRecords.filter(r => {
     const d = new Date(r.timestamp);
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   });
+  const monthlyRecordedDays = new Set(
+    monthlyRecords.map((record) => {
+      const date = new Date(record.timestamp);
+      return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    })
+  ).size;
   
   const currentPathRecords = currentDirection
     ? getCurrentPathRecords(sortedRecords, currentDirection)
@@ -56,8 +63,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
   
   const today = new Date();
   
-  const monthlyEligibleDays = Math.max(1, today.getDate());
-  const monthlyConsistency = monthlyRecords.length > 0 ? Math.round((monthlyRecords.length / monthlyEligibleDays) * 100) : 0;
+  const monthlyConsistency = monthlyRecordedDays > 0 ? Math.round((monthlyRecordedDays / daysInCurrentMonth) * 100) : 0;
   
   const currentPathConsistency = currentPathRecords.length > 0 && currentPathStartDate
     ? Math.round(
@@ -98,7 +104,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
 
   if (isHomeDataLoading) {
     return (
-      <div className="flex flex-col gap-6 animate-fade-in pb-32 pt-2 relative z-10">
+      <div className="flex flex-col gap-6 xl:gap-5 animate-fade-in pb-32 pt-2 relative z-10">
         <HeroSkeleton />
         <TodaysCardSkeleton />
         <div className="flex flex-col gap-4">
@@ -111,10 +117,10 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
   }
 
   return (
-    <div className="flex flex-col gap-6 animate-slide-up pb-32 pt-2 relative z-10">
+    <div className="flex flex-col gap-6 xl:gap-5 animate-slide-up pb-32 pt-2 relative z-10">
 
       {/* 0. Hero Header */}
-      <div className="px-2 mt-2 flex justify-between items-start">
+      <div className="px-2 mt-2 xl:mt-1 flex justify-between items-start">
         <div>
           <span
             className="text-[10px] px-3 py-1 rounded-full backdrop-blur-sm shadow-sm font-medium tracking-wide"
@@ -126,8 +132,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
           >
             {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
           </span>
-          <h1 className="text-xl font-semibold mt-3 px-1" style={{ color: palette.strongText }}>{heroTitle}</h1>
-          <p className="text-sm mt-1 px-1" style={{ color: palette.mutedText }}>
+          <h1 className="text-xl xl:text-lg font-semibold mt-3 xl:mt-2 px-1" style={{ color: palette.strongText }}>{heroTitle}</h1>
+          <p className="text-sm xl:text-[13px] mt-1 px-1" style={{ color: palette.mutedText }}>
              {heroSubtitle}
           </p>
         </div>
@@ -149,7 +155,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
       />
 
       {/* Tier 2: Path & Progress */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 xl:gap-3">
         {/* Condensed Path Information */}
         {hasActiveDirection && (
           <CurrentPathStrip 
@@ -176,7 +182,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
       />
 
       {/* Tier 4: Utility functions */}
-      <div className="grid grid-cols-2 gap-3 px-1 mt-4">
+      <div className="grid grid-cols-2 gap-3 px-1 mt-4 xl:mt-3">
         <SoftButton variant="secondary" onClick={onRecordsClick} className="!py-4 shadow-[0_4px_15px_rgba(0,0,0,0.02)]" style={{
           background: palette.cardBgMuted,
           border: `1px solid ${palette.border}`,

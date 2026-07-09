@@ -1,10 +1,15 @@
 import React from 'react';
-import { Record as RecordType } from '../types';
+import { Download, PencilLine, Trash2, X } from 'lucide-react';
+import { Record as RecordType, type RecordCardDisplayMode } from '../types';
+import { getRecordParagraphs } from '../utils/recordText';
+import { WaterDropCharacter, type CharacterMood } from './WaterDropCharacter';
 
 interface Props {
   record: RecordType;
   nickname?: string;
   pageNumber?: number;
+  displayMode?: RecordCardDisplayMode;
+  onDisplayModeChange?: (mode: RecordCardDisplayMode) => void;
   onClose?: () => void;
   onEdit?: () => void;
   onShare?: () => void;
@@ -12,20 +17,54 @@ interface Props {
 }
 
 const MOOD_TONE: Record<string, { bg: string; border: string; text: string }> = {
-  '포근': { bg: 'bg-point-50',  border: 'border-point-200',  text: 'text-point-600'  },
-  '반짝': { bg: 'bg-amber-50',  border: 'border-amber-200',  text: 'text-amber-600'  },
-  '잔잔': { bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-500'   },
-  '버팀': { bg: 'bg-green-50',  border: 'border-green-200',  text: 'text-green-600'  },
-  '두근': { bg: 'bg-rose-50',   border: 'border-rose-200',   text: 'text-rose-500'   },
-  '멍함': { bg: 'bg-mist-50',   border: 'border-mist-200',   text: 'text-mist-500'   },
+  포근: { bg: 'bg-point-50', border: 'border-point-200', text: 'text-point-600' },
+  반짝: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-600' },
+  잔잔: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-500' },
+  버팀: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-600' },
+  두근: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-500' },
+  멍함: { bg: 'bg-mist-50', border: 'border-mist-200', text: 'text-mist-500' },
 };
 
-const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-const WEEKDAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const fmtTime = (d: Date) => d.toTimeString().slice(0, 5);
 
+const resolveCharacterMood = (mood?: string): CharacterMood => {
+  switch (mood) {
+    case '잔잔':
+      return 'CALM';
+    case '반짝':
+      return 'SPARKLE';
+    case '두근':
+      return 'EXCITED';
+    case '버팀':
+      return 'HOLDING';
+    case '멍함':
+      return 'BLANK';
+    case '포근':
+      return 'COZY';
+    default:
+      return 'COZY';
+  }
+};
+
+const toolbarButtonBaseClassName =
+  'inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-[0_10px_20px_-18px_rgba(82,96,109,0.45)] transition active:scale-[0.97]';
+const toolbarIconClassName = 'h-[15px] w-[15px] shrink-0';
+const toolbarPrimaryButtonClassName = `${toolbarButtonBaseClassName} border-point-100 bg-point-50/72 text-point-500 hover:border-point-200 hover:bg-point-50 hover:text-point-600`;
+const toolbarSecondaryButtonClassName = `${toolbarButtonBaseClassName} border-white/80 bg-white/62 text-mist-500 hover:bg-white hover:text-slate-700`;
+const toolbarDangerButtonClassName = `${toolbarButtonBaseClassName} border-rose-100 bg-rose-50/70 text-rose-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600`;
+
 export const RecordDetailDiary: React.FC<Props> = ({
-  record, nickname, pageNumber, onClose, onEdit, onShare, onDelete,
+  record,
+  nickname,
+  pageNumber,
+  displayMode = 'diary',
+  onDisplayModeChange,
+  onClose,
+  onEdit,
+  onShare,
+  onDelete,
 }) => {
   const date = new Date(record.timestamp);
   const mood = record.moodCode;
@@ -34,10 +73,35 @@ export const RecordDetailDiary: React.FC<Props> = ({
   const hasPhoto = !!record.imageUrl;
   const hasOneWord = !!record.oneWordText?.trim();
   const hasTomorrow = !!record.tomorrowText?.trim();
+  const actionParagraphs = getRecordParagraphs(record.action);
+  const tomorrowParagraphs = hasTomorrow ? getRecordParagraphs(record.tomorrowText!) : [];
+  const characterMood = resolveCharacterMood(mood);
+  const mascotRailMoods: CharacterMood[] = [characterMood, 'COZY', 'SPARKLE', 'CALM', 'HOLDING'];
+  const detailDisplayMode: RecordCardDisplayMode = hasPhoto ? displayMode : 'diary';
+  const isPosterMode = hasPhoto && detailDisplayMode === 'poster';
+  const posterActionText = actionParagraphs.join(' ');
+
+  const cardSurfaceStyle: React.CSSProperties = {
+    background: 'linear-gradient(160deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.74) 100%)',
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.94), 0 2px 6px rgba(82,96,109,0.05), 0 18px 36px -22px rgba(82,96,109,0.22)',
+  };
+  const posterCardStyle: React.CSSProperties = {
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.74), 0 2px 6px rgba(82,96,109,0.06), 0 18px 36px -22px rgba(82,96,109,0.28)',
+  };
+  const diaryPhotoSurfaceStyle: React.CSSProperties = {
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,255,0.96) 100%)',
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.96), 0 2px 6px rgba(82,96,109,0.06), 0 18px 36px -22px rgba(82,96,109,0.22)',
+  };
+
+  const defaultSectionLabelClassName = 'text-[10px] font-bold tracking-[0.12em] text-mist-400';
+  const posterSectionLabelClassName = 'text-[10px] font-bold tracking-[0.12em] text-white/70';
 
   return (
     <div
-      className="absolute inset-0 z-50 flex flex-col overflow-y-auto"
+      className="fixed inset-y-0 left-1/2 z-50 flex w-full max-w-[430px] -translate-x-1/2 flex-col overflow-y-auto"
       style={{
         background:
           'radial-gradient(circle at -30% -25%, rgba(194,209,255,0.44) 0%, rgba(194,209,255,0) 62%),' +
@@ -45,154 +109,375 @@ export const RecordDetailDiary: React.FC<Props> = ({
           'linear-gradient(180deg, #ECEFFE 0%, #E2EEEC 100%)',
       }}
     >
-      <header className="flex items-center justify-between px-5 pt-6">
-        <button
-          onClick={onClose}
-          className="text-mist-500 text-[13px] font-bold px-2 py-2 rounded-full hover:bg-white/40"
-        >
-          닫기
-        </button>
-        <span className="font-mono text-[11px] font-bold tracking-[0.12em] text-mist-400">
-          RECORD · {String(pageNumber ?? 1).padStart(3, '0')}
-        </span>
-        <div className="w-9 h-9" />
-      </header>
-
-      <div className="px-5 mt-3 pb-10">
-        <article
-          className="relative rounded-[22px] overflow-hidden border border-white/90"
-          style={{
-            background:
-              'radial-gradient(circle at 30% 0%, rgba(255,255,255,0.85) 0%, transparent 60%),' +
-              'linear-gradient(180deg, #F4F6FE 0%, #EDF1ED 100%)',
-            boxShadow:
-              '0 1px 0 rgba(255,255,255,0.9) inset, 0 18px 36px -22px rgba(82,96,109,0.22), 0 2px 6px -2px rgba(82,96,109,0.06)',
-          }}
-        >
-          {/* noise texture */}
-          <span
-            aria-hidden
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              opacity: 0.03,
-              mixBlendMode: 'multiply',
-              backgroundImage:
-                "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-            }}
-          />
-
-          {/* 1) Header */}
-          <div className="px-6 pt-6 pb-4 flex items-end justify-between">
-            <div>
-              <p className="font-mono text-[10px] font-bold text-mist-500 tracking-[0.22em] mb-1">
-                {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
-              </p>
-              <p className="text-[52px] font-bold text-slate-800 leading-none tabular-nums tracking-tight">
-                {String(date.getDate()).padStart(2, '0')}
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <span className="font-mono text-[10px] text-mist-400 tracking-wider">{fmtTime(date)}</span>
-              {moodTone && mood && (
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-full border ${moodTone.bg} ${moodTone.border}`}>
-                  <span className={`text-[11px] font-bold leading-none ${moodTone.text}`}>{mood}</span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* 2) Photo (optional) */}
-          {hasPhoto && (
-            <div className="px-6">
-              <div className="aspect-[4/3] rounded-md overflow-hidden border border-mist-200/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_2px_8px_-4px_rgba(82,96,109,0.18)] bg-white">
-                <img src={record.imageUrl} alt="기록 사진" className="w-full h-full object-cover" />
-              </div>
-            </div>
-          )}
-
-          {/* 3) One Word — large when no photo, small when photo exists */}
-          {hasOneWord && !hasPhoto && (
-            <div
-              className="mx-6 mb-1 mt-1 relative px-5 py-7 rounded-md text-center"
-              style={{
-                background: 'linear-gradient(180deg, rgba(255,228,230,0.5) 0%, rgba(245,243,255,0.45) 100%)',
-                border: '1px dashed rgba(154,165,177,0.35)',
-              }}
-            >
-              <p className="font-mono text-[9px] font-bold text-mist-400 tracking-[0.28em] mb-3">— ONE WORD</p>
-              <p className="text-[26px] font-bold text-slate-800 leading-tight tracking-tight">
-                "{record.oneWordText}"
-              </p>
-            </div>
-          )}
-          {hasOneWord && hasPhoto && (
-            <div className="px-6 pt-5 pb-1">
-              <p className="font-mono text-[9px] font-bold text-mist-400 tracking-[0.24em] mb-1">— ONE WORD</p>
-              <p className="text-[24px] font-bold text-slate-800 leading-tight tracking-tight">
-                "{record.oneWordText}"
-              </p>
-            </div>
-          )}
-
-          {/* 4) Body — on ruling lines */}
-          <div
-            className="px-6 pt-6 pb-7"
-            style={{
-              backgroundImage:
-                'repeating-linear-gradient(180deg, transparent 0, transparent 31px, rgba(154,165,177,0.18) 31px, rgba(154,165,177,0.18) 32px)',
-            }}
-          >
-            <p className="font-mono text-[9px] font-bold text-mist-400 tracking-[0.24em] mb-2">— TODAY'S SCENE</p>
-            <p className="text-[14.5px] text-slate-800 leading-[32px] font-medium whitespace-pre-line">
-              {record.action}
-            </p>
-          </div>
-
-          {/* 5) Tomorrow (optional) */}
-          {hasTomorrow && (
-            <div className="px-6 pt-2 pb-6 text-right">
-              <p className="font-mono text-[9px] font-bold text-mist-400 tracking-[0.24em] mb-1">— TOMORROW</p>
-              <p className="text-[14px] text-mist-600 font-medium">{record.tomorrowText}</p>
-            </div>
-          )}
-
-          {/* 6) Signature */}
-          <div className="px-6 pb-6 flex items-center justify-between">
-            <span className="font-mono text-[9px] text-mist-400 tracking-[0.22em]">
-              {nickname ? `— ${nickname}` : ''}
-            </span>
-            <span className="font-mono text-[9px] text-mist-400 tracking-[0.22em]">
-              pg.{String(pageNumber ?? 1).padStart(3, '0')}
-            </span>
-          </div>
-        </article>
-
-        {/* Actions */}
-        <div className="flex items-center justify-center gap-2 mt-5">
-          {onEdit && (
-            <button
-              onClick={onEdit}
-              className="px-4 py-2 rounded-full bg-white/70 border border-white text-mist-500 text-[11px] font-bold hover:bg-white transition"
-            >
-              편집
-            </button>
-          )}
+      <header
+        className="sticky top-0 z-30 flex flex-wrap items-center justify-between gap-2 px-5 py-3"
+        style={{
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          background: 'linear-gradient(180deg, rgba(236,239,254,0.95) 0%, rgba(236,239,254,0.85) 100%)',
+          borderBottom: '1px solid rgba(226, 232, 240, 0.8)',
+        }}
+      >
+        <div className="flex flex-wrap items-center gap-2">
           {onShare && (
             <button
               onClick={onShare}
-              className="px-4 py-2 rounded-full bg-white/70 border border-white text-mist-500 text-[11px] font-bold hover:bg-white transition"
+              className={toolbarPrimaryButtonClassName}
+              title="카드 저장"
+              aria-label="카드 저장"
             >
-              공유
+              <Download className={toolbarIconClassName} strokeWidth={2.2} />
             </button>
           )}
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className={toolbarSecondaryButtonClassName}
+              title="편집"
+              aria-label="편집"
+            >
+              <PencilLine className={toolbarIconClassName} strokeWidth={2.2} />
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {onDelete && (
             <button
               onClick={onDelete}
-              className="px-4 py-2 rounded-full bg-white/70 border border-white text-rose-400 text-[11px] font-bold hover:bg-rose-50 transition"
+              className={toolbarDangerButtonClassName}
+              title="삭제하기"
+              aria-label="삭제하기"
             >
-              삭제하기
+              <Trash2 className={toolbarIconClassName} strokeWidth={2.2} />
             </button>
           )}
+          <button
+            onClick={onClose}
+            className={toolbarSecondaryButtonClassName}
+            title="닫기"
+            aria-label="닫기"
+          >
+            <X className={toolbarIconClassName} strokeWidth={2.2} />
+          </button>
+        </div>
+      </header>
+
+      <div
+        className={[
+          'relative flex flex-1 flex-col justify-start overflow-x-hidden px-5 pb-8',
+          hasPhoto ? 'pt-4' : 'pt-10',
+        ].join(' ')}
+      >
+        <div className="mx-auto mt-6 flex w-full max-w-[640px] flex-col">
+          <div className="relative mb-5 flex items-center justify-between min-h-[36px]">
+            <span className="font-mono text-[11px] font-bold tracking-[0.12em] text-mist-400">
+              RECORD · {String(pageNumber ?? 1).padStart(3, '0')}
+            </span>
+            {hasPhoto && onDisplayModeChange && (
+              <div className="inline-flex items-center rounded-full border border-white/70 bg-white/62 p-0.5 shadow-[0_8px_18px_-14px_rgba(82,96,109,0.35)] backdrop-blur-sm">
+                <button
+                  onClick={() => onDisplayModeChange('poster')}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
+                    detailDisplayMode === 'poster'
+                      ? 'bg-point-500 text-white shadow-[0_4px_10px_-4px_rgba(139,92,246,0.35)]'
+                      : 'text-mist-500 hover:bg-white/80'
+                  }`}
+                >
+                  포스터형
+                </button>
+                <button
+                  onClick={() => onDisplayModeChange('diary')}
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition-all ${
+                    detailDisplayMode === 'diary'
+                      ? 'bg-point-500 text-white shadow-[0_4px_10px_-4px_rgba(139,92,246,0.35)]'
+                      : 'text-mist-500 hover:bg-white/80'
+                  }`}
+                >
+                  기록형
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="relative z-10">
+            {isPosterMode ? (
+              <article
+                className="relative overflow-hidden rounded-[26px] border border-white/85"
+                style={posterCardStyle}
+              >
+                <img src={record.imageUrl} alt="기록 사진" className="absolute inset-0 h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.08)_34%,rgba(10,20,42,0.12)_58%,rgba(10,20,42,0.44)_78%,rgba(10,20,42,0.82)_100%)]" />
+                <div className="relative aspect-[4/3]">
+                  <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
+                    <div className="text-white">
+                      <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-white/92">
+                        {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
+                      </p>
+                      <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-white">
+                        {String(date.getDate()).padStart(2, '0')}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-center gap-2.5">
+                      <span className="font-mono text-[10px] tracking-wider text-center text-white">{fmtTime(date)}</span>
+                      {mood && (
+                        <span className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-white/42 bg-white/14 px-3 py-1.5 backdrop-blur-sm">
+                          <span className="text-xs font-bold leading-none text-white">{mood}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative px-6 pb-6 pt-9">
+                  <div aria-hidden className="pointer-events-none absolute right-8 top-7 opacity-[0.08]">
+                    <WaterDropCharacter size={74} mood={characterMood} animate={false} />
+                  </div>
+
+                  <p className={`mb-5 text-center ${posterSectionLabelClassName}`}>오늘의 기록</p>
+                  <div className="space-y-[18px] text-center">
+                    {actionParagraphs.map((paragraph, index) => (
+                      <p
+                        key={`${record.id}-poster-action-${index}`}
+                        className="whitespace-pre-line text-[20px] font-bold leading-[1.72] tracking-[-0.01em] text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.24)]"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+
+                  {hasOneWord && (
+                    <div className="mt-8 flex justify-center">
+                      <div className="flex items-center gap-[10px] rounded-full border border-white/38 bg-white/10 px-5 py-3 backdrop-blur-sm">
+                        <span className="text-[10px] font-bold tracking-[0.12em] text-white">한 단어</span>
+                        <span className="h-px w-[14px] bg-white" />
+                        <span className="text-[18px] font-semibold italic tracking-[-0.01em] text-white">
+                          "{record.oneWordText}"
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasTomorrow && (
+                    <div className="mt-8 border-t border-white/14 pt-5 text-center">
+                      <p className="mb-3 text-[10px] font-bold tracking-[0.12em] text-white/68">내일의 메모</p>
+                      <div className="space-y-2">
+                        {tomorrowParagraphs.map((paragraph, index) => (
+                          <p
+                            key={`${record.id}-poster-tomorrow-${index}`}
+                            className="whitespace-pre-line text-[13px] font-medium leading-[1.7] tracking-[-0.01em] text-white/78"
+                          >
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-7 flex items-center justify-between">
+                    <span className="font-mono text-[9px] tracking-[0.2em] text-white/38">{nickname ? `— ${nickname}` : ''}</span>
+                    <span className="font-mono text-[9px] tracking-[0.2em] text-white/46">
+                      pg.{String(pageNumber ?? 1).padStart(3, '0')}
+                    </span>
+                  </div>
+                </div>
+              </article>
+            ) : hasPhoto ? (
+              <article className="overflow-hidden rounded-[26px] border border-white/85" style={diaryPhotoSurfaceStyle}>
+                <div className="relative aspect-[4/3] overflow-hidden">
+                  <img src={record.imageUrl} alt="기록 사진" className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.03)_60%,rgba(10,20,42,0.46)_100%)]" />
+                  <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
+                    <div className="text-white">
+                      <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-white/92">
+                        {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
+                      </p>
+                      <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-white">
+                        {String(date.getDate()).padStart(2, '0')}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-center gap-2.5">
+                      <span className="font-mono text-[10px] tracking-wider text-center text-white">{fmtTime(date)}</span>
+                      {mood && (
+                        <span className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-white/42 bg-white/14 px-3 py-1.5 backdrop-blur-sm">
+                          <span className="text-xs font-bold leading-none text-white">{mood}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative px-6 pb-6 pt-9">
+                  <div aria-hidden className="pointer-events-none absolute right-8 top-7 opacity-[0.08]">
+                    <WaterDropCharacter size={74} mood={characterMood} animate={false} />
+                  </div>
+
+                  <p className="mb-5 text-center text-[10px] font-bold tracking-[0.12em] text-mist-400">오늘의 기록</p>
+                  <div className="space-y-[18px] text-center">
+                    {actionParagraphs.map((paragraph, index) => (
+                      <p
+                        key={`${record.id}-action-${index}`}
+                        className="whitespace-pre-line text-[20px] font-bold leading-[1.72] tracking-[-0.01em] text-slate-800"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+
+                  {hasOneWord && (
+                    <div className="mt-8 flex justify-center">
+                      <div className="flex items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                        <span className={defaultSectionLabelClassName}>한 단어</span>
+                        <span className="h-px w-[14px] bg-mist-200" />
+                        <span className="text-[18px] font-semibold italic tracking-[-0.01em] text-point-600">
+                          "{record.oneWordText}"
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasTomorrow && (
+                    <div className="mt-8 border-t border-mist-200/60 pt-5 text-center">
+                      <p className="mb-3 text-[10px] font-bold tracking-[0.12em] text-mist-400">내일의 메모</p>
+                      <div className="space-y-2">
+                        {tomorrowParagraphs.map((paragraph, index) => (
+                          <p
+                            key={`${record.id}-tomorrow-${index}`}
+                            className="whitespace-pre-line text-[13px] font-medium leading-[1.7] tracking-[-0.01em] text-mist-500"
+                          >
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-7 flex items-center justify-between">
+                    <span className="font-mono text-[9px] tracking-[0.2em] text-mist-300">{nickname ? `— ${nickname}` : ''}</span>
+                    <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">
+                      pg.{String(pageNumber ?? 1).padStart(3, '0')}
+                    </span>
+                  </div>
+                </div>
+              </article>
+            ) : (
+              <article className="overflow-hidden rounded-[26px] border border-white/85" style={cardSurfaceStyle}>
+                <div className="flex items-end justify-between px-6 pb-[18px] pt-6">
+                  <div>
+                    <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-mist-500">
+                      {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
+                    </p>
+                    <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-slate-800">
+                      {String(date.getDate()).padStart(2, '0')}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-center gap-2.5">
+                    <span className="font-mono text-[10px] tracking-wider text-center text-mist-400">{fmtTime(date)}</span>
+                    {moodTone && mood && (
+                      <span className={`inline-flex items-center justify-center rounded-xl border-[1.5px] px-3 py-1.5 ${moodTone.bg} ${moodTone.border}`}>
+                        <span className={`text-xs font-bold leading-none ${moodTone.text}`}>{mood}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="relative px-8 pb-8 pt-4">
+                  <div
+                    aria-hidden
+                    className="absolute left-1/2 top-6 h-[180px] w-[180px] -translate-x-1/2 rounded-full blur-3xl"
+                    style={{ background: 'rgba(196,181,253,0.18)' }}
+                  />
+                  <div aria-hidden className="absolute right-5 top-0 opacity-[0.08]">
+                    <WaterDropCharacter size={68} mood={characterMood} animate={false} />
+                  </div>
+                  <p className={`${defaultSectionLabelClassName} mb-4 text-center`}>오늘의 기록</p>
+                  <div className="relative mx-auto max-w-[420px] space-y-[18px] text-center">
+                    {actionParagraphs.map((paragraph, index) => (
+                      <p
+                        key={`${record.id}-action-${index}`}
+                        className="whitespace-pre-line text-[22px] font-bold leading-[1.85] tracking-[-0.01em] text-slate-800"
+                      >
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                {hasOneWord && (
+                  <div className="px-6 pb-5">
+                    <div className="mx-auto flex w-fit items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                      <span className={defaultSectionLabelClassName}>한 단어</span>
+                      <span className="h-px w-[14px] bg-mist-200" />
+                      <span className="text-[15px] font-semibold italic tracking-[-0.01em] text-point-600">
+                        "{record.oneWordText}"
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {hasTomorrow && (
+                  <div className="border-t border-mist-200/60 px-6 pb-[18px] pt-4">
+                    <div className="space-y-2 text-center">
+                      <span className={`${defaultSectionLabelClassName} block`}>내일의 메모</span>
+                      <div className="mx-auto max-w-[360px] space-y-2">
+                        {tomorrowParagraphs.map((paragraph, index) => (
+                          <p
+                            key={`${record.id}-tomorrow-${index}`}
+                            className="whitespace-pre-line text-[14px] font-medium leading-[1.8] tracking-[-0.01em] text-mist-500"
+                          >
+                            {paragraph}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between px-6 pb-5">
+                  <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">{nickname ? `— ${nickname}` : ''}</span>
+                  <span className="font-mono text-[9px] tracking-[0.2em] text-mist-400">
+                    pg.{String(pageNumber ?? 1).padStart(3, '0')}
+                  </span>
+                </div>
+              </article>
+            )}
+
+          </div>
+
+          <div aria-hidden className="pointer-events-none relative mt-16 flex justify-center pb-12">
+            <div className="relative w-full max-w-[640px]">
+              <div className="absolute -left-8 bottom-6 opacity-[0.15]">
+                <WaterDropCharacter size={132} mood={characterMood} animate={false} />
+              </div>
+              <div className="absolute -right-5 bottom-10 opacity-[0.11]">
+                <WaterDropCharacter size={78} mood="SPARKLE" animate={false} />
+              </div>
+              <div
+                className="absolute right-0 top-3 h-[96px] w-[96px] rounded-full blur-2xl"
+                style={{ background: 'rgba(167,139,250,0.18)' }}
+              />
+              <div className="mx-auto w-fit">
+                <div className="mb-2 text-center">
+                  <span className="font-mono text-[10px] font-bold tracking-[0.22em] text-mist-400">QUIET MEMORY</span>
+                </div>
+                <div className="flex items-end gap-3 rounded-[28px] border border-white/40 bg-white/28 px-5 py-4 backdrop-blur-md shadow-[0_16px_30px_-24px_rgba(82,96,109,0.3)]">
+                  {mascotRailMoods.map((railMood, index) => (
+                    <div key={`${record.id}-mascot-${railMood}-${index}`} className="flex flex-col items-center gap-2">
+                      <WaterDropCharacter
+                        size={index === 0 ? 44 : index === 2 ? 38 : 34}
+                        mood={railMood}
+                        animate={false}
+                        className={index === 0 ? '' : 'opacity-85'}
+                      />
+                      <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 text-center text-[12px] font-medium tracking-[-0.01em] text-mist-400">
+                  짧은 하루도 이렇게 남겨두면 충분해요
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

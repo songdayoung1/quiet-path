@@ -12,6 +12,7 @@ import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
 import kr.co.quietpath.api.record.dto.response.RecordListItem;
 import kr.co.quietpath.api.record.dto.response.RecordListResponse;
 import kr.co.quietpath.api.record.dto.response.RecordMonthlyResponse;
+import kr.co.quietpath.api.record.dto.response.RecordPinResponse;
 import kr.co.quietpath.api.record.dto.response.RecordShareResponse;
 import kr.co.quietpath.api.record.dto.response.RecordTodayResponse;
 import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
@@ -109,7 +110,7 @@ public class RecordService {
     @Transactional(readOnly = true)
     public RecordListResponse getRecords(Long userId) {
         getUser(userId);
-        List<RecordListItem> items = recordRepository.findByUser_IdAndIsHiddenFalseOrderByRecordDateDescIdDesc(userId)
+        List<RecordListItem> items = recordRepository.findByUser_IdAndIsHiddenFalseOrderByPinnedAtDescRecordDateDescIdDesc(userId)
             .stream()
             .map(this::toListItem)
             .toList();
@@ -132,7 +133,7 @@ public class RecordService {
         LocalDate from = yearMonth.atDay(1);
         LocalDate to = yearMonth.atEndOfMonth();
 
-        List<RecordListItem> items = recordRepository.findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByRecordDateDescIdDesc(
+        List<RecordListItem> items = recordRepository.findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByPinnedAtDescRecordDateDescIdDesc(
                 userId,
                 from,
                 to
@@ -298,6 +299,25 @@ public class RecordService {
             .id(record.getId())
             .visibility(record.getVisibility())
             .sharedAt(record.getSharedAt() != null ? formatDateTime(record.getSharedAt()) : null)
+            .build();
+    }
+
+    public RecordPinResponse updatePin(Long userId, Long recordId, Boolean pinned) {
+        if (pinned == null) {
+            throw new ApiException(ErrorCode.INVALID_REQUEST);
+        }
+        Record record = getRecord(recordId);
+        validateOwner(userId, record);
+
+        if (Boolean.TRUE.equals(pinned)) {
+            record.pinMemory();
+        } else {
+            record.unpinMemory();
+        }
+
+        return RecordPinResponse.builder()
+            .id(record.getId())
+            .isPinned(record.getPinnedAt() != null)
             .build();
     }
 

@@ -81,17 +81,17 @@ import { QpCard, QpCardHeader, QpInput, QpTextArea, QpPhotoSlot } from '../compo
 </QpCard>
 
 <QpCard className="mt-4">
-  <QpCardHeader title="오늘의 장면을 남겨볼까요?" index="02 · SCENE" />
+  <QpCardHeader title="오늘의 기록" index="02 · RECORD" />
   <QpTextArea value={action} onChange={e => setAction(e.target.value)} placeholder="기억에 남는 순간이나 한 일을 편하게 적어주세요." />
 </QpCard>
 
 <QpCard className="mt-4">
-  <QpCardHeader title="오늘을 한 단어로 표현한다면?" index="03 · WORD" />
+  <QpCardHeader title="오늘의 한 단어" index="03 · WORD" />
   <QpInput value={oneWordText} onChange={e => setOneWordText(e.target.value)} placeholder="다짐, 평온, 위로 등…" />
 </QpCard>
 
 <QpCard className="mt-4">
-  <QpCardHeader title="내일은 무엇을 해볼까요?" index="04 · OPTIONAL" hint="선택 사항이에요. 부담 없이 적어보세요." />
+  <QpCardHeader title="내일의 메모" index="04 · MEMO" hint="선택 사항이에요. 부담 없이 적어보세요." />
   <QpInput value={tomorrowText} onChange={e => setTomorrowText(e.target.value)} placeholder="내일의 작은 목표나 계획을 적어보세요." className="mb-4" />
   <p className="block text-[11px] font-bold text-mist-500 mb-2 pl-[13px] tracking-wide">오늘의 사진 한 장</p>
   <QpPhotoSlot

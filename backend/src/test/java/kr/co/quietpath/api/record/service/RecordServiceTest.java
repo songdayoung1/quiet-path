@@ -115,7 +115,8 @@ class RecordServiceTest {
         record.share();
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(recordRepository.findByUser_IdAndIsHiddenFalseOrderByRecordDateDescIdDesc(1L)).thenReturn(List.of(record));
+        when(recordRepository.findByUser_IdAndIsHiddenFalseOrderByPinnedAtDescRecordDateDescIdDesc(1L))
+            .thenReturn(List.of(record));
 
         var response = recordService.getRecords(1L);
 
@@ -136,7 +137,7 @@ class RecordServiceTest {
         second.updateContent("기록", null, null, "반짝", "https://image.test/sample.png");
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(recordRepository.findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByRecordDateDescIdDesc(
+        when(recordRepository.findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByPinnedAtDescRecordDateDescIdDesc(
             1L,
             LocalDate.of(2026, 6, 1),
             LocalDate.of(2026, 6, 30)
@@ -155,6 +156,23 @@ class RecordServiceTest {
         assertEquals(50, response.getPhotoCoverage());
         assertEquals(true, response.getItems().get(0).getIsPinned());
         assertEquals(false, response.getItems().get(1).getIsPinned());
+    }
+
+    @Test
+    void updatePin_togglesPinnedState() {
+        User owner = User.createGoogle("provider", "owner@example.com", "owner");
+        setId(owner, 1L);
+        Record record = buildRecord(owner, LocalDate.now().minusDays(5));
+
+        when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
+
+        var pinnedResponse = recordService.updatePin(1L, 10L, true);
+        assertEquals(true, pinnedResponse.getIsPinned());
+        assertEquals(true, record.getPinnedAt() != null);
+
+        var unpinnedResponse = recordService.updatePin(1L, 10L, false);
+        assertEquals(false, unpinnedResponse.getIsPinned());
+        assertEquals(true, record.getPinnedAt() == null);
     }
 
     @Test

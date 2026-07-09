@@ -72,6 +72,11 @@ export interface RecordVisibilityResponse {
   sharedAt: string | null;
 }
 
+export interface RecordPinResponse {
+  id: number;
+  isPinned: boolean;
+}
+
 export const recordApi = {
   async getRecords(token: string): Promise<RecordListResponse> {
     const response = await apiFetch('/api/v1/records', {
@@ -175,6 +180,24 @@ export const recordApi = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ visibility }),
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+
+    return response.json();
+  },
+
+  async updatePin(token: string, recordId: number, pinned: boolean): Promise<RecordPinResponse> {
+    const response = await apiFetch(`/api/v1/records/${recordId}/pin`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ pinned }),
     }, {
       accessToken: token,
     });

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Record as RecordType } from '../../types';
-import { MoodSticker } from '../UI';
 import { Image as ImageIcon } from 'lucide-react';
 import { WaterDropCharacter, CharacterTone } from '../WaterDropCharacter';
 import { getThemePalette, useResolvedTheme } from '../../theme';
@@ -75,19 +74,16 @@ export const AlbumTab: React.FC<AlbumTabProps> = ({
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             </div>
-            <div className="absolute font-bold bottom-2 left-3 right-3 pointer-events-none">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] tracking-wider px-2 py-1 rounded-full shadow-sm" style={{ background: palette.pillBg, color: palette.mutedText }}>
-                  {new Date(record.timestamp).getDate()}일
-                </span>
-                {record.moodCode && (
-                  <MoodSticker code={record.moodCode} className="scale-75 origin-right shadow-none shrink-0" />
-                )}
-              </div>
-              {record.oneWordText && (
-                <p className="mt-1 text-[11px] truncate px-1" style={{ color: palette.mutedText }}>{record.oneWordText}</p>
-              )}
-            </div>
+            <span
+              className="pointer-events-none absolute bottom-3 right-3 text-[11px] font-semibold tracking-[0.02em]"
+              style={{ color: palette.mutedText }}
+            >
+              {new Intl.DateTimeFormat('ko-KR', {
+                month: 'long',
+                day: 'numeric',
+                weekday: 'short',
+              }).format(new Date(record.timestamp))}
+            </span>
           </div>
         ))}
       </div>
