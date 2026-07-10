@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, ViewState, Record, Direction } from './types';
-import { loadState, saveState, createDirectionId } from './storage';
+import { loadState, saveState, createDirectionId, persistAuthState } from './storage';
 import { HomeView } from './views/HomeView';
 import { RecordsView } from './views/RecordsView';
 import { DirectionView } from './views/DirectionView';
@@ -275,6 +275,12 @@ const isRefreshSessionInvalid = (error: unknown) => {
   return status === 400 || status === 401;
 };
 
+const getAuthErrorDebugInfo = (error: unknown) => ({
+  status: (error as ApiErrorWithStatus | undefined)?.status,
+  code: (error as ApiErrorWithStatus | undefined)?.code,
+  message: error instanceof Error ? error.message : 'unknown error',
+});
+
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
     currentDirection: null,
@@ -504,6 +510,16 @@ const App: React.FC = () => {
                   refreshToken: restored.refreshToken,
                   userId: restored.me.id,
                 });
+                persistAuthState(
+                  {
+                    isLoggedIn: true,
+                    token: restored.accessToken,
+                    refreshToken: restored.refreshToken,
+                    userId: restored.me.id,
+                    onboardingStatus: restored.me.onboardingStatus,
+                  },
+                  { hasSeenOnboarding: loaded.hasSeenOnboarding }
+                );
                 if (restored.me.onboardingStatus === 'NEW') {
                    setCurrentView('NICKNAME_SETUP');
                 } else {
@@ -521,6 +537,10 @@ const App: React.FC = () => {
                     refreshToken: null,
                     userId: null,
                   });
+                  persistAuthState(
+                    { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+                    { hasSeenOnboarding: loaded.hasSeenOnboarding, clearServerState: true }
+                  );
                   setCurrentView('ONBOARDING');
                 } else {
                   setCurrentView(loaded.hasSeenOnboarding ? 'NOW' : 'ONBOARDING');
@@ -885,6 +905,10 @@ const App: React.FC = () => {
         refreshToken: null,
         userId: null,
       });
+      persistAuthState(
+        { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+        { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
+      );
       return null;
     }
 
@@ -921,9 +945,22 @@ const App: React.FC = () => {
             userId: nextUserId ?? prev.auth.userId ?? null,
           },
         }));
+        persistAuthState(
+          {
+            isLoggedIn: true,
+            token: refreshed.token,
+            refreshToken: refreshed.refreshToken,
+            userId: nextUserId,
+            onboardingStatus: state.auth.onboardingStatus,
+          },
+          { hasSeenOnboarding: state.hasSeenOnboarding }
+        );
 
         return refreshed.token;
       } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[auth] refresh failed', getAuthErrorDebugInfo(error));
+        }
         if (isRefreshSessionInvalid(error)) {
           setState(prev => ({
             ...clearServerDrivenState(prev),
@@ -935,6 +972,10 @@ const App: React.FC = () => {
             refreshToken: null,
             userId: null,
           });
+          persistAuthState(
+            { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+            { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
+          );
         }
         return null;
       } finally {
@@ -943,7 +984,7 @@ const App: React.FC = () => {
     })();
 
     return refreshAuthRequestRef.current;
-  }, [syncAuthSessionRef]);
+  }, [state.auth.onboardingStatus, state.hasSeenOnboarding, syncAuthSessionRef]);
 
   useEffect(() => {
     configureApiClient({ refreshAccessToken: refreshCommunityAccessToken });
@@ -1061,6 +1102,16 @@ const App: React.FC = () => {
         refreshToken,
         userId: me?.id ?? null,
       });
+      persistAuthState(
+        {
+          isLoggedIn: true,
+          token,
+          refreshToken,
+          userId: me?.id ?? null,
+          onboardingStatus: status,
+        },
+        { hasSeenOnboarding: true }
+      );
       if (status === 'NEW') {
           setCurrentView('NICKNAME_SETUP');
       } else {
@@ -1118,6 +1169,10 @@ const App: React.FC = () => {
       refreshToken: null,
       userId: null,
     });
+    persistAuthState(
+      { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+      { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
+    );
     setCurrentView('NOW');
   };
 
