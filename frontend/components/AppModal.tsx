@@ -17,6 +17,9 @@ interface AppModalProps {
   confirmVariant?: ConfirmVariant;
   confirmDisabled?: boolean;
   cancelDisabled?: boolean;
+  secondaryActionLabel?: string;
+  onSecondaryAction?: () => void;
+  secondaryActionDisabled?: boolean;
 }
 
 const getConfirmStyle = (theme: 'light' | 'dark', variant: ConfirmVariant, disabled: boolean): React.CSSProperties => {
@@ -51,6 +54,9 @@ export const AppModal: React.FC<AppModalProps> = ({
   confirmVariant = 'primary',
   confirmDisabled = false,
   cancelDisabled = false,
+  secondaryActionLabel,
+  onSecondaryAction,
+  secondaryActionDisabled = false,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
@@ -82,6 +88,13 @@ export const AppModal: React.FC<AppModalProps> = ({
     border: `1px solid ${theme === 'dark' ? palette.border : 'transparent'}`,
   };
 
+  const secondaryButtonStyle: React.CSSProperties = {
+    background: theme === 'dark' ? 'rgba(127,29,29,0.22)' : 'rgba(255,241,242,0.96)',
+    color: '#E11D48',
+    border: `1px solid ${theme === 'dark' ? 'rgba(251,113,133,0.4)' : 'rgba(251,113,133,0.35)'}`,
+    opacity: secondaryActionDisabled ? 0.65 : 1,
+  };
+
   return createPortal(
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center px-5 py-8"
@@ -110,27 +123,40 @@ export const AppModal: React.FC<AppModalProps> = ({
           <div className="text-[13px] leading-[1.75]" style={{ color: palette.mutedText }}>{description}</div>
         </div>
 
-        <div className="flex gap-3 p-5 pt-6">
-          {!hideCancel && (
+        <div className="p-5 pt-6">
+          {secondaryActionLabel && onSecondaryAction && (
             <button
               type="button"
-              onClick={onClose}
-              disabled={cancelDisabled}
-              className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-semibold"
-              style={cancelButtonStyle}
+              onClick={onSecondaryAction}
+              disabled={secondaryActionDisabled}
+              className="w-full min-h-[48px] rounded-[18px] text-[13px] font-semibold mb-2.5"
+              style={secondaryButtonStyle}
             >
-              {cancelLabel}
+              {secondaryActionLabel}
             </button>
           )}
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={confirmDisabled}
-            className={`${hideCancel ? 'w-full' : 'flex-1'} min-h-[52px] rounded-[20px] text-[14px] font-bold`}
-            style={getConfirmStyle(theme, confirmVariant, confirmDisabled)}
-          >
-            {confirmLabel}
-          </button>
+          <div className="flex gap-3">
+            {!hideCancel && (
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={cancelDisabled}
+                className="flex-1 min-h-[52px] rounded-[20px] text-[14px] font-semibold"
+                style={cancelButtonStyle}
+              >
+                {cancelLabel}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={confirmDisabled}
+              className={`${hideCancel ? 'w-full' : 'flex-1'} min-h-[52px] rounded-[20px] text-[14px] font-bold`}
+              style={getConfirmStyle(theme, confirmVariant, confirmDisabled)}
+            >
+              {confirmLabel}
+            </button>
+          </div>
         </div>
       </div>
     </div>,

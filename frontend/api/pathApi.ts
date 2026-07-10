@@ -23,12 +23,20 @@ export interface PathActiveResponse {
   status?: string;
   createdAt?: string;
   reviewAt?: string;
+  expired?: boolean;
 }
 
 export interface PathFinishResponse {
   pathId: number;
   status: string;
   completedAt: string;
+}
+
+export interface PathReviewExtendResponse {
+  pathId: number;
+  status: string;
+  reviewAt: string;
+  expired: boolean;
 }
 
 export interface PathDetailRecordItem {
@@ -115,6 +123,24 @@ export const pathApi = {
   async finish(token: string, pathId: number): Promise<PathFinishResponse> {
     const response = await apiFetch(`/api/v1/paths/${pathId}/finish`, {
       method: 'POST',
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+
+    return response.json();
+  },
+
+  async extendReviewAt(token: string, pathId: number, reviewAt: string): Promise<PathReviewExtendResponse> {
+    const response = await apiFetch(`/api/v1/paths/${pathId}/review-at`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ reviewAt }),
     }, {
       accessToken: token,
     });

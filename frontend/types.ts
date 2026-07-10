@@ -61,6 +61,7 @@ export interface Direction {
   endedAt?: number; // When this direction was archived
   reviewAt?: number; // Time Anchor: When to review this flow
   isActive: boolean;
+  expired?: boolean;
   aiSummary?: string; // The "Future Retrieval" summary
 }
 
