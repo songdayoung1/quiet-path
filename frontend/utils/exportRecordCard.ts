@@ -1563,70 +1563,51 @@ export const exportMonthlyCollage = async (
   return { mode: 'download' as const, pages: totalPages };
 };
 
-// ─── Monthly Activity Board ────────────────────────────────────────────────
+// ─── Monthly Calendar Export ───────────────────────────────────────────────
 
-const ACTIVITY_BOARD_CANVAS_HEIGHT = 1350;
+const CALENDAR_EXPORT_CANVAS_HEIGHT = 1350;
 
-const drawActivityBoardCell = (
-  ctx: CanvasRenderingContext2D,
-  day: number,
-  record: RecordType | undefined,
-  isToday: boolean,
-  isFuture: boolean,
-  useCurrentMonthState: boolean,
-  x: number,
-  y: number,
-  size: number
-) => {
-  const radius = 10;
-  const fillColor = record ? getMoodActivityCellColor(record.moodCode) : '#EEF3F7';
-  const shouldDrawFuturePlaceholder = useCurrentMonthState && isFuture && !record;
-  const shouldDrawTodayMarker = useCurrentMonthState && isToday;
-  const shouldDrawEmptyCell = record || !shouldDrawFuturePlaceholder;
+type CalendarExportCell =
+  | { type: 'empty' }
+  | { type: 'day'; day: number; record?: RecordType };
 
-  if (shouldDrawEmptyCell) {
-    ctx.save();
-    roundedRect(ctx, x, y, size, size, radius);
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-    ctx.restore();
+const buildMonthlyCalendarCells = (
+  records: RecordType[],
+  year: number,
+  month: number
+): CalendarExportCell[] => {
+  const recordByDay = new Map<number, RecordType>();
+
+  records.forEach((record) => {
+    const date = new Date(record.timestamp);
+    const day = date.getDate();
+    const previous = recordByDay.get(day);
+
+    if (!previous || record.timestamp > previous.timestamp) {
+      recordByDay.set(day, record);
+    }
+  });
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDayOffset = new Date(year, month - 1, 1).getDay();
+  const cells: CalendarExportCell[] = [];
+
+  for (let i = 0; i < firstDayOffset; i += 1) {
+    cells.push({ type: 'empty' });
   }
 
-  if (!record && !shouldDrawFuturePlaceholder) {
-    roundedRect(ctx, x, y, size, size, radius);
-    ctx.strokeStyle = shouldDrawTodayMarker ? '#A78BFA' : '#E3EAF1';
-    ctx.lineWidth = shouldDrawTodayMarker ? 2.2 : 1.5;
-    ctx.stroke();
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push({ type: 'day', day, record: recordByDay.get(day) });
   }
 
-  if (record && shouldDrawTodayMarker) {
-    roundedRect(ctx, x, y, size, size, radius);
-    ctx.strokeStyle = '#A78BFA';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+  while (cells.length % 7 !== 0) {
+    cells.push({ type: 'empty' });
   }
 
-  ctx.fillStyle = record
-    ? 'rgba(71,85,105,0.72)'
-    : shouldDrawFuturePlaceholder
-      ? 'rgba(148,163,184,0.28)'
-      : 'rgba(148,163,184,0.74)';
-  ctx.font = `${record ? 600 : 500} ${Math.max(size * 0.30, 14)}px "SF Pro Display", "Pretendard", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(day), x + size / 2, y + size / 2 + 1);
-
-  if (!record && shouldDrawTodayMarker) {
-    ctx.fillStyle = '#B69BFF';
-    ctx.beginPath();
-    ctx.arc(x + size / 2, y + size - Math.max(size * 0.12, 6), Math.max(size * 0.055, 2.6), 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.textBaseline = 'alphabetic';
+  return cells;
 };
 
-const createMonthlyActivityBoardBlob = async (
+const createMonthlyCalendarBlob = async (
   records: RecordType[],
   year: number,
   month: number,
@@ -1679,17 +1660,17 @@ const createMonthlyActivityBoardBlob = async (
   const boardX = innerX;
   const boardY = bodyStartY;
   const boardWidth = innerWidth;
-  const boardHeight = s(250);
+  const boardHeight = s(276);
 
   ctx.save();
   roundedRect(ctx, boardX, boardY, boardWidth, boardHeight, s(20));
-  ctx.fillStyle = 'rgba(255,255,255,0.56)';
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
   ctx.fill();
   ctx.restore();
 
   const cells = buildMonthlyCalendarCells(records, year, month);
   const rowCount = cells.length / 7;
-  const headerHeight = s(44);
+  const headerHeight = s(46);
   const gridTop = boardY + headerHeight;
   const cellWidth = boardWidth / 7;
   const cellHeight = (boardHeight - headerHeight) / rowCount;
@@ -1720,7 +1701,7 @@ const createMonthlyActivityBoardBlob = async (
     ctx.fillText(label, boardX + cellWidth * index + cellWidth / 2, boardY + s(28));
   });
 
-  ctx.strokeStyle = 'rgba(226,232,240,0.9)';
+  ctx.strokeStyle = 'rgba(226,232,240,0.95)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(boardX, gridTop);
@@ -1751,24 +1732,24 @@ const createMonthlyActivityBoardBlob = async (
     if (isToday) {
       ctx.save();
       ctx.strokeStyle = moodCode ? getMoodActivityCellColor(moodCode) : '#7C3AED';
-      ctx.lineWidth = 1.8;
+      ctx.lineWidth = 2.2;
       ctx.strokeRect(cellX + 1, cellY + 1, cellWidth - 2, cellHeight - 2);
       ctx.restore();
     }
 
-    ctx.fillStyle = cell.record ? '#475569' : '#94A3B8';
+    ctx.fillStyle = cell.record ? '#64748B' : '#94A3B8';
     if (isToday) {
       ctx.fillStyle = '#334155';
     }
-    ctx.font = `700 ${s(9)}px "JetBrains Mono", ui-monospace, monospace`;
-    ctx.fillText(String(cell.day), cellX + s(9), cellY + s(14));
+    ctx.font = `700 ${s(9.8)}px "JetBrains Mono", ui-monospace, monospace`;
+    ctx.fillText(String(cell.day), cellX + s(9), cellY + s(15));
 
     if (!cell.record || !moodCode) return;
 
     const bubbleColor = getMoodActivityCellColor(moodCode);
     const centerX = cellX + cellWidth / 2;
-    const centerY = cellY + cellHeight / 2 + s(2);
-    const bubbleRadius = s(17.5);
+    const centerY = cellY + cellHeight / 2 + s(4);
+    const bubbleRadius = s(isToday ? 21 : 20);
     const bubble = ctx.createRadialGradient(
       centerX - bubbleRadius * 0.35,
       centerY - bubbleRadius * 0.45,
@@ -1778,16 +1759,22 @@ const createMonthlyActivityBoardBlob = async (
       bubbleRadius
     );
     bubble.addColorStop(0, 'rgba(255,255,255,0.94)');
-    bubble.addColorStop(0.62, hexToRgba(bubbleColor, 0.20));
-    bubble.addColorStop(1, hexToRgba(bubbleColor, 0.08));
+    bubble.addColorStop(0.58, hexToRgba(bubbleColor, 0.28));
+    bubble.addColorStop(1, hexToRgba(bubbleColor, 0.12));
     ctx.fillStyle = bubble;
     ctx.beginPath();
     ctx.arc(centerX, centerY, bubbleRadius, 0, Math.PI * 2);
     ctx.fill();
 
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.52)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+
     const mascotImage = moodImageMap.get(moodCode);
     if (mascotImage) {
-      const mascotSize = s(isToday ? 25 : 24);
+      const mascotSize = s(isToday ? 31 : 30);
       ctx.drawImage(mascotImage, centerX - mascotSize / 2, centerY - mascotSize / 2, mascotSize, mascotSize);
     }
   });
@@ -1801,46 +1788,57 @@ const createMonthlyActivityBoardBlob = async (
     .map((mood) => ({ mood, count: moodCounts[mood] || 0 }))
     .filter(({ count }) => count > 0);
 
-  const summaryTop = boardY + boardHeight + s(28);
+  const summaryTop = boardY + boardHeight + s(30);
   ctx.fillStyle = '#94A3B8';
   ctx.font = `700 ${s(10.5)}px "SF Pro Display", "Pretendard", sans-serif`;
   ctx.textAlign = 'left';
   ctx.fillText('이번 달 무드', innerX, summaryTop);
 
-  let chipX = innerX;
-  let chipY = summaryTop + s(14);
-  const chipGap = s(10);
-  const chipHeight = s(34);
+  if (moodEntries.length > 0) {
+    const itemGap = s(16);
+    const itemWidth = s(44);
+    const rowWidth = moodEntries.length * itemWidth + (moodEntries.length - 1) * itemGap;
+    const startX = innerX + (innerWidth - rowWidth) / 2;
+    const iconCenterY = summaryTop + s(34);
 
-  moodEntries.forEach(({ mood, count }) => {
-    const mascotImage = moodImageMap.get(mood);
-    const moodColors = getMoodExportColor(mood);
-    ctx.font = `700 ${s(11)}px "SF Pro Display", "Pretendard", sans-serif`;
-    const label = `${mood} ×${count}`;
-    const chipWidth = Math.max(ctx.measureText(label).width + s(54), s(92));
+    moodEntries.forEach(({ mood, count }, index) => {
+      const mascotImage = moodImageMap.get(mood);
+      const moodColor = getMoodActivityCellColor(mood);
+      const centerX = startX + itemWidth * index + itemGap * index + itemWidth / 2;
+      const bubbleRadius = s(18);
+      const bubble = ctx.createRadialGradient(
+        centerX - bubbleRadius * 0.35,
+        iconCenterY - bubbleRadius * 0.45,
+        bubbleRadius * 0.18,
+        centerX,
+        iconCenterY,
+        bubbleRadius
+      );
+      bubble.addColorStop(0, 'rgba(255,255,255,0.96)');
+      bubble.addColorStop(0.58, hexToRgba(moodColor, 0.26));
+      bubble.addColorStop(1, hexToRgba(moodColor, 0.10));
+      ctx.fillStyle = bubble;
+      ctx.beginPath();
+      ctx.arc(centerX, iconCenterY, bubbleRadius, 0, Math.PI * 2);
+      ctx.fill();
 
-    if (chipX + chipWidth > innerX + innerWidth) {
-      chipX = innerX;
-      chipY += chipHeight + chipGap;
-    }
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
 
-    roundedRect(ctx, chipX, chipY, chipWidth, chipHeight, chipHeight / 2);
-    ctx.fillStyle = moodColors.bg;
-    ctx.fill();
-    ctx.strokeStyle = moodColors.border;
-    ctx.lineWidth = 2;
-    ctx.stroke();
+      if (mascotImage) {
+        const mascotSize = s(28);
+        ctx.drawImage(mascotImage, centerX - mascotSize / 2, iconCenterY - mascotSize / 2, mascotSize, mascotSize);
+      }
 
-    if (mascotImage) {
-      const mascotSize = s(20);
-      ctx.drawImage(mascotImage, chipX + s(12), chipY + chipHeight / 2 - mascotSize / 2, mascotSize, mascotSize);
-    }
-
-    ctx.fillStyle = moodColors.text;
-    ctx.textAlign = 'left';
-    ctx.fillText(label, chipX + s(36), chipY + s(22));
-    chipX += chipWidth + chipGap;
-  });
+      ctx.fillStyle = '#64748B';
+      ctx.font = `700 ${s(13)}px "SF Pro Display", "Pretendard", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(String(count), centerX, iconCenterY + bubbleRadius + s(16));
+    });
+  }
 
   drawExportFooterText(ctx, {
     text: 'quietpath.app',
