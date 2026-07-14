@@ -85,6 +85,7 @@ const invalidateCacheByPrefix = (prefix: string) => {
 export const feedApi = {
   async getFeed(params: {
     token?: string | null;
+    cacheScope?: string;
     category?: FeedCategory;
     cursor?: string | null;
     size?: number;
@@ -99,7 +100,8 @@ export const feedApi = {
       query.set('cursor', params.cursor);
     }
 
-    const cacheKey = `feed:${params.token ?? 'guest'}:${query.toString()}`;
+    const cacheScope = params.cacheScope ?? (params.token ? 'member' : 'guest');
+    const cacheKey = `feed:${cacheScope}:${query.toString()}`;
     const cached = params.bypassCache ? null : readCache<FeedResponse>(cacheKey);
     if (cached) {
       return cached;
@@ -120,8 +122,12 @@ export const feedApi = {
     return data;
   },
 
-  async getWeeklyTop3(token?: string | null, options?: { bypassCache?: boolean }): Promise<WeeklyTop3Response> {
-    const cacheKey = `weekly-top3:${token ?? 'guest'}`;
+  async getWeeklyTop3(
+    token?: string | null,
+    options?: { bypassCache?: boolean; cacheScope?: string }
+  ): Promise<WeeklyTop3Response> {
+    const cacheScope = options?.cacheScope ?? (token ? 'member' : 'guest');
+    const cacheKey = `weekly-top3:${cacheScope}`;
     const cached = options?.bypassCache ? null : readCache<WeeklyTop3Response>(cacheKey);
     if (cached) {
       return cached;
