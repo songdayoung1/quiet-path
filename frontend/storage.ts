@@ -160,5 +160,44 @@ export const saveState = (state: AppState) => {
   }
 };
 
+export const persistAuthState = (
+  auth: AppState['auth'],
+  options?: {
+    hasSeenOnboarding?: boolean;
+    clearServerState?: boolean;
+  }
+) => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    const parsed = saved ? JSON.parse(saved) : null;
+    const preservedState: AppState = {
+      ...INITIAL_STATE,
+      ...(parsed || {}),
+    };
+    const baseState = options?.clearServerState
+      ? stripServerDrivenState(preservedState)
+      : preservedState;
+
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(
+        buildPersistedState({
+          ...baseState,
+          hasSeenOnboarding: options?.hasSeenOnboarding ?? baseState.hasSeenOnboarding,
+          auth: {
+            ...INITIAL_STATE.auth,
+            ...(baseState.auth || {}),
+            ...auth,
+            refreshToken: auth.refreshToken ?? null,
+            userId: auth.userId ?? null,
+          },
+        })
+      )
+    );
+  } catch (e) {
+    console.error('Failed to persist auth state', e);
+  }
+};
+
 export const createLogId = () => `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 export const createDirectionId = () => `dir_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

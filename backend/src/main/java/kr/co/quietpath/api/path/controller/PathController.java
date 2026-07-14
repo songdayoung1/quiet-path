@@ -5,6 +5,7 @@ import kr.co.quietpath.api.auth.UserPrincipal;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.path.dto.request.PathCreateRequest;
+import kr.co.quietpath.api.path.dto.request.PathReviewExtendRequest;
 import kr.co.quietpath.api.path.dto.response.*;
 import kr.co.quietpath.api.path.service.PathService;
 import kr.co.quietpath.api.summary.service.PathSummaryCommandService;
@@ -42,6 +43,16 @@ public class PathController {
     ) {
         Long userId = extractUserId(principal);
         return pathService.finishPath(userId, pathId);
+    }
+
+    @PatchMapping("/{pathId}/review-at")
+    public PathReviewExtendResponse extendReviewAt(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long pathId,
+        @RequestBody PathReviewExtendRequest request
+    ) {
+        Long userId = extractUserId(principal);
+        return pathService.extendReviewAt(userId, pathId, request);
     }
 
     @GetMapping

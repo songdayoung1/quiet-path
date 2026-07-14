@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.path.dto.request.PathCreateRequest;
+import kr.co.quietpath.api.path.dto.request.PathReviewExtendRequest;
 import kr.co.quietpath.api.path.dto.response.*;
 import kr.co.quietpath.api.summary.service.PathSummaryPolicy;
 import kr.co.quietpath.domain.path.entity.Path;
@@ -62,16 +63,19 @@ public class PathService {
             .status(currentPath.getStatus())
             .createdAt(formatDate(currentPath.getCreatedAt()))
             .reviewAt(formatDate(currentPath.getReviewAt()))
+            .expired(isExpired(currentPath))
             .build();
     }
 
     public PathCreateResponse createPath(Long userId, PathCreateRequest request) {
         getUser(userId);
-        if (pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE).isPresent()) {
-            throw new ApiException(ErrorCode.PATH_ALREADY_ACTIVE);
+        Path activePath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
+            .orElse(null);
+        if (activePath != null) {
+            throwActivePathConflict(activePath);
         }
         LocalDate createdAt = LocalDate.now();
-        LocalDate reviewAt = resolveReviewAt(request, createdAt);
+        LocalDate reviewAt = resolveReviewAt(request.getReviewAt(), createdAt);
         String categoryCode = normalizeCategoryCode(request.getCategoryCode());
 
         Path path = Path.builder()
@@ -86,6 +90,11 @@ public class PathService {
             pathRepository.saveAndFlush(path);
         } catch (DataIntegrityViolationException ex) {
             if (isActivePathUniqueViolation(ex)) {
+                Path conflictedPath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
+                    .orElse(null);
+                if (conflictedPath != null) {
+                    throwActivePathConflict(conflictedPath);
+                }
                 throw new ApiException(ErrorCode.PATH_ALREADY_ACTIVE);
             }
             throw ex;
@@ -97,6 +106,26 @@ public class PathService {
             .status(path.getStatus())
             .createdAt(createdAt.toString())
             .reviewAt(reviewAt.toString())
+            .build();
+    }
+
+    public PathReviewExtendResponse extendReviewAt(Long userId, Long pathId, PathReviewExtendRequest request) {
+        getUser(userId);
+        Path currentPath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
+            .orElseThrow(() -> new ApiException(ErrorCode.PATH_NOT_ACTIVE));
+        if (currentPath.getId() == null || !currentPath.getId().equals(pathId)) {
+            throw new ApiException(ErrorCode.NOT_OWNER);
+        }
+
+        LocalDate nextReviewAt = resolveReviewAt(request.getReviewAt(), LocalDate.now());
+        currentPath.updateReviewAt(nextReviewAt.atStartOfDay());
+        pathRepository.save(currentPath);
+
+        return PathReviewExtendResponse.builder()
+            .pathId(currentPath.getId())
+            .status(currentPath.getStatus())
+            .reviewAt(nextReviewAt.toString())
+            .expired(false)
             .build();
     }
 
@@ -225,14 +254,14 @@ public class PathService {
         return message != null && message.contains("uk_paths_active_user");
     }
 
-    private LocalDate resolveReviewAt(PathCreateRequest request, LocalDate createdAt) {
-        if (request.getReviewAt() == null) {
+    private LocalDate resolveReviewAt(LocalDate reviewAt, LocalDate baseDate) {
+        if (reviewAt == null) {
             throw new ApiException(ErrorCode.INVALID_PERIOD);
         }
-        if (!request.getReviewAt().isAfter(createdAt)) {
+        if (!reviewAt.isAfter(baseDate)) {
             throw new ApiException(ErrorCode.INVALID_PERIOD);
         }
-        return request.getReviewAt();
+        return reviewAt;
     }
 
     private String normalizeCategoryCode(String categoryCode) {
@@ -289,6 +318,18 @@ public class PathService {
             return record.getSceneText();
         }
         return record.getOneWordText();
+    }
+
+    private void throwActivePathConflict(Path path) {
+        if (isExpired(path)) {
+            throw new ApiException(ErrorCode.PATH_REVIEW_REQUIRED);
+        }
+        throw new ApiException(ErrorCode.PATH_ALREADY_ACTIVE);
+    }
+
+    private boolean isExpired(Path path) {
+        return path.getReviewAt() != null
+            && path.getReviewAt().toLocalDate().isBefore(LocalDate.now());
     }
 
     private String formatDate(LocalDateTime dateTime) {

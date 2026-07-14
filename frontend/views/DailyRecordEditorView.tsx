@@ -7,6 +7,7 @@ import { MOOD_STICKERS } from '../constants';
 import { CharacterTone } from '../components/WaterDropCharacter';
 import { useResolvedTheme } from '../theme';
 import { recordApi } from '../api/recordApi';
+import type { ApiErrorWithStatus } from '../api/apiClient';
 import { AppModal } from '../components/AppModal';
 
 interface DailyRecordEditorViewProps {
@@ -15,6 +16,7 @@ interface DailyRecordEditorViewProps {
   onSave: (record: RecordType, directionUpdate?: Partial<Direction>) => void;
   onCancel: () => void;
   onStartDirection: () => void;
+  onExpiredDirectionRequired?: () => void;
 }
 
 const MOOD_CHIP: Record<string, { bg: string; border: string; text: string }> = {
@@ -40,6 +42,7 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
   onSave,
   onCancel,
   onStartDirection,
+  onExpiredDirectionRequired,
 }) => {
   const theme = useResolvedTheme();
   const [action, setAction] = useState('');
@@ -142,6 +145,10 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
         }
       } catch (error) {
         setSaveState('idle');
+        if ((error as ApiErrorWithStatus | undefined)?.code === 'PATH_REVIEW_REQUIRED') {
+          onExpiredDirectionRequired?.();
+          return;
+        }
         setNoticeMessage(error instanceof Error ? error.message : '기록 저장에 실패했습니다.');
         return;
       }

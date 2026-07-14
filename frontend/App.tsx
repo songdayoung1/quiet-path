@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, ViewState, Record, Direction } from './types';
-import { loadState, saveState, createDirectionId } from './storage';
+import { loadState, saveState, createDirectionId, persistAuthState } from './storage';
 import { HomeView } from './views/HomeView';
 import { RecordsView } from './views/RecordsView';
 import { DirectionView } from './views/DirectionView';
@@ -119,6 +119,19 @@ const toLocalDateString = (timestamp?: number) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const buildFutureDateInputValue = (daysFromToday: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromToday);
+  return formatDateInputValue(date);
+};
+
 const MIN_DIRECTION_LOADING_MS = 900;
 
 const waitForMinimumDuration = async (startedAt: number, minimumMs: number) => {
@@ -134,12 +147,28 @@ const parseLocalDateString = (value?: string) => {
   return new Date(`${value}T00:00:00`).getTime();
 };
 
+const isDirectionExpired = (direction?: Direction | null) => {
+  if (!direction || !direction.isActive || !direction.reviewAt) {
+    return false;
+  }
+  if (direction.expired === true) {
+    return true;
+  }
+
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const reviewDate = new Date(direction.reviewAt);
+  const reviewStart = new Date(reviewDate.getFullYear(), reviewDate.getMonth(), reviewDate.getDate()).getTime();
+  return reviewStart < todayStart;
+};
+
 const buildDirectionFromActivePath = (
   path: PathActiveResponse,
   fallback?: Direction | null
 ): Direction | null => {
   if (!path.pathId) return null;
   const category = CATEGORIES.find((item) => item.id === path.categoryCode);
+  const reviewAt = parseLocalDateString(path.reviewAt) ?? fallback?.reviewAt;
   return {
     id: String(path.pathId),
     question: path.directionText || fallback?.question || '이 방향으로 나는 어떻게 걸어가고 있을까?',
@@ -147,8 +176,19 @@ const buildDirectionFromActivePath = (
     categoryId: path.categoryCode || fallback?.categoryId,
     categoryLabel: category?.label || fallback?.categoryLabel,
     createdAt: parseLocalDateString(path.createdAt) ?? fallback?.createdAt ?? Date.now(),
-    reviewAt: parseLocalDateString(path.reviewAt) ?? fallback?.reviewAt,
+    reviewAt,
     isActive: path.status ? path.status === 'ACTIVE' : true,
+    expired:
+      typeof path.expired === 'boolean'
+        ? path.expired
+        : isDirectionExpired({
+            id: String(path.pathId),
+            question: '',
+            description: '',
+            createdAt: parseLocalDateString(path.createdAt) ?? fallback?.createdAt ?? Date.now(),
+            reviewAt,
+            isActive: path.status ? path.status === 'ACTIVE' : true,
+          }),
   };
 };
 
@@ -163,6 +203,7 @@ const buildDirectionFromCreatedPath = (
   createdAt: parseLocalDateString(path.createdAt) ?? fallback.createdAt,
   reviewAt: parseLocalDateString(path.reviewAt) ?? fallback.reviewAt,
   isActive: path.status ? path.status === 'ACTIVE' : true,
+  expired: false,
 });
 
 const buildDirectionFromPastPath = (path: PastPathListItem): Direction => ({
@@ -172,6 +213,7 @@ const buildDirectionFromPastPath = (path: PastPathListItem): Direction => ({
   createdAt: parseLocalDateString(path.createdAt) ?? Date.now(),
   endedAt: parseLocalDateString(path.completedAt ?? undefined),
   isActive: false,
+  expired: false,
 });
 
 const buildRecordFromResponse = (
@@ -222,10 +264,22 @@ type AuthSessionSnapshot = {
   userId: string | null;
 };
 
+type ExpiredDirectionResolutionState = {
+  directionId: string;
+  afterExtendView: ViewState;
+  afterFinishView: ViewState;
+};
+
 const isRefreshSessionInvalid = (error: unknown) => {
   const status = (error as ApiErrorWithStatus | undefined)?.status;
   return status === 400 || status === 401;
 };
+
+const getAuthErrorDebugInfo = (error: unknown) => ({
+  status: (error as ApiErrorWithStatus | undefined)?.status,
+  code: (error as ApiErrorWithStatus | undefined)?.code,
+  message: error instanceof Error ? error.message : 'unknown error',
+});
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
@@ -249,6 +303,9 @@ const App: React.FC = () => {
     title: string;
     description: string;
   } | null>(null);
+  const [expiredDirectionResolution, setExpiredDirectionResolution] = useState<ExpiredDirectionResolutionState | null>(null);
+  const [expiredDirectionReviewAt, setExpiredDirectionReviewAt] = useState(() => buildFutureDateInputValue(7));
+  const [isExpiredDirectionResolving, setIsExpiredDirectionResolving] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
   const refreshAuthRequestRef = useRef<Promise<string | null> | null>(null);
@@ -258,6 +315,7 @@ const App: React.FC = () => {
     refreshToken: null,
     userId: null,
   });
+  const minExpiredDirectionReviewAt = buildFutureDateInputValue(1);
   const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
   const shellFrameStyle = useMemo<React.CSSProperties>(
     () => ({
@@ -330,6 +388,19 @@ const App: React.FC = () => {
       userId: state.auth.userId ?? null,
     });
   }, [state.auth.isLoggedIn, state.auth.refreshToken, state.auth.token, state.auth.userId, syncAuthSessionRef]);
+
+  useEffect(() => {
+    if (!expiredDirectionResolution) {
+      return;
+    }
+    if (
+      !state.currentDirection ||
+      state.currentDirection.id !== expiredDirectionResolution.directionId ||
+      !isDirectionExpired(state.currentDirection)
+    ) {
+      setExpiredDirectionResolution(null);
+    }
+  }, [expiredDirectionResolution, state.currentDirection]);
 
   useEffect(() => {
     const initApp = async () => {
@@ -439,6 +510,16 @@ const App: React.FC = () => {
                   refreshToken: restored.refreshToken,
                   userId: restored.me.id,
                 });
+                persistAuthState(
+                  {
+                    isLoggedIn: true,
+                    token: restored.accessToken,
+                    refreshToken: restored.refreshToken,
+                    userId: restored.me.id,
+                    onboardingStatus: restored.me.onboardingStatus,
+                  },
+                  { hasSeenOnboarding: loaded.hasSeenOnboarding }
+                );
                 if (restored.me.onboardingStatus === 'NEW') {
                    setCurrentView('NICKNAME_SETUP');
                 } else {
@@ -456,6 +537,10 @@ const App: React.FC = () => {
                     refreshToken: null,
                     userId: null,
                   });
+                  persistAuthState(
+                    { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+                    { hasSeenOnboarding: loaded.hasSeenOnboarding, clearServerState: true }
+                  );
                   setCurrentView('ONBOARDING');
                 } else {
                   setCurrentView(loaded.hasSeenOnboarding ? 'NOW' : 'ONBOARDING');
@@ -493,8 +578,12 @@ const App: React.FC = () => {
           });
           nextDirection = buildDirectionFromCreatedPath(createdPath, initialDirection);
         } catch (err) {
-          if (err instanceof Error && err.message.includes('이미 진행 중인 방향')) {
-            await syncRemotePathAndRecords(token, state.currentDirection);
+          if (isPathAlreadyActiveError(err) || isPathReviewRequiredError(err)) {
+            const activeDirection = await syncRemotePathAndRecords(token, state.currentDirection);
+            if (activeDirection && isDirectionExpired(activeDirection)) {
+              openExpiredDirectionResolution(activeDirection, 'DIRECTION', 'DIRECTION');
+              return;
+            }
             setCurrentView('NOW');
             return;
           }
@@ -594,6 +683,215 @@ const App: React.FC = () => {
     return activeDirection;
   };
 
+  const isPathReviewRequiredError = (error: unknown) =>
+    (error as ApiErrorWithStatus | undefined)?.code === 'PATH_REVIEW_REQUIRED';
+
+  const isPathAlreadyActiveError = (error: unknown) =>
+    (error as ApiErrorWithStatus | undefined)?.code === 'PATH_ALREADY_ACTIVE';
+
+  const openExpiredDirectionResolution = (
+    direction: Direction,
+    afterExtendView: ViewState,
+    afterFinishView: ViewState,
+  ) => {
+    setExpiredDirectionReviewAt(buildFutureDateInputValue(7));
+    setExpiredDirectionResolution({
+      directionId: direction.id,
+      afterExtendView,
+      afterFinishView,
+    });
+  };
+
+  const requestExpiredDirectionResolution = (
+    afterExtendView: ViewState,
+    afterFinishView: ViewState,
+    direction = state.currentDirection,
+  ) => {
+    if (!direction || !isDirectionExpired(direction)) {
+      return false;
+    }
+    openExpiredDirectionResolution(direction, afterExtendView, afterFinishView);
+    return true;
+  };
+
+  const handleExpiredDirectionRequirement = async (
+    token: string,
+    afterExtendView: ViewState,
+    afterFinishView: ViewState,
+  ) => {
+    const activeDirection = await syncRemotePathAndRecords(token, state.currentDirection);
+    if (activeDirection && isDirectionExpired(activeDirection)) {
+      openExpiredDirectionResolution(activeDirection, afterExtendView, afterFinishView);
+      return true;
+    }
+    return false;
+  };
+
+  const finishDirection = async (afterSuccessView?: ViewState) => {
+    const currentDirection = state.currentDirection;
+    if (!currentDirection) return false;
+
+    const token = state.auth?.token;
+    if (state.auth?.isLoggedIn && token) {
+      const pathId = Number(currentDirection.id);
+      if (!Number.isInteger(pathId)) {
+        setNoticeModal({
+          title: '방향을 마무리하지 못했어요',
+          description: '현재 방향 정보를 다시 불러온 뒤 시도해 주세요.',
+        });
+        return false;
+      }
+
+      try {
+        const response = await pathApi.finish(token, pathId);
+        const completedAt = response.completedAt ? new Date(response.completedAt).getTime() : Date.now();
+        setState(prev => {
+          if (!prev.currentDirection || prev.currentDirection.id !== currentDirection.id) {
+            return prev;
+          }
+
+          const archivedDirection = {
+            ...prev.currentDirection,
+            endedAt: completedAt,
+            isActive: false,
+            expired: false,
+          };
+
+          return {
+            ...prev,
+            pastDirections: [archivedDirection, ...prev.pastDirections],
+            currentDirection: null,
+            hasLoggedToday: false,
+          };
+        });
+        if (afterSuccessView) {
+          setCurrentView(afterSuccessView);
+        }
+        return true;
+      } catch (err) {
+        setNoticeModal({
+          title: '방향을 마무리하지 못했어요',
+          description: err instanceof Error ? err.message : '방향 종료에 실패했습니다.',
+        });
+        return false;
+      }
+    }
+
+    setState(prev => {
+      if (!prev.currentDirection) return prev;
+
+      const archivedDirection = {
+        ...prev.currentDirection,
+        endedAt: Date.now(),
+        isActive: false,
+        expired: false,
+      };
+
+      return {
+        ...prev,
+        pastDirections: [archivedDirection, ...prev.pastDirections],
+        currentDirection: null,
+        hasLoggedToday: false,
+      };
+    });
+    if (afterSuccessView) {
+      setCurrentView(afterSuccessView);
+    }
+    return true;
+  };
+
+  const handleExtendExpiredDirection = async () => {
+    const resolution = expiredDirectionResolution;
+    const currentDirection = state.currentDirection;
+    if (
+      !resolution ||
+      !currentDirection ||
+      !expiredDirectionReviewAt ||
+      expiredDirectionReviewAt < minExpiredDirectionReviewAt
+    ) {
+      return;
+    }
+
+    setIsExpiredDirectionResolving(true);
+
+    try {
+      const token = state.auth?.token;
+      const nextReviewAt = parseLocalDateString(expiredDirectionReviewAt);
+
+      if (state.auth?.isLoggedIn && token) {
+        const pathId = Number(currentDirection.id);
+        if (!Number.isInteger(pathId)) {
+          throw new Error('현재 방향 정보를 다시 불러온 뒤 시도해 주세요.');
+        }
+
+        const response = await pathApi.extendReviewAt(token, pathId, expiredDirectionReviewAt);
+        setState(prev => {
+          if (!prev.currentDirection || prev.currentDirection.id !== currentDirection.id) {
+            return prev;
+          }
+          return {
+            ...prev,
+            currentDirection: {
+              ...prev.currentDirection,
+              reviewAt: parseLocalDateString(response.reviewAt) ?? nextReviewAt,
+              expired: response.expired,
+            },
+          };
+        });
+      } else {
+        setState(prev => {
+          if (!prev.currentDirection || prev.currentDirection.id !== currentDirection.id) {
+            return prev;
+          }
+          return {
+            ...prev,
+            currentDirection: {
+              ...prev.currentDirection,
+              reviewAt: nextReviewAt,
+              expired: false,
+            },
+          };
+        });
+      }
+
+      setExpiredDirectionResolution(null);
+      setCurrentView(resolution.afterExtendView);
+    } catch (error) {
+      const token = state.auth?.token;
+      if (state.auth?.isLoggedIn && token && isPathReviewRequiredError(error)) {
+        await handleExpiredDirectionRequirement(
+          token,
+          resolution.afterExtendView,
+          resolution.afterFinishView,
+        );
+        return;
+      }
+
+      setNoticeModal({
+        title: '회고일을 연장하지 못했어요',
+        description: error instanceof Error ? error.message : '회고일 연장에 실패했습니다.',
+      });
+    } finally {
+      setIsExpiredDirectionResolving(false);
+    }
+  };
+
+  const handleFinishExpiredDirection = async () => {
+    if (!expiredDirectionResolution) {
+      return;
+    }
+
+    setIsExpiredDirectionResolving(true);
+    try {
+      const finished = await finishDirection(expiredDirectionResolution.afterFinishView);
+      if (finished) {
+        setExpiredDirectionResolution(null);
+      }
+    } finally {
+      setIsExpiredDirectionResolving(false);
+    }
+  };
+
   const refreshCommunityAccessToken = useCallback(async (): Promise<string | null> => {
     const refreshToken = authSessionRef.current.refreshToken;
     if (!refreshToken) {
@@ -607,6 +905,10 @@ const App: React.FC = () => {
         refreshToken: null,
         userId: null,
       });
+      persistAuthState(
+        { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+        { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
+      );
       return null;
     }
 
@@ -643,9 +945,22 @@ const App: React.FC = () => {
             userId: nextUserId ?? prev.auth.userId ?? null,
           },
         }));
+        persistAuthState(
+          {
+            isLoggedIn: true,
+            token: refreshed.token,
+            refreshToken: refreshed.refreshToken,
+            userId: nextUserId,
+            onboardingStatus: state.auth.onboardingStatus,
+          },
+          { hasSeenOnboarding: state.hasSeenOnboarding }
+        );
 
         return refreshed.token;
       } catch (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[auth] refresh failed', getAuthErrorDebugInfo(error));
+        }
         if (isRefreshSessionInvalid(error)) {
           setState(prev => ({
             ...clearServerDrivenState(prev),
@@ -657,6 +972,10 @@ const App: React.FC = () => {
             refreshToken: null,
             userId: null,
           });
+          persistAuthState(
+            { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+            { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
+          );
         }
         return null;
       } finally {
@@ -665,7 +984,7 @@ const App: React.FC = () => {
     })();
 
     return refreshAuthRequestRef.current;
-  }, [syncAuthSessionRef]);
+  }, [state.auth.onboardingStatus, state.hasSeenOnboarding, syncAuthSessionRef]);
 
   useEffect(() => {
     configureApiClient({ refreshAccessToken: refreshCommunityAccessToken });
@@ -687,7 +1006,8 @@ const App: React.FC = () => {
       categoryLabel: updates.categoryLabel,
       createdAt: Date.now(),
       reviewAt: updates.reviewAt,
-      isActive: true
+      isActive: true,
+      expired: false,
     };
 
     const token = state.auth?.token;
@@ -701,9 +1021,21 @@ const App: React.FC = () => {
         });
         newDir = buildDirectionFromCreatedPath(createdPath, newDir);
       } catch (err) {
-        if (err instanceof Error && err.message.includes('이미 진행 중인 방향')) {
-          await syncRemotePathAndRecords(token, state.currentDirection);
+        if (isPathAlreadyActiveError(err)) {
+          const activeDirection = await syncRemotePathAndRecords(token, state.currentDirection);
+          if (activeDirection && isDirectionExpired(activeDirection)) {
+            openExpiredDirectionResolution(activeDirection, 'DIRECTION', 'DIRECTION');
+            return;
+          }
           setCurrentView('NOW');
+          return;
+        }
+        if (isPathReviewRequiredError(err)) {
+          const handled = await handleExpiredDirectionRequirement(token, 'DIRECTION', 'DIRECTION');
+          if (handled) {
+            return;
+          }
+          setCurrentView('DIRECTION');
           return;
         }
         throw err;
@@ -721,68 +1053,22 @@ const App: React.FC = () => {
   };
 
   const handleFinishDirection = async () => {
-    const currentDirection = state.currentDirection;
-    if (!currentDirection) return;
+    await finishDirection();
+  };
 
-    const token = state.auth?.token;
-    if (state.auth?.isLoggedIn && token) {
-      const pathId = Number(currentDirection.id);
-      if (!Number.isInteger(pathId)) {
-        setNoticeModal({
-          title: '방향을 마무리하지 못했어요',
-          description: '현재 방향 정보를 다시 불러온 뒤 시도해 주세요.',
-        });
-        return;
-      }
-
-      try {
-        const response = await pathApi.finish(token, pathId);
-        const completedAt = response.completedAt ? new Date(response.completedAt).getTime() : Date.now();
-        setState(prev => {
-          if (!prev.currentDirection || prev.currentDirection.id !== currentDirection.id) {
-            return prev;
-          }
-
-          const archivedDirection = {
-            ...prev.currentDirection,
-            endedAt: completedAt,
-            isActive: false,
-          };
-
-          return {
-            ...prev,
-            pastDirections: [archivedDirection, ...prev.pastDirections],
-            currentDirection: null,
-            hasLoggedToday: false,
-          };
-        });
-        return;
-      } catch (err) {
-        setNoticeModal({
-          title: '방향을 마무리하지 못했어요',
-          description: err instanceof Error ? err.message : '방향 종료에 실패했습니다.',
-        });
-        return;
-      }
+  const handleOpenDirectionView = () => {
+    if (requestExpiredDirectionResolution('DIRECTION', 'DIRECTION')) {
+      return;
     }
-
-    setState(prev => {
-      if (!prev.currentDirection) return prev;
-
-      const archivedDirection = { ...prev.currentDirection, endedAt: Date.now(), isActive: false };
-      
-      return {
-        ...prev,
-        pastDirections: [archivedDirection, ...prev.pastDirections],
-        currentDirection: null,
-        hasLoggedToday: false,
-      };
-    });
+    setCurrentView('DIRECTION');
   };
 
   const handleOpenLogEditor = () => {
     if (!state.currentDirection) {
       setRecordGuardModalOpen(true);
+      return;
+    }
+    if (requestExpiredDirectionResolution('WRITE_LOG', 'DIRECTION')) {
       return;
     }
     setCurrentView('WRITE_LOG');
@@ -816,6 +1102,16 @@ const App: React.FC = () => {
         refreshToken,
         userId: me?.id ?? null,
       });
+      persistAuthState(
+        {
+          isLoggedIn: true,
+          token,
+          refreshToken,
+          userId: me?.id ?? null,
+          onboardingStatus: status,
+        },
+        { hasSeenOnboarding: true }
+      );
       if (status === 'NEW') {
           setCurrentView('NICKNAME_SETUP');
       } else {
@@ -873,6 +1169,10 @@ const App: React.FC = () => {
       refreshToken: null,
       userId: null,
     });
+    persistAuthState(
+      { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+      { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
+    );
     setCurrentView('NOW');
   };
 
@@ -882,7 +1182,13 @@ const App: React.FC = () => {
     const isActive = currentView === view;
     return (
       <button
-        onClick={() => setCurrentView(view as ViewState)}
+        onClick={() => {
+          if (view === 'DIRECTION') {
+            handleOpenDirectionView();
+            return;
+          }
+          setCurrentView(view as ViewState);
+        }}
         className="relative flex flex-col items-center justify-center flex-1 h-full group pointer-events-auto"
       >
         <div
@@ -1120,7 +1426,7 @@ const App: React.FC = () => {
           <HomeView
             state={state}
             onLogClick={handleOpenLogEditor}
-            onStartDirectionClick={() => setCurrentView('DIRECTION')}
+            onStartDirectionClick={handleOpenDirectionView}
             onHistoryClick={() => setCurrentView('PAST_DIRECTIONS')}
             onRecordsClick={() => setCurrentView('RECORDS')}
             isHomeDataLoading={isHomeDataLoading}
@@ -1158,7 +1464,7 @@ const App: React.FC = () => {
                 records={state.records}
                 accessToken={state.auth?.token}
                 onLoginRequired={() => setCurrentView('ACCOUNT_CONNECT')}
-                onBack={() => setCurrentView('DIRECTION')} 
+                onBack={handleOpenDirectionView}
             />
         )}
         {currentView === 'SETTINGS' && (
@@ -1181,7 +1487,10 @@ const App: React.FC = () => {
           state={state} 
           initialRecord={currentPathTodayRecord}
           onSave={handleSaveLog} 
-          onStartDirection={() => setCurrentView('DIRECTION')}
+          onStartDirection={handleOpenDirectionView}
+          onExpiredDirectionRequired={() => {
+            requestExpiredDirectionResolution('WRITE_LOG', 'DIRECTION');
+          }}
           onCancel={() => setCurrentView('NOW')} 
         />
       )}
@@ -1202,7 +1511,94 @@ const App: React.FC = () => {
         onClose={() => setRecordGuardModalOpen(false)}
         onConfirm={() => {
           setRecordGuardModalOpen(false);
-          setCurrentView('DIRECTION');
+          handleOpenDirectionView();
+        }}
+      />
+
+      <AppModal
+        open={expiredDirectionResolution !== null}
+        icon={<Compass size={22} />}
+        title="회고일이 지난 방향이에요"
+        description={
+          <div className="text-left">
+            <p>
+              기록을 남기거나 새 방향을 시작하기 전에,
+              <br />
+              현재 방향을 연장하거나 마무리해 주세요.
+            </p>
+            <div className="mt-4 flex flex-col gap-2.5">
+              <div className="grid grid-cols-3 gap-2">
+                {[7, 14, 30].map((days) => {
+                  const value = buildFutureDateInputValue(days);
+                  const selected = expiredDirectionReviewAt === value;
+                  return (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => setExpiredDirectionReviewAt(value)}
+                      className="rounded-[14px] px-3 py-2 text-[12px] font-bold transition-colors"
+                      style={{
+                        background: selected
+                          ? 'linear-gradient(135deg, rgba(168,85,247,0.96) 0%, rgba(139,92,246,0.96) 100%)'
+                          : resolvedTheme === 'dark'
+                            ? 'rgba(30,41,59,0.9)'
+                            : 'rgba(248,250,252,0.96)',
+                        color: selected ? '#FFFFFF' : resolvedTheme === 'dark' ? '#E2E8F0' : '#475569',
+                        border: `1px solid ${
+                          selected
+                            ? 'rgba(139,92,246,0.9)'
+                            : resolvedTheme === 'dark'
+                              ? 'rgba(148,163,184,0.22)'
+                              : 'rgba(226,232,240,0.96)'
+                        }`,
+                      }}
+                    >
+                      {days}일 후
+                    </button>
+                  );
+                })}
+              </div>
+              <input
+                type="date"
+                min={minExpiredDirectionReviewAt}
+                value={expiredDirectionReviewAt}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setExpiredDirectionReviewAt(
+                    nextValue && nextValue >= minExpiredDirectionReviewAt
+                      ? nextValue
+                      : minExpiredDirectionReviewAt
+                  );
+                }}
+                className="w-full rounded-[16px] px-4 py-3 text-[13px] font-semibold outline-none"
+                style={{
+                  background: resolvedTheme === 'dark' ? 'rgba(30,41,59,0.9)' : 'rgba(248,250,252,0.96)',
+                  color: resolvedTheme === 'dark' ? '#E2E8F0' : '#334155',
+                  border: `1px solid ${resolvedTheme === 'dark' ? 'rgba(167,139,250,0.22)' : 'rgba(221,214,254,0.95)'}`,
+                }}
+              />
+            </div>
+          </div>
+        }
+        confirmLabel="회고일 연장하기"
+        cancelLabel="닫기"
+        confirmDisabled={
+          isExpiredDirectionResolving ||
+          !expiredDirectionReviewAt ||
+          expiredDirectionReviewAt < minExpiredDirectionReviewAt
+        }
+        cancelDisabled={isExpiredDirectionResolving}
+        secondaryActionLabel="이 방향 마무리하기"
+        secondaryActionDisabled={isExpiredDirectionResolving}
+        onSecondaryAction={() => {
+          void handleFinishExpiredDirection();
+        }}
+        onClose={() => {
+          if (isExpiredDirectionResolving) return;
+          setExpiredDirectionResolution(null);
+        }}
+        onConfirm={() => {
+          void handleExtendExpiredDirection();
         }}
       />
 

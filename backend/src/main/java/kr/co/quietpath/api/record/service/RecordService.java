@@ -58,10 +58,13 @@ public class RecordService {
 
     public RecordCreateResponse createRecord(Long userId, RecordCreateRequest request) {
         User user = getUser(userId);
+        LocalDate today = LocalDate.now(ZoneId.systemDefault());
         Path activePath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
             .orElseThrow(() -> new ApiException(ErrorCode.ACTIVE_PATH_REQUIRED));
+        if (isExpired(activePath, today)) {
+            throw new ApiException(ErrorCode.PATH_REVIEW_REQUIRED);
+        }
 
-        LocalDate today = LocalDate.now(ZoneId.systemDefault());
         if (recordRepository.existsByPath_IdAndRecordDateAndIsHiddenFalse(activePath.getId(), today)) {
             throw new ApiException(ErrorCode.RECORD_ALREADY_EXISTS);
         }
@@ -368,6 +371,11 @@ public class RecordService {
             throw new ApiException(ErrorCode.INVALID_REQUEST);
         }
         return moodCode;
+    }
+
+    private boolean isExpired(Path activePath, LocalDate today) {
+        return activePath.getReviewAt() != null
+            && activePath.getReviewAt().toLocalDate().isBefore(today);
     }
 
     private String normalizeOptionalText(String value) {

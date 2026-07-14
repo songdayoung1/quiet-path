@@ -12,6 +12,7 @@ public enum ErrorCode {
     NICKNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "NICKNAME_ALREADY_EXISTS", "이미 사용 중인 닉네임입니다."),
     INVALID_NICKNAME_FORMAT(HttpStatus.BAD_REQUEST, "INVALID_NICKNAME_FORMAT", "닉네임 형식이 올바르지 않습니다."),
     PATH_ALREADY_ACTIVE(HttpStatus.CONFLICT, "PATH_ALREADY_ACTIVE", "이미 진행 중인 방향이 있습니다."),
+    PATH_REVIEW_REQUIRED(HttpStatus.CONFLICT, "PATH_REVIEW_REQUIRED", "회고일이 지난 방향을 먼저 연장하거나 마무리해 주세요."),
     PATH_NOT_ACTIVE(HttpStatus.CONFLICT, "PATH_NOT_ACTIVE", "진행 중인 방향이 아닙니다."),
     NOT_OWNER(HttpStatus.FORBIDDEN, "NOT_OWNER", "본인 경로가 아닙니다."),
     PATH_NOT_FOUND(HttpStatus.NOT_FOUND, "PATH_NOT_FOUND", "Path를 찾을 수 없습니다."),

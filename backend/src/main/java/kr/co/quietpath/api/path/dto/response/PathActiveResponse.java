@@ -15,6 +15,7 @@ public class PathActiveResponse {
     private String status;
     private String createdAt;
     private String reviewAt;
+    private Boolean expired;
 
     public static PathActiveResponse empty() {
         return PathActiveResponse.builder()

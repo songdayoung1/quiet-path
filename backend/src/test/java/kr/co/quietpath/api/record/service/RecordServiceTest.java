@@ -108,6 +108,23 @@ class RecordServiceTest {
     }
 
     @Test
+    void createRecord_expiredActivePath_returnsPathReviewRequired() {
+        User user = User.createGoogle("provider", "user@example.com", "nick");
+        setId(user, 1L);
+        Path expiredPath = buildExpiredPath(1L);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(expiredPath));
+
+        RecordCreateRequest request = new RecordCreateRequest();
+        request.setContent("오늘은 멈춰서 돌아봤다");
+        request.setVisibility("PRIVATE");
+
+        ApiException ex = assertThrows(ApiException.class, () -> recordService.createRecord(1L, request));
+        assertEquals(ErrorCode.PATH_REVIEW_REQUIRED, ex.getErrorCode());
+    }
+
+    @Test
     void getRecords_returnsDirectionAndVisibilityMetadata() {
         User user = User.createGoogle("provider", "user@example.com", "nick");
         setId(user, 1L);
@@ -341,6 +358,18 @@ class RecordServiceTest {
             .directionName("질문")
             .directionText("설명")
             .reviewAt(LocalDateTime.now().plusDays(7))
+            .build();
+        setId(path, id);
+        return path;
+    }
+
+    private Path buildExpiredPath(Long id) {
+        Path path = Path.builder()
+            .userId(1L)
+            .categoryCode("job")
+            .directionName("질문")
+            .directionText("설명")
+            .reviewAt(LocalDateTime.now().minusDays(1))
             .build();
         setId(path, id);
         return path;

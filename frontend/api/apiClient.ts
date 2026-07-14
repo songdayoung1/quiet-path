@@ -1,6 +1,6 @@
 type RefreshAccessTokenHandler = () => Promise<string | null>;
 
-export type ApiErrorWithStatus = Error & { status?: number };
+export type ApiErrorWithStatus = Error & { status?: number; code?: string };
 
 let refreshAccessTokenHandler: RefreshAccessTokenHandler | null = null;
 
@@ -20,23 +20,29 @@ export const configureApiClient = (options: {
   refreshAccessTokenHandler = options.refreshAccessToken ?? null;
 };
 
-export const parseErrorMessage = async (response: Response) => {
+const parseErrorPayload = async (response: Response) => {
   try {
-    const body = await response.json();
-    return body?.message || '요청 처리에 실패했습니다.';
+    return await response.json();
   } catch {
-    return '요청 처리에 실패했습니다.';
+    return null;
   }
 };
 
+export const parseErrorMessage = async (response: Response) => {
+  const body = await parseErrorPayload(response);
+  return body?.message || '요청 처리에 실패했습니다.';
+};
+
 export const buildApiError = async (response: Response) => {
-  const message = await parseErrorMessage(response);
+  const body = await parseErrorPayload(response);
+  const message = body?.message || '요청 처리에 실패했습니다.';
   const resolvedMessage =
     response.status === 401 && message === '요청 처리에 실패했습니다.'
       ? '세션이 만료되었습니다. 다시 로그인해 주세요.'
       : message;
   const error = new Error(resolvedMessage) as ApiErrorWithStatus;
   error.status = response.status;
+  error.code = body?.code;
   return error;
 };
 

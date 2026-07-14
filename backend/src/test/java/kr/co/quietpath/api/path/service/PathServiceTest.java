@@ -3,6 +3,7 @@ package kr.co.quietpath.api.path.service;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.path.dto.request.PathCreateRequest;
+import kr.co.quietpath.api.path.dto.request.PathReviewExtendRequest;
 import kr.co.quietpath.api.path.dto.response.PathDetailResponse;
 import kr.co.quietpath.api.path.dto.response.PathSummaryPayload;
 import kr.co.quietpath.domain.path.entity.Path;
@@ -72,6 +73,24 @@ class PathServiceTest {
 
         ApiException ex = assertThrows(ApiException.class, () -> pathService.createPath(1L, request));
         assertEquals(ErrorCode.PATH_ALREADY_ACTIVE, ex.getErrorCode());
+    }
+
+    @Test
+    void createPath_expiredActiveExists_returnsPathReviewRequired() {
+        User user = User.createGoogle("provider", "user@example.com", "nick");
+        Path expiredPath = buildExpiredActivePath(1L);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(expiredPath));
+
+        PathCreateRequest request = new PathCreateRequest();
+        request.setDirectionName("질문");
+        request.setCategoryCode("study");
+        request.setDirectionText("설명");
+        request.setReviewAt(LocalDate.now().plusDays(7));
+
+        ApiException ex = assertThrows(ApiException.class, () -> pathService.createPath(1L, request));
+        assertEquals(ErrorCode.PATH_REVIEW_REQUIRED, ex.getErrorCode());
     }
 
     @Test
@@ -150,6 +169,38 @@ class PathServiceTest {
 
         ApiException ex = assertThrows(ApiException.class, () -> pathService.createPath(1L, request));
         assertEquals(ErrorCode.INVALID_REQUEST, ex.getErrorCode());
+    }
+
+    @Test
+    void getActivePath_expiredActive_returnsExpiredTrue() {
+        User user = User.createGoogle("provider", "user@example.com", "nick");
+        Path expiredPath = buildExpiredActivePath(1L);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(expiredPath));
+
+        var response = pathService.getActivePath(1L);
+
+        assertEquals(true, response.getExpired());
+    }
+
+    @Test
+    void extendReviewAt_updatesReviewDate() {
+        User user = User.createGoogle("provider", "user@example.com", "nick");
+        Path expiredPath = buildExpiredActivePath(1L);
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(pathRepository.findByUserIdAndStatus(1L, "ACTIVE")).thenReturn(Optional.of(expiredPath));
+
+        PathReviewExtendRequest request = new PathReviewExtendRequest();
+        request.setReviewAt(LocalDate.now().plusDays(14));
+
+        var response = pathService.extendReviewAt(1L, 1L, request);
+
+        assertEquals(LocalDate.now().plusDays(14).toString(), response.getReviewAt());
+        assertEquals(false, response.isExpired());
+        assertEquals(LocalDate.now().plusDays(14), expiredPath.getReviewAt().toLocalDate());
+        verify(pathRepository).save(expiredPath);
     }
 
     @Test
@@ -239,6 +290,18 @@ class PathServiceTest {
 
     private Path buildPath(Long id) {
         return buildFutureReviewPath(id);
+    }
+
+    private Path buildExpiredActivePath(Long id) {
+        Path path = Path.builder()
+            .userId(1L)
+            .categoryCode("study")
+            .directionName("질문")
+            .directionText("설명")
+            .reviewAt(LocalDateTime.now().minusDays(1))
+            .build();
+        setId(path, id);
+        return path;
     }
 
     private Path buildPastReviewCompletedPath(Long id) {
