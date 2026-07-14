@@ -5,11 +5,11 @@ import kr.co.quietpath.api.auth.config.KakaoAuthProperties;
 import kr.co.quietpath.api.auth.dto.OnboardingStatus;
 import kr.co.quietpath.api.auth.dto.kakao.KakaoTokenResponse;
 import kr.co.quietpath.api.auth.dto.kakao.KakaoUserResponse;
-import kr.co.quietpath.api.auth.dto.response.AuthCallbackResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthLogoutResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthMeResponse;
-import kr.co.quietpath.api.auth.dto.response.AuthRefreshResponse;
 import kr.co.quietpath.api.auth.security.JwtTokenProvider;
+import kr.co.quietpath.api.auth.service.result.AuthLoginResult;
+import kr.co.quietpath.api.auth.service.result.AuthRefreshResult;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.domain.auth.entity.RefreshTokenSession;
@@ -88,7 +88,7 @@ public class AuthService {
             .toUriString();
     }
 
-    public AuthCallbackResponse loginWithKakaoCode(String code) {
+    public AuthLoginResult loginWithKakaoCode(String code) {
         if (!StringUtils.hasText(code)) {
             throw new ApiException(ErrorCode.INVALID_REQUEST);
         }
@@ -124,11 +124,7 @@ public class AuthService {
         String sessionId = UUID.randomUUID().toString();
         String appAccessToken = jwtTokenProvider.createAccessToken(user.getId(), sessionId);
         String appRefreshToken = issueRefreshToken(user.getId(), sessionId);
-        return AuthCallbackResponse.builder()
-            .token(appAccessToken)
-            .refreshToken(appRefreshToken)
-            .onboardingStatus(onboardingStatus)
-            .build();
+        return new AuthLoginResult(appAccessToken, appRefreshToken, onboardingStatus);
     }
 
     @Transactional(readOnly = true)
@@ -143,39 +139,41 @@ public class AuthService {
             .build();
     }
 
-    public AuthRefreshResponse refresh(String refreshToken) {
+    public AuthRefreshResult refresh(String refreshToken) {
         if (!StringUtils.hasText(refreshToken)) {
+            log.debug("Refresh rejected: cookie is missing");
             throw new ApiException(ErrorCode.REFRESH_TOKEN_REQUIRED);
         }
 
         String currentTokenHash = hashToken(refreshToken);
         String lockKey = REFRESH_ROTATION_LOCK_PREFIX + currentTokenHash;
         if (!Boolean.TRUE.equals(stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "1", REFRESH_ROTATION_LOCK_TTL))) {
+            log.warn("Refresh rejected: token rotation is already in progress");
             throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
         }
 
         try {
             // Redis TTL이 만료되면 키 자체가 없으므로 INVALID로 처리된다.
             RefreshTokenSession session = refreshTokenSessionRepository.findByTokenHash(currentTokenHash)
-                .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
+                .orElseThrow(() -> {
+                    log.warn("Refresh rejected: Redis session is missing or expired");
+                    return new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
+                });
 
             String rotatedRefreshToken = generateOpaqueRefreshToken();
             session.rotate(hashToken(rotatedRefreshToken), getRefreshTokenTtlSeconds());
             refreshTokenSessionRepository.save(session);
 
             String newAccessToken = jwtTokenProvider.createAccessToken(session.getUserId(), session.getSessionId());
-            return AuthRefreshResponse.builder()
-                .token(newAccessToken)
-                .refreshToken(rotatedRefreshToken)
-                .build();
+            return new AuthRefreshResult(newAccessToken, rotatedRefreshToken);
         } finally {
             stringRedisTemplate.delete(lockKey);
         }
     }
 
-    public AuthLogoutResponse logout(Long userId, String sessionId) {
-        if (StringUtils.hasText(sessionId)) {
-            refreshTokenSessionRepository.findByUserIdAndSessionId(userId, sessionId)
+    public AuthLogoutResponse logout(String refreshToken) {
+        if (StringUtils.hasText(refreshToken)) {
+            refreshTokenSessionRepository.findByTokenHash(hashToken(refreshToken))
                 .ifPresent(refreshTokenSessionRepository::delete);
         }
         return AuthLogoutResponse.builder()

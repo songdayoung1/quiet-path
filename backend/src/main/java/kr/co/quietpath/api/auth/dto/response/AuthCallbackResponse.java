@@ -8,6 +8,5 @@ import lombok.Getter;
 @Builder
 public class AuthCallbackResponse {
     private String token;
-    private String refreshToken;
     private OnboardingStatus onboardingStatus;
 }

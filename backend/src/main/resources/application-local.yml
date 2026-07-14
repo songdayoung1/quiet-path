@@ -32,6 +32,9 @@ kakao:
     user-info-uri: https://kapi.kakao.com/v2/user/me
 
 app:
+  auth:
+    refresh-cookie:
+      secure: ${APP_AUTH_REFRESH_COOKIE_SECURE:false}
   jwt:
     secret: ${APP_JWT_SECRET:change-this-jwt-secret-key-to-32-bytes-min}
     access-token-ttl-seconds: ${APP_JWT_ACCESS_TOKEN_TTL_SECONDS:3600}
