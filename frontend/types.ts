@@ -85,7 +85,6 @@ export type OnboardingStatus = 'NEW' | 'EXISTING';
 export interface AuthState {
   isLoggedIn: boolean;
   token: string | null;
-  refreshToken: string | null;
   userId?: string | null;
   onboardingStatus?: OnboardingStatus;
 }

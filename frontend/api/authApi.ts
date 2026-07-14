@@ -1,5 +1,5 @@
 import { OnboardingStatus, MeResponse } from '../types';
-import { apiUrl, buildApiError, parseErrorMessage } from './apiClient';
+import { apiFetch, apiUrl, buildApiError, parseErrorMessage } from './apiClient';
 
 /**
  * Auth API
@@ -18,6 +18,7 @@ export const authApi = {
   startKakaoLogin: async (): Promise<void> => {
     const response = await fetch(apiUrl('/api/v1/auth/kakao/start-url'), {
       method: 'GET',
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -40,14 +41,14 @@ export const authApi = {
 
   loginWithKakao: async (
     code: string
-  ): Promise<{ token: string; refreshToken: string; onboardingStatus: OnboardingStatus }> => {
+  ): Promise<{ token: string; onboardingStatus: OnboardingStatus }> => {
     if (import.meta.env.DEV && MOCK_CODES.has(code)) {
       await delay(1500);
       if (code === 'new_user') {
-        return { token: 'mock_token_new', refreshToken: 'mock_refresh_new', onboardingStatus: 'NEW' };
+        return { token: 'mock_token_new', onboardingStatus: 'NEW' };
       }
       if (code === 'existing_user') {
-        return { token: 'mock_token_existing', refreshToken: 'mock_refresh_existing', onboardingStatus: 'EXISTING' };
+        return { token: 'mock_token_existing', onboardingStatus: 'EXISTING' };
       }
       throw new Error('카카오 로그인에 실패했습니다. (Mock Error)');
     }
@@ -56,6 +57,7 @@ export const authApi = {
       apiUrl(`/api/v1/auth/kakao/callback?code=${encodeURIComponent(code)}`),
       {
         method: 'GET',
+        credentials: 'include',
       }
     );
 
@@ -66,12 +68,14 @@ export const authApi = {
     const data = await response.json();
     return {
       token: data.token,
-      refreshToken: data.refreshToken,
       onboardingStatus: data.onboardingStatus,
     };
   },
 
-  getMe: async (token: string): Promise<MeResponse> => {
+  getMe: async (
+    token: string,
+    options?: { retryOnUnauthorized?: boolean }
+  ): Promise<MeResponse> => {
     if (import.meta.env.DEV && isMockAccessToken(token)) {
       await delay(300);
       if (mockStatusByToken(token) === 'NEW') {
@@ -80,12 +84,17 @@ export const authApi = {
       return { id: 'u2', name: '단골손님', onboardingStatus: 'EXISTING' };
     }
 
-    const response = await fetch(apiUrl('/api/v1/auth/me'), {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await apiFetch(
+      '/api/v1/auth/me',
+      {
+        method: 'GET',
+        credentials: 'include',
       },
-    });
+      {
+        accessToken: token,
+        retryOnUnauthorized: options?.retryOnUnauthorized ?? true,
+      }
+    );
 
     if (!response.ok) {
       throw new Error(await parseErrorMessage(response));
@@ -99,21 +108,10 @@ export const authApi = {
     };
   },
 
-  refresh: async (refreshToken: string): Promise<{ token: string; refreshToken: string }> => {
-    if (import.meta.env.DEV && refreshToken.startsWith('mock_refresh_')) {
-      await delay(250);
-      if (refreshToken.includes('new')) {
-        return { token: `mock_access_new_${Date.now()}`, refreshToken: 'mock_refresh_new' };
-      }
-      return { token: `mock_access_existing_${Date.now()}`, refreshToken: 'mock_refresh_existing' };
-    }
-
+  refresh: async (): Promise<{ token: string }> => {
     const response = await fetch(apiUrl('/api/v1/auth/refresh'), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refreshToken }),
+      credentials: 'include',
     });
 
     if (!response.ok) {
@@ -123,19 +121,13 @@ export const authApi = {
     const data = await response.json();
     return {
       token: data.token,
-      refreshToken: data.refreshToken,
     };
   },
 
-  logout: async (token: string): Promise<void> => {
-    if (import.meta.env.DEV && isMockAccessToken(token)) {
-      return;
-    }
+  logout: async (): Promise<void> => {
     const response = await fetch(apiUrl('/api/v1/auth/logout'), {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: 'include',
     });
     if (!response.ok) {
       throw new Error(await parseErrorMessage(response));
@@ -151,14 +143,18 @@ export const authApi = {
       };
     }
 
-    const response = await fetch(apiUrl('/api/v1/auth/me/nickname'), {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+    const response = await apiFetch(
+      '/api/v1/auth/me/nickname',
+      {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ nickname }),
       },
-      body: JSON.stringify({ nickname }),
-    });
+      { accessToken: token }
+    );
 
     if (!response.ok) {
       throw new Error(await parseErrorMessage(response));

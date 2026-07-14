@@ -14,7 +14,7 @@ import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
 import { configureApiClient } from './api/apiClient';
 import type { ApiErrorWithStatus } from './api/apiClient';
-import { authApi } from './api/authApi';
+import { authApi, isMockAccessToken } from './api/authApi';
 import { pathApi, PastPathListItem, PathActiveResponse, PathCreateResponse } from './api/pathApi';
 import { recordApi, RecordResponse } from './api/recordApi';
 import { Settings, Compass, AlertCircle } from 'lucide-react';
@@ -257,13 +257,6 @@ const clearServerDrivenState = (prev: AppState): AppState => ({
   userLevel: 'Beginning',
 });
 
-type AuthSessionSnapshot = {
-  isLoggedIn: boolean;
-  accessToken: string | null;
-  refreshToken: string | null;
-  userId: string | null;
-};
-
 type ExpiredDirectionResolutionState = {
   directionId: string;
   afterExtendView: ViewState;
@@ -289,7 +282,7 @@ const App: React.FC = () => {
     hasLoggedToday: false,
     hasSeenOnboarding: false,
     userLevel: 'Beginning',
-    auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null }
+    auth: { isLoggedIn: false, token: null, userId: null }
   });
 
   const [currentView, setCurrentView] = useState<ViewState | 'INITIALIZING'>('INITIALIZING');
@@ -309,12 +302,7 @@ const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
   const refreshAuthRequestRef = useRef<Promise<string | null> | null>(null);
-  const authSessionRef = useRef<AuthSessionSnapshot>({
-    isLoggedIn: false,
-    accessToken: null,
-    refreshToken: null,
-    userId: null,
-  });
+  const hasInitializedAppRef = useRef(false);
   const minExpiredDirectionReviewAt = buildFutureDateInputValue(1);
   const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
   const shellFrameStyle = useMemo<React.CSSProperties>(
@@ -373,22 +361,6 @@ const App: React.FC = () => {
     return () => media.removeEventListener?.('change', onChange);
   }, [themeMode]);
 
-  const syncAuthSessionRef = useCallback((nextAuth: Partial<AuthSessionSnapshot>) => {
-    authSessionRef.current = {
-      ...authSessionRef.current,
-      ...nextAuth,
-    };
-  }, []);
-
-  useEffect(() => {
-    syncAuthSessionRef({
-      isLoggedIn: state.auth.isLoggedIn,
-      accessToken: state.auth.token,
-      refreshToken: state.auth.refreshToken,
-      userId: state.auth.userId ?? null,
-    });
-  }, [state.auth.isLoggedIn, state.auth.refreshToken, state.auth.token, state.auth.userId, syncAuthSessionRef]);
-
   useEffect(() => {
     if (!expiredDirectionResolution) {
       return;
@@ -403,22 +375,19 @@ const App: React.FC = () => {
   }, [expiredDirectionResolution, state.currentDirection]);
 
   useEffect(() => {
+    // StrictMode의 개발 환경 effect 재실행으로 refresh token이 두 번 회전하는 것을 막는다.
+    if (hasInitializedAppRef.current) {
+      return;
+    }
+    hasInitializedAppRef.current = true;
+
     const initApp = async () => {
         const loaded = loadState();
-        if (!loaded.auth) loaded.auth = { isLoggedIn: false, token: null, refreshToken: null, userId: null };
-        if (loaded.auth && typeof loaded.auth.refreshToken === 'undefined') {
-          loaded.auth.refreshToken = null;
-        }
+        if (!loaded.auth) loaded.auth = { isLoggedIn: false, token: null, userId: null };
         if (loaded.auth && typeof loaded.auth.userId === 'undefined') {
           loaded.auth.userId = null;
         }
         setState(loaded);
-        syncAuthSessionRef({
-          isLoggedIn: loaded.auth.isLoggedIn,
-          accessToken: loaded.auth.token,
-          refreshToken: loaded.auth.refreshToken,
-          userId: loaded.auth.userId ?? null,
-        });
 
         const params = new URLSearchParams(window.location.search);
         const urlCode = params.get('code');
@@ -444,29 +413,23 @@ const App: React.FC = () => {
         } else if (pendingError) {
             setAuthCodeParam('error_user');
             setCurrentView('OAUTH_CALLBACK');
-        } else if (loaded.auth.token || loaded.auth.refreshToken) {
+        } else {
             const restoreWithRefresh = async () => {
               let accessToken = loaded.auth.token ?? null;
-              let refreshToken = loaded.auth.refreshToken ?? null;
 
               if (accessToken) {
                 try {
-                  const me = await authApi.getMe(accessToken);
-                  return { me, accessToken, refreshToken };
+                  const me = await authApi.getMe(accessToken, { retryOnUnauthorized: false });
+                  return { me, accessToken };
                 } catch (err) {
                   // access token 만료 가능성: refresh로 1회 복구 시도
                 }
               }
 
-              if (!refreshToken) {
-                throw new Error('세션이 만료되었습니다.');
-              }
-
-              const refreshed = await authApi.refresh(refreshToken);
+              const refreshed = await authApi.refresh();
               accessToken = refreshed.token;
-              refreshToken = refreshed.refreshToken;
-              const me = await authApi.getMe(accessToken);
-              return { me, accessToken, refreshToken };
+              const me = await authApi.getMe(accessToken, { retryOnUnauthorized: false });
+              return { me, accessToken };
             };
 
             try {
@@ -499,22 +462,14 @@ const App: React.FC = () => {
                     auth: {
                       isLoggedIn: true,
                       token: restored.accessToken,
-                      refreshToken: restored.refreshToken,
                       userId: restored.me.id,
                       onboardingStatus: restored.me.onboardingStatus
                     }
                 }));
-                syncAuthSessionRef({
-                  isLoggedIn: true,
-                  accessToken: restored.accessToken,
-                  refreshToken: restored.refreshToken,
-                  userId: restored.me.id,
-                });
                 persistAuthState(
                   {
                     isLoggedIn: true,
                     token: restored.accessToken,
-                    refreshToken: restored.refreshToken,
                     userId: restored.me.id,
                     onboardingStatus: restored.me.onboardingStatus,
                   },
@@ -529,34 +484,22 @@ const App: React.FC = () => {
                 if (isRefreshSessionInvalid(err)) {
                   setState(prev => ({
                     ...clearServerDrivenState(prev),
-                    auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null }
+                    auth: { isLoggedIn: false, token: null, userId: null }
                   }));
-                  syncAuthSessionRef({
-                    isLoggedIn: false,
-                    accessToken: null,
-                    refreshToken: null,
-                    userId: null,
-                  });
                   persistAuthState(
-                    { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+                    { isLoggedIn: false, token: null, userId: null },
                     { hasSeenOnboarding: loaded.hasSeenOnboarding, clearServerState: true }
                   );
-                  setCurrentView('ONBOARDING');
+                  setCurrentView(loaded.hasSeenOnboarding ? 'NOW' : 'ONBOARDING');
                 } else {
                   setCurrentView(loaded.hasSeenOnboarding ? 'NOW' : 'ONBOARDING');
                 }
-            }
-        } else {
-            if (!loaded.hasSeenOnboarding) {
-                setCurrentView('ONBOARDING');
-            } else {
-                setCurrentView('NOW');
             }
         }
         setIsLoaded(true);
     };
     initApp();
-  }, [syncAuthSessionRef]);
+  }, []);
 
   useEffect(() => {
     if (isLoaded) {
@@ -892,48 +835,22 @@ const App: React.FC = () => {
     }
   };
 
-  const refreshCommunityAccessToken = useCallback(async (): Promise<string | null> => {
-    const refreshToken = authSessionRef.current.refreshToken;
-    if (!refreshToken) {
-      setState(prev => ({
-        ...clearServerDrivenState(prev),
-        auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
-      }));
-      syncAuthSessionRef({
-        isLoggedIn: false,
-        accessToken: null,
-        refreshToken: null,
-        userId: null,
-      });
-      persistAuthState(
-        { isLoggedIn: false, token: null, refreshToken: null, userId: null },
-        { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
-      );
-      return null;
-    }
-
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
     if (refreshAuthRequestRef.current) {
       return refreshAuthRequestRef.current;
     }
 
     refreshAuthRequestRef.current = (async () => {
       try {
-        const refreshed = await authApi.refresh(refreshToken);
-        let nextUserId = authSessionRef.current.userId ?? null;
+        const refreshed = await authApi.refresh();
+        let nextUserId = state.auth.userId ?? null;
 
         try {
-          const me = await authApi.getMe(refreshed.token);
+          const me = await authApi.getMe(refreshed.token, { retryOnUnauthorized: false });
           nextUserId = me.id;
         } catch {
-          nextUserId = authSessionRef.current.userId ?? null;
+          nextUserId = state.auth.userId ?? null;
         }
-
-        syncAuthSessionRef({
-          isLoggedIn: true,
-          accessToken: refreshed.token,
-          refreshToken: refreshed.refreshToken,
-          userId: nextUserId,
-        });
 
         setState(prev => ({
           ...prev,
@@ -941,7 +858,6 @@ const App: React.FC = () => {
             ...prev.auth,
             isLoggedIn: true,
             token: refreshed.token,
-            refreshToken: refreshed.refreshToken,
             userId: nextUserId ?? prev.auth.userId ?? null,
           },
         }));
@@ -949,7 +865,6 @@ const App: React.FC = () => {
           {
             isLoggedIn: true,
             token: refreshed.token,
-            refreshToken: refreshed.refreshToken,
             userId: nextUserId,
             onboardingStatus: state.auth.onboardingStatus,
           },
@@ -964,16 +879,10 @@ const App: React.FC = () => {
         if (isRefreshSessionInvalid(error)) {
           setState(prev => ({
             ...clearServerDrivenState(prev),
-            auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+            auth: { isLoggedIn: false, token: null, userId: null },
           }));
-          syncAuthSessionRef({
-            isLoggedIn: false,
-            accessToken: null,
-            refreshToken: null,
-            userId: null,
-          });
           persistAuthState(
-            { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+            { isLoggedIn: false, token: null, userId: null },
             { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
           );
         }
@@ -984,15 +893,15 @@ const App: React.FC = () => {
     })();
 
     return refreshAuthRequestRef.current;
-  }, [state.auth.onboardingStatus, state.hasSeenOnboarding, syncAuthSessionRef]);
+  }, [state.auth.onboardingStatus, state.auth.userId, state.hasSeenOnboarding]);
 
   useEffect(() => {
-    configureApiClient({ refreshAccessToken: refreshCommunityAccessToken });
+    configureApiClient({ refreshAccessToken });
 
     return () => {
       configureApiClient({ refreshAccessToken: null });
     };
-  }, [refreshCommunityAccessToken]);
+  }, [refreshAccessToken]);
 
   const handleStartDirection = async (updates: Partial<Direction>) => {
     if (state.currentDirection) return;
@@ -1074,13 +983,13 @@ const App: React.FC = () => {
     setCurrentView('WRITE_LOG');
   };
 
-  const handleLoginSuccess = async (status: 'NEW' | 'EXISTING', token: string, refreshToken: string) => {
+  const handleLoginSuccess = async (status: 'NEW' | 'EXISTING', token: string) => {
       window.sessionStorage.removeItem(OAUTH_PENDING_CODE_KEY);
       window.sessionStorage.removeItem(OAUTH_PENDING_ERROR_KEY);
 
       let me: Awaited<ReturnType<typeof authApi.getMe>> | null = null;
       try {
-        me = await authApi.getMe(token);
+        me = await authApi.getMe(token, { retryOnUnauthorized: false });
       } catch {
         me = null;
       }
@@ -1091,22 +1000,14 @@ const App: React.FC = () => {
          auth: {
            isLoggedIn: true,
            token,
-           refreshToken,
            userId: me?.id ?? null,
            onboardingStatus: status,
          }
       }));
-      syncAuthSessionRef({
-        isLoggedIn: true,
-        accessToken: token,
-        refreshToken,
-        userId: me?.id ?? null,
-      });
       persistAuthState(
         {
           isLoggedIn: true,
           token,
-          refreshToken,
           userId: me?.id ?? null,
           onboardingStatus: status,
         },
@@ -1126,7 +1027,6 @@ const App: React.FC = () => {
                   ...prev.auth,
                   isLoggedIn: true,
                   token,
-                  refreshToken,
                   userId: me?.id ?? prev.auth.userId ?? null,
                   onboardingStatus: status,
                 },
@@ -1140,37 +1040,16 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    let accessToken = state.auth.token;
-    let refreshToken = state.auth.refreshToken;
-
-    if (accessToken) {
-      try {
-        await authApi.logout(accessToken);
-      } catch {
-        if (refreshToken) {
-          try {
-            const refreshed = await authApi.refresh(refreshToken);
-            accessToken = refreshed.token;
-            refreshToken = refreshed.refreshToken;
-            await authApi.logout(accessToken);
-          } catch {
-            // 서버 revoke 실패 시에도 로컬 세션은 종료
-          }
-        }
-      }
+    const accessToken = state.auth.token;
+    if (!accessToken || !isMockAccessToken(accessToken)) {
+      await authApi.logout().catch(() => undefined);
     }
     setState(prev => ({
       ...clearServerDrivenState(prev),
-      auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+      auth: { isLoggedIn: false, token: null, userId: null },
     }));
-    syncAuthSessionRef({
-      isLoggedIn: false,
-      accessToken: null,
-      refreshToken: null,
-      userId: null,
-    });
     persistAuthState(
-      { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+      { isLoggedIn: false, token: null, userId: null },
       { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
     );
     setCurrentView('NOW');

@@ -182,6 +182,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
   const [nicknameDraft, setNicknameDraft] = useState('');
   const [nicknameError, setNicknameError] = useState('');
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
+  const profileRequestRef = useRef<ReturnType<typeof authApi.getMe> | null>(null);
 
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
@@ -311,15 +312,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
 
   useEffect(() => {
     let cancelled = false;
-    if (!isLoggedIn || !token) return;
-    authApi
-      .getMe(token)
+    if (!isLoggedIn || !token) {
+      profileRequestRef.current = null;
+      return;
+    }
+
+    if (!profileRequestRef.current) {
+      profileRequestRef.current = authApi.getMe(token, { retryOnUnauthorized: true });
+    }
+    const profileRequest = profileRequestRef.current;
+
+    profileRequest
       .then((me) => {
         if (cancelled) return;
         setNickname(me.name);
         localStorage.setItem(NICKNAME_KEY, me.name);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (profileRequestRef.current === profileRequest) {
+          profileRequestRef.current = null;
+        }
+      });
     return () => {
       cancelled = true;
     };
