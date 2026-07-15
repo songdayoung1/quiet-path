@@ -1,18 +1,23 @@
 package kr.co.quietpath.api.auth.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import kr.co.quietpath.api.auth.UserPrincipal;
+import kr.co.quietpath.api.auth.cookie.RefreshTokenCookieProvider;
 import kr.co.quietpath.api.auth.dto.request.AuthNicknameUpdateRequest;
-import kr.co.quietpath.api.auth.dto.request.AuthRefreshRequest;
 import kr.co.quietpath.api.auth.dto.response.AuthCallbackResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthLogoutResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthMeResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthRefreshResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthStartResponse;
 import kr.co.quietpath.api.auth.service.AuthService;
+import kr.co.quietpath.api.auth.service.result.AuthLoginResult;
+import kr.co.quietpath.api.auth.service.result.AuthRefreshResult;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,6 +37,7 @@ import java.net.URI;
 public class AuthController {
 
     private final AuthService authService;
+    private final RefreshTokenCookieProvider refreshTokenCookieProvider;
 
     @GetMapping("/kakao/start")
     public ResponseEntity<Void> startKakaoLogin() {
@@ -49,10 +55,17 @@ public class AuthController {
     }
 
     @GetMapping("/kakao/callback")
-    public AuthCallbackResponse handleKakaoCallback(
+    public ResponseEntity<AuthCallbackResponse> handleKakaoCallback(
         @RequestParam("code") String code
     ) {
-        return authService.loginWithKakaoCode(code);
+        AuthLoginResult result = authService.loginWithKakaoCode(code);
+        AuthCallbackResponse response = AuthCallbackResponse.builder()
+            .token(result.accessToken())
+            .onboardingStatus(result.onboardingStatus())
+            .build();
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, refreshTokenCookieProvider.issue(result.refreshToken()).toString())
+            .body(response);
     }
 
     @GetMapping("/me")
@@ -63,17 +76,39 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public AuthRefreshResponse refresh(
-        @Valid @RequestBody AuthRefreshRequest request
+    public ResponseEntity<AuthRefreshResponse> refresh(
+        HttpServletRequest request,
+        HttpServletResponse servletResponse
     ) {
-        return authService.refresh(request.getRefreshToken());
+        String refreshToken = refreshTokenCookieProvider.resolveRefreshToken(request);
+        try {
+            AuthRefreshResult result = authService.refresh(refreshToken);
+            AuthRefreshResponse response = AuthRefreshResponse.builder()
+                .token(result.accessToken())
+                .build();
+            return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookieProvider.issue(result.refreshToken()).toString())
+                .body(response);
+        } catch (ApiException exception) {
+            if (shouldExpireRefreshCookie(exception)) {
+                servletResponse.addHeader(
+                    HttpHeaders.SET_COOKIE,
+                    refreshTokenCookieProvider.expire().toString()
+                );
+            }
+            throw exception;
+        }
     }
 
     @PostMapping("/logout")
-    public AuthLogoutResponse logout(
-        @AuthenticationPrincipal UserPrincipal principal
+    public ResponseEntity<AuthLogoutResponse> logout(
+        HttpServletRequest request
     ) {
-        return authService.logout(extractUserId(principal), principal.getSessionId());
+        String refreshToken = refreshTokenCookieProvider.resolveRefreshToken(request);
+        AuthLogoutResponse response = authService.logout(refreshToken);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, refreshTokenCookieProvider.expire().toString())
+            .body(response);
     }
 
     @PatchMapping("/me/nickname")
@@ -90,5 +125,10 @@ public class AuthController {
             throw new ApiException(ErrorCode.AUTH_REQUIRED);
         }
         return principal.getUserId();
+    }
+
+    private boolean shouldExpireRefreshCookie(ApiException exception) {
+        return exception.getErrorCode() == ErrorCode.REFRESH_TOKEN_REQUIRED
+            || exception.getErrorCode() == ErrorCode.REFRESH_TOKEN_INVALID;
     }
 }
