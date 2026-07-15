@@ -85,7 +85,7 @@ const invalidateCacheByPrefix = (prefix: string) => {
 export const feedApi = {
   async getFeed(params: {
     token?: string | null;
-    cacheScope?: string;
+    cacheScope?: string | null;
     category?: FeedCategory;
     cursor?: string | null;
     size?: number;
@@ -100,9 +100,11 @@ export const feedApi = {
       query.set('cursor', params.cursor);
     }
 
-    const cacheScope = params.cacheScope ?? (params.token ? 'member' : 'guest');
-    const cacheKey = `feed:${cacheScope}:${query.toString()}`;
-    const cached = params.bypassCache ? null : readCache<FeedResponse>(cacheKey);
+    const cacheScope = params.cacheScope === undefined
+      ? (params.token ? null : 'guest')
+      : params.cacheScope;
+    const cacheKey = cacheScope ? `feed:${cacheScope}:${query.toString()}` : null;
+    const cached = params.bypassCache || !cacheKey ? null : readCache<FeedResponse>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -118,17 +120,21 @@ export const feedApi = {
     }
 
     const data = await response.json();
-    writeCache(cacheKey, data);
+    if (cacheKey) {
+      writeCache(cacheKey, data);
+    }
     return data;
   },
 
   async getWeeklyTop3(
     token?: string | null,
-    options?: { bypassCache?: boolean; cacheScope?: string }
+    options?: { bypassCache?: boolean; cacheScope?: string | null }
   ): Promise<WeeklyTop3Response> {
-    const cacheScope = options?.cacheScope ?? (token ? 'member' : 'guest');
-    const cacheKey = `weekly-top3:${cacheScope}`;
-    const cached = options?.bypassCache ? null : readCache<WeeklyTop3Response>(cacheKey);
+    const cacheScope = options?.cacheScope === undefined
+      ? (token ? null : 'guest')
+      : options.cacheScope;
+    const cacheKey = cacheScope ? `weekly-top3:${cacheScope}` : null;
+    const cached = options?.bypassCache || !cacheKey ? null : readCache<WeeklyTop3Response>(cacheKey);
     if (cached) {
       return cached;
     }
@@ -144,7 +150,9 @@ export const feedApi = {
     }
 
     const data = await response.json();
-    writeCache(cacheKey, data);
+    if (cacheKey) {
+      writeCache(cacheKey, data);
+    }
     return data;
   },
 

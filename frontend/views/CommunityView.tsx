@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, Heart, Lock, MessageCircle, RefreshCcw, Sparkles } from 'lucide-react';
 import { reactionApi } from '../api/reactionApi';
 import { feedApi, FeedCategory, FeedItemResponse, WeeklyTop3ItemResponse } from '../api/feedApi';
@@ -422,14 +422,14 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const activeWeeklyTopRequestsRef = useRef(new Set<string>());
   const viewContextRef = useRef<string | null>(null);
   const accessTokenRef = useRef(accessToken);
-  const pendingViewerId = useId();
   accessTokenRef.current = accessToken;
   const viewerScope = isGuest
     ? 'guest'
     : currentUserId
       ? `user:${currentUserId}`
-      : `pending-user:${pendingViewerId}`;
-  const requestContextKey = `${selectedCategory}:${viewerScope}`;
+      : null;
+  const requestScope = viewerScope ?? 'uncached-member';
+  const requestContextKey = `${selectedCategory}:${requestScope}`;
   viewContextRef.current = requestContextKey;
 
   const handleRestrictedAction = useCallback(() => {
@@ -446,7 +446,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       return;
     }
 
-    const requestKey = `${selectedCategory}:${viewerScope}`;
+    const requestKey = `${selectedCategory}:${requestScope}`;
     if (activeWeeklyTopRequestsRef.current.has(requestKey)) {
       return;
     }
@@ -474,7 +474,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         setIsWeeklyTopLoading(false);
       }
     }
-  }, [isGuest, requestContextKey, selectedCategory, viewerScope]);
+  }, [isGuest, requestContextKey, requestScope, selectedCategory, viewerScope]);
 
   const loadFeedPage = useCallback(
     async (cursor: string | null, append: boolean) => {
@@ -491,7 +491,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         loadingMoreRef.current = true;
         setIsLoadingMore(true);
       } else {
-        requestKey = `${selectedCategory}:${viewerScope}:${cursor ?? 'first'}`;
+        requestKey = `${selectedCategory}:${requestScope}:${cursor ?? 'first'}`;
         if (activeFeedRequestsRef.current.has(requestKey)) {
           return;
         }
@@ -550,7 +550,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         }
       }
     },
-    [isGuest, requestContextKey, selectedCategory, viewerScope]
+    [isGuest, requestContextKey, requestScope, selectedCategory, viewerScope]
   );
 
   useEffect(() => {
