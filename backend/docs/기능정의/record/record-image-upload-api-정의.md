@@ -201,12 +201,54 @@ RecordController
 
 ## 11. 후속 범위
 
-- S3 저장소 구현과 환경별 빈 전환
-- 원격 URL 또는 CDN 정책
 - 고아 파일 주기 정리
 - presigned URL, 썸네일, 다중 이미지가 필요해질 경우 별도 설계
 
-## 12. 중복 요청과 동시 수정 후속 정책
+## 12. S3 배포 설정
+
+`APP_RECORD_IMAGE_STORAGE=s3`이면 로컬 저장소 대신 `S3RecordImageStorage`가 활성화됨.
+
+```env
+APP_RECORD_IMAGE_STORAGE=s3
+APP_RECORD_IMAGE_S3_BUCKET=quiet-path-record-images
+APP_RECORD_IMAGE_S3_REGION=ap-northeast-2
+APP_RECORD_IMAGE_S3_BASE_URL=https://cdn.example.com
+```
+
+- `APP_RECORD_IMAGE_S3_BASE_URL`은 S3 객체 또는 CDN을 브라우저에서 조회할 수 있는 기본 URL임
+- AWS 인증은 SDK 기본 자격 증명 체인을 사용함
+- 운영에서는 액세스 키 직접 등록보다 EC2/ECS IAM Role 사용을 우선함
+- 로컬 원격 테스트에서는 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`를 사용할 수 있음
+
+애플리케이션 IAM에는 해당 버킷의 기록 이미지 prefix에 대한 최소 권한만 부여함.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::quiet-path-record-images/records/*"
+    }
+  ]
+}
+```
+
+카드 저장 기능은 원격 이미지를 Canvas에 그리므로 버킷 또는 CDN CORS에 실제 프론트 Origin의 `GET`과 `HEAD`를 허용해야 함. 현재 `baseUrl` 구현은 브라우저가 직접 접근 가능한 URL을 전제로 하며, private 객체용 presigned URL은 별도 후속 범위임.
+
+실제 버킷 연결 후 다음을 확인함.
+
+- 이미지 생성 시 `records/yyyy/MM/dd/{uuid}.webp` 객체 업로드
+- 이미지 교체 후 이전 객체 삭제
+- 이미지 제거 후 기존 객체 삭제
+- 상세·목록·앨범·홈·카드 저장 이미지 조회
+- 잘못된 IAM, CORS, base URL 설정 시 로그와 API 오류 응답
+
+## 13. 중복 요청과 동시 수정 후속 정책
 
 - 프론트의 모든 생성·수정 버튼에 실행 중 중복 클릭 차단 적용
 - 기록 생성은 현재 사용자·방향·기록일 기준 유니크 제약 유지

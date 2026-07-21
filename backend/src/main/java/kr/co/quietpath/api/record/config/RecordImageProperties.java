@@ -35,6 +35,9 @@ public class RecordImageProperties {
     @Valid
     private Local local = new Local();
 
+    @Valid
+    private S3 s3 = new S3();
+
     @Getter
     @Setter
     public static class Local {
@@ -44,5 +47,16 @@ public class RecordImageProperties {
 
         @NotBlank
         private String publicPath;
+    }
+
+    @Getter
+    @Setter
+    public static class S3 {
+
+        private String bucket;
+
+        private String region;
+
+        private String baseUrl;
     }
 }
