@@ -124,25 +124,29 @@ const clipImageCover = (
   y: number,
   width: number,
   height: number,
-  radius: number
+  radius: number,
+  positionX = 50,
+  positionY = 50,
+  scale = 1,
 ) => {
   const sourceRatio = image.width / image.height;
   const targetRatio = width / height;
 
   let drawWidth = width;
   let drawHeight = height;
-  let offsetX = x;
-  let offsetY = y;
 
   if (sourceRatio > targetRatio) {
     drawHeight = height;
     drawWidth = height * sourceRatio;
-    offsetX = x - (drawWidth - width) / 2;
   } else {
     drawWidth = width;
     drawHeight = width / sourceRatio;
-    offsetY = y - (drawHeight - height) / 2;
   }
+
+  drawWidth *= scale;
+  drawHeight *= scale;
+  const offsetX = x - (drawWidth - width) * (positionX / 100);
+  const offsetY = y - (drawHeight - height) * (positionY / 100);
 
   ctx.save();
   roundedRect(ctx, x, y, width, height, radius);
@@ -761,7 +765,18 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
 
   if (hasPhoto) {
     const image = await loadImage(record.imageUrl!);
-    clipImageCover(ctx, image, cardX, cardY, cardWidth, cardHeight, 44);
+    clipImageCover(
+      ctx,
+      image,
+      cardX,
+      cardY,
+      cardWidth,
+      cardHeight,
+      44,
+      record.imagePositionX,
+      record.imagePositionY,
+      record.imageScale,
+    );
 
     const overlay = ctx.createLinearGradient(0, cardY, 0, cardY + cardHeight);
     overlay.addColorStop(0, 'rgba(10,20,42,0.72)');
@@ -1099,7 +1114,18 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   ctx.save();
   roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
   ctx.clip();
-  clipImageCover(ctx, image, cardX, cardY, cardWidth, imageHeight, 0);
+  clipImageCover(
+    ctx,
+    image,
+    cardX,
+    cardY,
+    cardWidth,
+    imageHeight,
+    0,
+    record.imagePositionX,
+    record.imagePositionY,
+    record.imageScale,
+  );
   ctx.fillStyle = 'rgba(255,255,255,0.96)';
   ctx.fillRect(cardX, cardY + imageHeight, cardWidth, cardHeight - imageHeight);
   const imageOverlay = ctx.createLinearGradient(0, cardY, 0, cardY + imageHeight);

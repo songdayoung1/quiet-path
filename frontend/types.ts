@@ -13,6 +13,9 @@ export interface Record {
   isPinned?: boolean; // "Important Moment"
   moodCode?: string; // Mood Sticker Code
   imageUrl?: string; // Image Attachment
+  imagePositionX?: number;
+  imagePositionY?: number;
+  imageScale?: number;
   isShared?: boolean; // Shared to Community
 }
 

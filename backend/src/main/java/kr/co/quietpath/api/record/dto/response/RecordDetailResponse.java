@@ -1,5 +1,7 @@
 package kr.co.quietpath.api.record.dto.response;
 
+import java.math.BigDecimal;
+
 import lombok.Builder;
 import lombok.Getter;
 
@@ -11,6 +13,10 @@ public class RecordDetailResponse {
     private String recordDate;
     private String content;
     private String moodCode;
+    private String imageUrl;
+    private BigDecimal imagePositionX;
+    private BigDecimal imagePositionY;
+    private BigDecimal imageScale;
     private String visibility;
     private OwnerSummary owner;
     private long reactionCount;

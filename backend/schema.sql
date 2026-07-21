@@ -76,6 +76,24 @@ CREATE TABLE user_titles (
     CONSTRAINT fk_user_titles_title FOREIGN KEY (title_id) REFERENCES titles(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE record_images (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '기록 이미지 식별자',
+    storage_key VARCHAR(500) NULL COMMENT '로컬 또는 S3 저장소 객체 키, 기존 URL 이관 데이터는 NULL 가능',
+    image_url VARCHAR(1000) NOT NULL COMMENT '화면에서 이미지를 조회할 수 있는 URL',
+    position_x DECIMAL(5, 2) NOT NULL DEFAULT 50.00 COMMENT '4:3 프레임에 표시할 이미지 가로 중심 위치 비율(0~100)',
+    position_y DECIMAL(5, 2) NOT NULL DEFAULT 50.00 COMMENT '4:3 프레임에 표시할 이미지 세로 중심 위치 비율(0~100)',
+    scale DECIMAL(4, 2) NOT NULL DEFAULT 1.00 COMMENT '프레임을 채우는 최소 배율 기준 이미지 확대 비율(1~3)',
+    created_at DATETIME NOT NULL COMMENT '이미지 정보 생성 시각',
+    updated_at DATETIME NOT NULL COMMENT '이미지 정보 마지막 수정 시각',
+    UNIQUE KEY uk_record_images_storage_key (storage_key),
+    CONSTRAINT chk_record_images_position_x CHECK (position_x BETWEEN 0.00 AND 100.00),
+    CONSTRAINT chk_record_images_position_y CHECK (position_y BETWEEN 0.00 AND 100.00),
+    CONSTRAINT chk_record_images_scale CHECK (scale BETWEEN 1.00 AND 3.00)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci
+  COMMENT='기록에 연결되는 단건 이미지와 화면 구도';
+
 CREATE TABLE records (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -86,7 +104,7 @@ CREATE TABLE records (
     one_word_text VARCHAR(200),
     tomorrow_text VARCHAR(200),
     mood_code VARCHAR(30),
-    image_url VARCHAR(500),
+    image_id BIGINT COMMENT '기록에 연결된 단건 이미지 식별자',
     is_hidden TINYINT NOT NULL DEFAULT 0,
     pinned_at DATETIME,
     visibility VARCHAR(10) NOT NULL DEFAULT 'PRIVATE',
@@ -97,12 +115,14 @@ CREATE TABLE records (
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uk_path_date (path_id, record_date),
     UNIQUE KEY uk_records_share_code (share_code),
+    UNIQUE KEY uk_records_image (image_id),
     INDEX idx_user_record_date_id (user_id, record_date, id),
     INDEX idx_path_date (path_id, record_date),
     INDEX idx_visibility_category_shared (visibility, category_code, shared_at, id),
     INDEX idx_mood_date (mood_code, record_date),
     CONSTRAINT fk_records_user FOREIGN KEY (user_id) REFERENCES users(id),
-    CONSTRAINT fk_records_path FOREIGN KEY (path_id) REFERENCES paths(id)
+    CONSTRAINT fk_records_path FOREIGN KEY (path_id) REFERENCES paths(id),
+    CONSTRAINT fk_records_image FOREIGN KEY (image_id) REFERENCES record_images(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 ALTER TABLE paths ADD CONSTRAINT fk_paths_cover_record FOREIGN KEY (cover_record_id) REFERENCES records(id);

@@ -128,7 +128,7 @@ public class AuthController {
     }
 
     private boolean shouldExpireRefreshCookie(ApiException exception) {
-        return exception.getErrorCode() == ErrorCode.REFRESH_TOKEN_REQUIRED
-            || exception.getErrorCode() == ErrorCode.REFRESH_TOKEN_INVALID;
+        // 동시 회전 중 이전 토큰 요청이 늦게 실패해도 새 쿠키를 지우지 않는다.
+        return exception.getErrorCode() == ErrorCode.REFRESH_TOKEN_REQUIRED;
     }
 }

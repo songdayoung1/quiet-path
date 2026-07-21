@@ -19,9 +19,11 @@ import kr.co.quietpath.api.record.dto.response.RecordTodayResponse;
 import kr.co.quietpath.api.record.dto.response.RecordUpdateResponse;
 import kr.co.quietpath.api.record.dto.response.RecordVisibilityResponse;
 import kr.co.quietpath.api.record.service.RecordService;
+import kr.co.quietpath.api.record.service.RecordCommandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
 public class RecordController {
 
     private final RecordService recordService;
+    private final RecordCommandService recordCommandService;
 
     @GetMapping
     public RecordListResponse getRecords(
@@ -73,24 +76,30 @@ public class RecordController {
         return recordService.getRecordDetail(userId, recordId);
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<RecordCreateResponse> createRecord(
         @AuthenticationPrincipal UserPrincipal principal,
-        @Valid @RequestBody RecordCreateRequest request
+        @Valid @RequestPart("record") RecordCreateRequest request,
+        @RequestPart(value = "image", required = false) org.springframework.web.multipart.MultipartFile image
     ) {
         Long userId = extractUserId(principal);
-        RecordCreateResponse response = recordService.createRecord(userId, request);
+        RecordCreateResponse response = recordCommandService.createRecord(userId, request, image);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @RequestMapping(path = "/{recordId}", method = {RequestMethod.PUT, RequestMethod.PATCH})
+    @RequestMapping(
+        path = "/{recordId}",
+        method = {RequestMethod.PUT, RequestMethod.PATCH},
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
     public RecordUpdateResponse updateRecord(
         @AuthenticationPrincipal UserPrincipal principal,
         @PathVariable Long recordId,
-        @Valid @RequestBody RecordUpdateRequest request
+        @Valid @RequestPart("record") RecordUpdateRequest request,
+        @RequestPart(value = "image", required = false) org.springframework.web.multipart.MultipartFile image
     ) {
         Long userId = extractUserId(principal);
-        return recordService.updateRecord(userId, recordId, request);
+        return recordCommandService.updateRecord(userId, recordId, request, image);
     }
 
     @DeleteMapping("/{recordId}")

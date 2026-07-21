@@ -7,6 +7,7 @@ import { getThemePalette, useResolvedTheme } from '../theme';
 import { AppModal } from './AppModal';
 import { exportRecordCard } from '../utils/exportRecordCard';
 import { RecordPreviewLine } from './RecordPreviewLine';
+import { RecordImage } from './RecordImage';
 
 interface TodaysCardProps {
   hasLoggedToday: boolean;
@@ -170,10 +171,7 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
         {/* Background Image Setup */}
         {hasImage && (
           <>
-            <div 
-              className="absolute inset-0 bg-cover bg-center z-0"
-              style={{ backgroundImage: `url(${todayRecord.imageUrl})` }}
-            />
+            <RecordImage record={todayRecord} alt="오늘의 기록 사진" className="absolute inset-0 z-0 h-full w-full" />
             {/* Dark overlay for text readability on images */}
             <div className="absolute inset-0 bg-black/45 backdrop-blur-[1px] z-0" />
           </>

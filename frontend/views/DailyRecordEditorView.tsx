@@ -2,13 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Record as RecordType, Direction } from '../types';
 import { createLogId } from '../storage';
 import { SoftButton, AutoTextArea, WaterDropOverlay } from '../components/UI';
-import { X, Check, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { X, Check, AlertCircle } from 'lucide-react';
 import { MOOD_STICKERS } from '../constants';
 import { CharacterTone } from '../components/WaterDropCharacter';
 import { useResolvedTheme } from '../theme';
 import { recordApi } from '../api/recordApi';
+import type { RecordImageAction } from '../api/recordApi';
 import type { ApiErrorWithStatus } from '../api/apiClient';
 import { AppModal } from '../components/AppModal';
+import { RecordImageEditor } from '../components/RecordImageEditor';
+import { prepareRecordImage } from '../utils/recordImage';
 
 interface DailyRecordEditorViewProps {
   state: AppState;
@@ -50,10 +53,16 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
   const [tomorrowText, setTomorrowText] = useState('');
   const [moodCode, setMoodCode] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageAction, setImageAction] = useState<RecordImageAction>('KEEP');
+  const [imagePositionX, setImagePositionX] = useState(50);
+  const [imagePositionY, setImagePositionY] = useState(50);
+  const [imageScale, setImageScale] = useState(1);
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
 
   const [saveState, setSaveState] = useState<'idle' | 'animating' | 'leaving'>('idle');
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewObjectUrlRef = useRef<string | null>(null);
 
   const { currentDirection } = state;
   const isEditing = initialRecord !== null;
@@ -64,7 +73,52 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
     setTomorrowText(initialRecord?.tomorrowText ?? '');
     setMoodCode(initialRecord?.moodCode ?? '');
     setImageUrl(initialRecord?.imageUrl ?? '');
+    setImageFile(null);
+    setImageAction('KEEP');
+    setImagePositionX(initialRecord?.imagePositionX ?? 50);
+    setImagePositionY(initialRecord?.imagePositionY ?? 50);
+    setImageScale(initialRecord?.imageScale ?? 1);
   }, [initialRecord]);
+
+  useEffect(() => () => {
+    if (previewObjectUrlRef.current && state.auth?.isLoggedIn) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+    }
+  }, [state.auth?.isLoggedIn]);
+
+  const replacePreviewUrl = (nextUrl: string | null) => {
+    if (previewObjectUrlRef.current) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+    }
+    previewObjectUrlRef.current = nextUrl;
+  };
+
+  const handleImageSelect = async (file: File) => {
+    setIsPreparingImage(true);
+    try {
+      const preparedFile = await prepareRecordImage(file);
+      const nextPreviewUrl = URL.createObjectURL(preparedFile);
+      replacePreviewUrl(nextPreviewUrl);
+      setImageFile(preparedFile);
+      setImageUrl(nextPreviewUrl);
+      setImageAction('REPLACE');
+      setImagePositionX(50);
+      setImagePositionY(50);
+      setImageScale(1);
+    } finally {
+      setIsPreparingImage(false);
+    }
+  };
+
+  const handleImageRemove = () => {
+    replacePreviewUrl(null);
+    setImageFile(null);
+    setImageUrl('');
+    setImageAction(initialRecord?.imageUrl ? 'REMOVE' : 'KEEP');
+    setImagePositionX(50);
+    setImagePositionY(50);
+    setImageScale(1);
+  };
 
   const handleSubmit = async () => {
     if (!currentDirection || !action.trim() || saveState !== 'idle') return;
@@ -74,7 +128,9 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
       oneWordText: oneWordText.trim() || undefined,
       tomorrowText: tomorrowText.trim() || undefined,
       moodCode: moodCode || undefined,
-      imageUrl: imageUrl || undefined,
+      imagePositionX: imageUrl ? imagePositionX : undefined,
+      imagePositionY: imageUrl ? imagePositionY : undefined,
+      imageScale: imageUrl ? imageScale : undefined,
     };
 
     const localCreatedAt = initialRecord?.date ?? new Date().toISOString();
@@ -91,7 +147,10 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
           oneWordText: payload.oneWordText,
           tomorrowText: payload.tomorrowText,
           moodCode: payload.moodCode,
-          imageUrl: payload.imageUrl,
+          imageUrl: imageUrl || undefined,
+          imagePositionX: imageUrl ? imagePositionX : undefined,
+          imagePositionY: imageUrl ? imagePositionY : undefined,
+          imageScale: imageUrl ? imageScale : undefined,
         }
       : {
           id: createLogId(),
@@ -103,7 +162,10 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
           oneWordText: payload.oneWordText,
           tomorrowText: payload.tomorrowText,
           moodCode: payload.moodCode,
-          imageUrl: payload.imageUrl,
+          imageUrl: imageUrl || undefined,
+          imagePositionX: imageUrl ? imagePositionX : undefined,
+          imagePositionY: imageUrl ? imagePositionY : undefined,
+          imageScale: imageUrl ? imageScale : undefined,
           isShared: false,
         };
     const token = state.auth?.token;
@@ -115,7 +177,12 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
           if (!Number.isInteger(recordId)) {
             throw new Error('수정할 기록 정보를 찾지 못했습니다.');
           }
-          const response = await recordApi.update(token, recordId, payload);
+          const response = await recordApi.update(
+            token,
+            recordId,
+            { ...payload, imageAction },
+            imageAction === 'REPLACE' ? imageFile : null,
+          );
           savedRecord = {
             ...initialRecord,
             pathId: savedPathId,
@@ -125,10 +192,17 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
             tomorrowText: response.tomorrowText ?? undefined,
             moodCode: response.moodCode ?? undefined,
             imageUrl: response.imageUrl ?? undefined,
+            imagePositionX: response.imagePositionX ?? undefined,
+            imagePositionY: response.imagePositionY ?? undefined,
+            imageScale: response.imageScale ?? undefined,
             isShared: response.visibility === 'PUBLIC',
           };
         } else {
-          const response = await recordApi.create(token, { ...payload, visibility: 'PRIVATE' });
+          const response = await recordApi.create(
+            token,
+            { ...payload, visibility: 'PRIVATE' },
+            imageFile,
+          );
           savedRecord = {
             id: String(response.id),
             pathId: String(response.pathId),
@@ -140,6 +214,9 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
             tomorrowText: response.tomorrowText ?? undefined,
             moodCode: response.moodCode ?? undefined,
             imageUrl: response.imageUrl ?? undefined,
+            imagePositionX: response.imagePositionX ?? undefined,
+            imagePositionY: response.imagePositionY ?? undefined,
+            imageScale: response.imageScale ?? undefined,
             isShared: response.visibility === 'PUBLIC',
           };
         }
@@ -158,12 +235,7 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
     setTimeout(() => onSave(savedRecord), 1750);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setImageUrl(URL.createObjectURL(file));
-  };
-
-  const isSaving = saveState !== 'idle';
+  const isSaving = saveState !== 'idle' || isPreparingImage;
   const hasRecordText = action.trim().length > 0;
   const hasMoodAndRecord = hasRecordText && moodCode.length > 0;
   const mascotTone: CharacterTone = (MOOD_STICKERS.some((s) => s.code === moodCode) ? moodCode : 'default') as CharacterTone;
@@ -359,27 +431,21 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
             />
 
             <label className="block text-[11px] font-bold text-mist-500 mb-2 pl-[13px] tracking-wide">오늘의 사진 한 장</label>
-            {imageUrl ? (
-              <div className="relative group w-full aspect-video">
-                <img src={imageUrl} alt="Uploaded scene" className="w-full h-full object-cover rounded-2xl shadow-sm border border-white/70" />
-                <button
-                  onClick={() => setImageUrl('')}
-                  className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 p-2 rounded-full text-white opacity-0 group-hover:opacity-100 transition-all shadow-md"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full py-7 rounded-2xl border-[1.5px] border-dashed flex flex-col items-center gap-1.5 transition-all hover:text-point-500 hover:border-point-300"
-                style={{ borderColor: '#CBD2D9', color: '#9AA5B1', background: 'rgba(255,255,255,0.4)' }}
-              >
-                <ImageIcon size={22} />
-                <span className="text-xs font-semibold">사진 첨부하기</span>
-              </button>
-            )}
-            <input type="file" accept="image/*" className="hidden" ref={fileInputRef} onChange={handleImageUpload} />
+            <RecordImageEditor
+              imageUrl={imageUrl}
+              positionX={imagePositionX}
+              positionY={imagePositionY}
+              scale={imageScale}
+              disabled={isSaving}
+              onSelect={handleImageSelect}
+              onRemove={handleImageRemove}
+              onPositionChange={(positionX, positionY) => {
+                setImagePositionX(positionX);
+                setImagePositionY(positionY);
+              }}
+              onScaleChange={setImageScale}
+              onError={setNoticeMessage}
+            />
           </div>
 
         </div>
