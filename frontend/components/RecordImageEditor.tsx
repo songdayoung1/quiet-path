@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Image as ImageIcon, RotateCcw, X, ZoomIn } from 'lucide-react';
 
 interface RecordImageEditorProps {
@@ -40,10 +40,6 @@ export const RecordImageEditor: React.FC<RecordImageEditorProps> = ({
   const frameRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const [naturalSize, setNaturalSize] = useState({ width: 4, height: 3 });
-
-  useEffect(() => {
-    setNaturalSize({ width: 4, height: 3 });
-  }, [imageUrl]);
 
   const imageAspectRatio = naturalSize.width / naturalSize.height;
   const baseWidth = imageAspectRatio >= FRAME_ASPECT_RATIO
