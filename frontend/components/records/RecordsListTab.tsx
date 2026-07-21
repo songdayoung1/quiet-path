@@ -9,6 +9,7 @@ import { isMockAccessToken } from '../../api/authApi';
 import { AppModal } from '../AppModal';
 import { exportRecordCard } from '../../utils/exportRecordCard';
 import { RecordPreviewLine } from '../RecordPreviewLine';
+import { RecordImage } from '../RecordImage';
 
 interface RecordsListTabProps {
   records: RecordType[];
@@ -262,7 +263,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
                           }}
                         >
                           <span className="h-4 w-4 overflow-hidden rounded-full">
-                            <img src={record.imageUrl} alt="기록 사진 썸네일" className="h-full w-full object-cover" />
+                            <RecordImage record={record} alt="기록 사진 썸네일" className="h-full w-full" />
                           </span>
                           <span className="text-[9px] font-bold tracking-[0.12em]" style={{ color: palette.faintText }}>
                             사진

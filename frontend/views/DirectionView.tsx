@@ -7,6 +7,7 @@ import { DirectionSetupForm } from '../components/DirectionSetupForm';
 import { WaterDropCharacter } from '../components/WaterDropCharacter';
 import { AppModal } from '../components/AppModal';
 import { getThemePalette, useResolvedTheme } from '../theme';
+import { RecordImage } from '../components/RecordImage';
 import { getCurrentPathRecords } from '../utils/recordScope';
 
 const formatDateInputValue = (date: Date) => {
@@ -327,7 +328,13 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                     </div>
                     <div className="flex items-center -space-x-1.5">
                       {currentPathImages.map((record, idx) => (
-                        <img key={`thumb-${record.id}`} src={record.imageUrl} alt="Scene" className="w-[28px] h-[28px] rounded-full border-2 border-white object-cover shadow-sm bg-mist-100 relative" style={{ zIndex: 4 - idx }} />
+                        <RecordImage
+                          key={`thumb-${record.id}`}
+                          record={record}
+                          alt="Scene"
+                          className="relative h-[28px] w-[28px] rounded-full border-2 border-white bg-mist-100 shadow-sm"
+                          style={{ zIndex: 4 - idx }}
+                        />
                       ))}
                     </div>
                   </div>

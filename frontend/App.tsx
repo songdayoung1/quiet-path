@@ -235,6 +235,9 @@ const buildRecordFromResponse = (
     tomorrowText: record.tomorrowText ?? undefined,
     moodCode: record.moodCode ?? undefined,
     imageUrl: record.imageUrl ?? undefined,
+    imagePositionX: record.imagePositionX ?? undefined,
+    imagePositionY: record.imagePositionY ?? undefined,
+    imageScale: record.imageScale ?? undefined,
     isShared: record.visibility === 'PUBLIC',
     isPinned: record.isPinned ?? undefined,
   };

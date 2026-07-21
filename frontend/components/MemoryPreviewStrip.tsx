@@ -3,6 +3,7 @@ import { Record } from '../types';
 import { Card, MoodSticker } from './UI';
 import { Image as ImageIcon, ArrowRight } from 'lucide-react';
 import { getThemePalette, useResolvedTheme } from '../theme';
+import { RecordImage } from './RecordImage';
 
 interface MemoryPreviewStripProps {
   records: Record[];
@@ -50,7 +51,7 @@ export const MemoryPreviewStrip: React.FC<MemoryPreviewStripProps> = ({
         <div className="grid grid-cols-4 gap-3">
           {photoRecords.map((record) => (
             <div key={`memory-photo-${record.id}`} className="aspect-square rounded-2xl overflow-hidden border shadow-sm relative group cursor-pointer" style={{ borderColor: palette.border, background: palette.cardBgSoft }} onClick={onMoreClick}>
-              <img src={record.imageUrl} alt="Memory preview" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+              <RecordImage record={record} alt="Memory preview" className="w-full h-full transition-transform duration-500" />
               <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
           ))}
