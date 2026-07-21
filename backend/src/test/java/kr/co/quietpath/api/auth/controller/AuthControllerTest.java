@@ -98,15 +98,14 @@ class AuthControllerTest {
     }
 
     @Test
-    void refresh_withInvalidCookieExpiresCookie() throws Exception {
+    void refresh_withInvalidCookieDoesNotExpirePossiblyRotatedCookie() throws Exception {
         when(authService.refresh("invalid-refresh-token"))
             .thenThrow(new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
 
         mockMvc.perform(post("/api/v1/auth/refresh")
-                .cookie(new Cookie("refresh_token", "invalid-refresh-token")))
+            .cookie(new Cookie("refresh_token", "invalid-refresh-token")))
             .andExpect(status().isUnauthorized())
-            .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("refresh_token=;")))
-            .andExpect(header().string(HttpHeaders.SET_COOKIE, org.hamcrest.Matchers.containsString("Max-Age=0")))
+            .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
             .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
     }
 

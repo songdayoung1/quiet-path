@@ -9,6 +9,8 @@ import { apiFetch, apiUrl, buildApiError, parseErrorMessage } from './apiClient'
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MOCK_CODES = new Set(['new_user', 'existing_user', 'error_user']);
+const REFRESH_RETRY_DELAYS = [120, 250];
+let refreshRequest: Promise<{ token: string }> | null = null;
 export const isMockAccessToken = (token: string) =>
   token.startsWith('mock_token_') || token.startsWith('mock_access_');
 const mockStatusByToken = (token: string): OnboardingStatus =>
@@ -109,19 +111,16 @@ export const authApi = {
   },
 
   refresh: async (): Promise<{ token: string }> => {
-    const response = await fetch(apiUrl('/api/v1/auth/refresh'), {
-      method: 'POST',
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      throw await buildApiError(response);
+    if (refreshRequest) {
+      return refreshRequest;
     }
 
-    const data = await response.json();
-    return {
-      token: data.token,
-    };
+    refreshRequest = refreshAccessTokenWithRetry();
+    try {
+      return await refreshRequest;
+    } finally {
+      refreshRequest = null;
+    }
   },
 
   logout: async (): Promise<void> => {
@@ -167,4 +166,27 @@ export const authApi = {
       onboardingStatus: data.onboardingStatus,
     };
   },
+};
+
+const refreshAccessTokenWithRetry = async (): Promise<{ token: string }> => {
+  for (let attempt = 0; attempt <= REFRESH_RETRY_DELAYS.length; attempt += 1) {
+    const response = await fetch(apiUrl('/api/v1/auth/refresh'), {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return { token: data.token };
+    }
+
+    const error = await buildApiError(response);
+    const retryDelay = REFRESH_RETRY_DELAYS[attempt];
+    if (error.code !== 'REFRESH_TOKEN_INVALID' || retryDelay === undefined) {
+      throw error;
+    }
+    await delay(retryDelay);
+  }
+
+  throw new Error('세션을 갱신하지 못했습니다.');
 };
