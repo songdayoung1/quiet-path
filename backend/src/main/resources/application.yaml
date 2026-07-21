@@ -2,6 +2,10 @@ spring:
   application:
     name: quiet-path
   mandatory-file-encoding: UTF-8
+  servlet:
+    multipart:
+      max-file-size: ${APP_RECORD_IMAGE_MAX_FILE_SIZE:10MB}
+      max-request-size: ${APP_RECORD_IMAGE_MAX_REQUEST_SIZE:12MB}
 
 server:
   servlet:
@@ -11,6 +15,15 @@ server:
       force: true
 
 app:
+  record-image:
+    storage: ${APP_RECORD_IMAGE_STORAGE:local}
+    max-file-size-bytes: ${APP_RECORD_IMAGE_MAX_FILE_SIZE_BYTES:10485760}
+    max-pixel-count: ${APP_RECORD_IMAGE_MAX_PIXEL_COUNT:40000000}
+    max-long-edge: ${APP_RECORD_IMAGE_MAX_LONG_EDGE:1080}
+    webp-quality: ${APP_RECORD_IMAGE_WEBP_QUALITY:0.85}
+    local:
+      root-directory: ${APP_RECORD_IMAGE_LOCAL_ROOT:uploads}
+      public-path: ${APP_RECORD_IMAGE_PUBLIC_PATH:/uploads}
   auth:
     refresh-cookie:
       name: ${APP_AUTH_REFRESH_COOKIE_NAME:refresh_token}
