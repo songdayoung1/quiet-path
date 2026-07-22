@@ -22,6 +22,8 @@ public interface PathRepository extends JpaRepository<Path, Long> {
 
     Optional<Path> findByIdAndUserId(Long id, Long userId);
 
+    List<Path> findByUserIdInAndStatus(List<Long> userIds, String status);
+
     List<Path> findByIdIn(List<Long> ids);
 
     @Query("""
