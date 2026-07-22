@@ -15,7 +15,9 @@ import {
   X,
 } from 'lucide-react';
 import { AppState } from '../types';
-import { authApi } from '../api/authApi';
+import { authApi, isMockAccessToken } from '../api/authApi';
+import { notificationApi, NotificationPreferenceResponse } from '../api/notificationApi';
+import { disableWebPush, enableWebPush } from '../services/webPush';
 import { generateNickname } from './NicknameSetupView';
 import { AppModal } from '../components/AppModal';
 
@@ -108,6 +110,22 @@ const readLocalSettings = (): LocalSettings => {
 const writeLocalSettings = (settings: LocalSettings) => {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 };
+
+const notificationsFromResponse = (
+  response: NotificationPreferenceResponse
+): LocalSettings['notifications'] => {
+  const [hour, minute] = response.pathEndTime.split(':').map(Number);
+  return {
+    likes: response.reactionEnabled,
+    comments: response.commentEnabled,
+    pathEnd: response.pathEndEnabled,
+    hour: Number.isFinite(hour) ? hour : DEFAULT_SETTINGS.notifications.hour,
+    minute: Number.isFinite(minute) ? minute : DEFAULT_SETTINGS.notifications.minute,
+  };
+};
+
+const hasEnabledNotification = (notifications: LocalSettings['notifications']) =>
+  notifications.likes || notifications.comments || notifications.pathEnd;
 
 const resolveTheme = (mode: ThemeMode): 'light' | 'dark' => {
   if (mode === 'system') {
@@ -339,6 +357,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
   }, [isLoggedIn, token]);
 
   useEffect(() => {
+    let cancelled = false;
+    if (!isLoggedIn || !token || isMockAccessToken(token)) return;
+
+    notificationApi.getPreferences(token)
+      .then(async (preference) => {
+        if (cancelled) return;
+        const notifications = notificationsFromResponse(preference);
+        setSettings((prev) => ({ ...prev, notifications }));
+        if (Notification.permission === 'granted' && hasEnabledNotification(notifications)) {
+          await enableWebPush(token);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) pushToast('error', '알림 설정을 불러오지 못했어요');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, token]);
+
+  useEffect(() => {
     if (!nicknameEditing) return;
     const timer = window.setTimeout(() => {
       nicknameInputRef.current?.focus();
@@ -378,7 +418,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
         return;
       }
 
-      const permission = (await Notification.requestPermission()) as PermissionState;
+      const permission = isMockAccessToken(token ?? '')
+        ? (await Notification.requestPermission()) as PermissionState
+        : (await enableWebPush(token!)) && 'granted' as PermissionState;
       setSettings((prev) => ({ ...prev, permission }));
       if (permission === 'granted') pushToast('ok', '알림이 켜졌어요');
       else if (permission === 'denied') pushToast('info', '브라우저 설정에서 권한을 다시 켜주세요');
@@ -388,34 +430,63 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
     }
   };
 
+  const persistNotificationSettings = async (
+    key: 'likes' | 'comments' | 'pathEnd' | 'time',
+    notifications: LocalSettings['notifications'],
+    okMessage: string
+  ) => {
+    if (!token || busy[key]) return;
+    setBusy((prev) => ({ ...prev, [key]: true }));
+    try {
+      let saved = notifications;
+      if (isMockAccessToken(token)) {
+        await sleep(240);
+      } else {
+        const response = await notificationApi.updatePreferences(token, {
+          reactionEnabled: notifications.likes,
+          commentEnabled: notifications.comments,
+          pathEndEnabled: notifications.pathEnd,
+          pathEndTime: `${String(notifications.hour).padStart(2, '0')}:${String(notifications.minute).padStart(2, '0')}`,
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul',
+        });
+        saved = notificationsFromResponse(response);
+        if (hasEnabledNotification(saved) && Notification.permission === 'granted') {
+          await enableWebPush(token);
+        } else if (!hasEnabledNotification(saved)) {
+          await disableWebPush(token);
+        }
+      }
+      setSettings((prev) => ({ ...prev, notifications: saved }));
+      pushToast('ok', okMessage);
+    } catch (error) {
+      pushToast('error', error instanceof Error ? error.message : '알림 설정 저장에 실패했어요');
+    } finally {
+      setBusy((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
   const handleToggle = async (key: 'likes' | 'comments' | 'pathEnd', label: string) => {
     if (!isLoggedIn) {
       onLogin();
       return;
     }
-    const next = {
-      ...settings,
-      notifications: {
-        ...settings.notifications,
-        [key]: !settings.notifications[key],
-      },
+    const notifications = {
+      ...settings.notifications,
+      [key]: !settings.notifications[key],
     };
-    await persist(key, next, `${label} 알림이 ${next.notifications[key] ? '켜졌어요' : '꺼졌어요'}`);
+    await persistNotificationSettings(
+      key,
+      notifications,
+      `${label} 알림이 ${notifications[key] ? '켜졌어요' : '꺼졌어요'}`
+    );
   };
 
   const handleTimeChange = async (hour: number, minute: number) => {
     if (!isLoggedIn || busy.time) return;
-    const next = {
-      ...settings,
-      notifications: {
-        ...settings.notifications,
-        hour,
-        minute,
-      },
-    };
-    await persist(
+    const notifications = { ...settings.notifications, hour, minute };
+    await persistNotificationSettings(
       'time',
-      next,
+      notifications,
       `매일 ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} 알림으로 저장됐어요`
     );
   };
