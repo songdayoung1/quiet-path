@@ -45,10 +45,7 @@ public class PathReviewReminderScheduler {
             return;
         }
 
-        List<NotificationPreference> duePreferences = preferenceRepository.findAllByReviewReminderEnabledTrue()
-            .stream()
-            .filter(this::isDueNow)
-            .toList();
+        List<NotificationPreference> duePreferences = findDuePreferences();
         if (duePreferences.isEmpty()) {
             return;
         }
@@ -70,19 +67,28 @@ public class PathReviewReminderScheduler {
         }
     }
 
-    private boolean isDueNow(NotificationPreference preference) {
-        try {
-            LocalTime now = localNow(preference).toLocalTime().withSecond(0).withNano(0);
-            return now.equals(preference.getReviewReminderTime());
-        } catch (DateTimeException exception) {
-            log.warn("Skip invalid notification timezone: userId={}, timezone={}",
-                preference.getUserId(), preference.getTimeZone());
-            return false;
-        }
+    private List<NotificationPreference> findDuePreferences() {
+        return preferenceRepository.findDistinctTimeZonesByReviewReminderEnabledTrue().stream()
+            .flatMap(timeZone -> {
+                try {
+                    LocalTime localTime = localNow(timeZone).toLocalTime().withSecond(0).withNano(0);
+                    return preferenceRepository
+                        .findAllByReviewReminderEnabledTrueAndTimeZoneAndReviewReminderTime(timeZone, localTime)
+                        .stream();
+                } catch (DateTimeException exception) {
+                    log.warn("Skip invalid notification timezone: timezone={}", timeZone);
+                    return java.util.stream.Stream.empty();
+                }
+            })
+            .toList();
+    }
+
+    private ZonedDateTime localNow(String timeZone) {
+        return notificationClock.instant().atZone(ZoneId.of(timeZone));
     }
 
     private ZonedDateTime localNow(NotificationPreference preference) {
-        return notificationClock.instant().atZone(ZoneId.of(preference.getTimeZone()));
+        return localNow(preference.getTimeZone());
     }
 
     private void sendReminder(Path path, LocalDate scheduledDate) {

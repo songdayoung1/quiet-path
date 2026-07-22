@@ -181,6 +181,12 @@ CREATE TABLE notification_preferences (
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uk_notification_preferences_user (user_id),
+    INDEX idx_notification_preferences_review_due (
+        review_reminder_enabled,
+        time_zone,
+        review_reminder_time,
+        user_id
+    ),
     CONSTRAINT fk_notification_preferences_user FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

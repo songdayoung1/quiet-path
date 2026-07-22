@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -15,9 +16,18 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Entity
-@Table(name = "notification_preferences", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_notification_preferences_user", columnNames = "user_id")
-})
+@Table(
+    name = "notification_preferences",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_notification_preferences_user", columnNames = "user_id")
+    },
+    indexes = {
+        @Index(
+            name = "idx_notification_preferences_review_due",
+            columnList = "review_reminder_enabled, time_zone, review_reminder_time, user_id"
+        )
+    }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class NotificationPreference {
