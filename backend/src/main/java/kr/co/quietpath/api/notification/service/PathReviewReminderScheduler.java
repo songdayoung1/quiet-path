@@ -45,7 +45,7 @@ public class PathReviewReminderScheduler {
             return;
         }
 
-        List<NotificationPreference> duePreferences = preferenceRepository.findAllByPathEndEnabledTrue()
+        List<NotificationPreference> duePreferences = preferenceRepository.findAllByReviewReminderEnabledTrue()
             .stream()
             .filter(this::isDueNow)
             .toList();
@@ -73,7 +73,7 @@ public class PathReviewReminderScheduler {
     private boolean isDueNow(NotificationPreference preference) {
         try {
             LocalTime now = localNow(preference).toLocalTime().withSecond(0).withNano(0);
-            return now.equals(preference.getPathEndTime());
+            return now.equals(preference.getReviewReminderTime());
         } catch (DateTimeException exception) {
             log.warn("Skip invalid notification timezone: userId={}, timezone={}",
                 preference.getUserId(), preference.getTimeZone());

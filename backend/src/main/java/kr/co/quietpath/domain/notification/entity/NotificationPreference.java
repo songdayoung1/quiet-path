@@ -22,7 +22,7 @@ import java.time.LocalTime;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class NotificationPreference {
 
-    public static final LocalTime DEFAULT_PATH_END_TIME = LocalTime.of(21, 0);
+    public static final LocalTime DEFAULT_REVIEW_REMINDER_TIME = LocalTime.of(21, 0);
     public static final String DEFAULT_TIME_ZONE = "Asia/Seoul";
 
     @Id
@@ -39,10 +39,10 @@ public class NotificationPreference {
     private boolean commentEnabled;
 
     @Column(nullable = false)
-    private boolean pathEndEnabled;
+    private boolean reviewReminderEnabled;
 
     @Column(nullable = false)
-    private LocalTime pathEndTime;
+    private LocalTime reviewReminderTime;
 
     @Column(nullable = false, length = 50)
     private String timeZone;
@@ -55,10 +55,10 @@ public class NotificationPreference {
 
     private NotificationPreference(Long userId) {
         this.userId = userId;
-        this.reactionEnabled = true;
-        this.commentEnabled = true;
-        this.pathEndEnabled = true;
-        this.pathEndTime = DEFAULT_PATH_END_TIME;
+        this.reactionEnabled = false;
+        this.commentEnabled = false;
+        this.reviewReminderEnabled = false;
+        this.reviewReminderTime = DEFAULT_REVIEW_REMINDER_TIME;
         this.timeZone = DEFAULT_TIME_ZONE;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = this.createdAt;
@@ -71,14 +71,14 @@ public class NotificationPreference {
     public void update(
         boolean reactionEnabled,
         boolean commentEnabled,
-        boolean pathEndEnabled,
-        LocalTime pathEndTime,
+        boolean reviewReminderEnabled,
+        LocalTime reviewReminderTime,
         String timeZone
     ) {
         this.reactionEnabled = reactionEnabled;
         this.commentEnabled = commentEnabled;
-        this.pathEndEnabled = pathEndEnabled;
-        this.pathEndTime = pathEndTime;
+        this.reviewReminderEnabled = reviewReminderEnabled;
+        this.reviewReminderTime = reviewReminderTime;
         this.timeZone = timeZone;
         this.updatedAt = LocalDateTime.now();
     }

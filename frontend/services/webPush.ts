@@ -8,6 +8,13 @@ export const isWebPushSupported = () =>
   'serviceWorker' in navigator &&
   'PushManager' in window;
 
+export const hasWebPushSubscription = async () => {
+  if (!isWebPushSupported() || Notification.permission !== 'granted') return false;
+  const registration = await navigator.serviceWorker.getRegistration('/');
+  if (!registration) return false;
+  return Boolean(await registration.pushManager.getSubscription());
+};
+
 const decodeApplicationServerKey = (value: string) => {
   const padding = '='.repeat((4 - (value.length % 4)) % 4);
   const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');

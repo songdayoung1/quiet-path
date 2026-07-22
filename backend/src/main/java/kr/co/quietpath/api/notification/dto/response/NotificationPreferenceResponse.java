@@ -8,7 +8,7 @@ import lombok.Getter;
 public class NotificationPreferenceResponse {
     private boolean reactionEnabled;
     private boolean commentEnabled;
-    private boolean pathEndEnabled;
-    private String pathEndTime;
+    private boolean reviewReminderEnabled;
+    private String reviewReminderTime;
     private String timeZone;
 }

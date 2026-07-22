@@ -10,5 +10,5 @@ public interface NotificationPreferenceRepository extends JpaRepository<Notifica
 
     Optional<NotificationPreference> findByUserId(Long userId);
 
-    List<NotificationPreference> findAllByPathEndEnabledTrue();
+    List<NotificationPreference> findAllByReviewReminderEnabledTrue();
 }

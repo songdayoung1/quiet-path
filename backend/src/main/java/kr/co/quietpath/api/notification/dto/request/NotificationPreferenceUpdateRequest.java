@@ -19,10 +19,10 @@ public class NotificationPreferenceUpdateRequest {
     private Boolean commentEnabled;
 
     @NotNull
-    private Boolean pathEndEnabled;
+    private Boolean reviewReminderEnabled;
 
     @NotNull
-    private LocalTime pathEndTime;
+    private LocalTime reviewReminderTime;
 
     @NotBlank
     @Size(max = 50)

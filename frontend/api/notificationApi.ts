@@ -3,8 +3,8 @@ import { apiFetch, buildApiError } from './apiClient';
 export interface NotificationPreferenceResponse {
   reactionEnabled: boolean;
   commentEnabled: boolean;
-  pathEndEnabled: boolean;
-  pathEndTime: string;
+  reviewReminderEnabled: boolean;
+  reviewReminderTime: string;
   timeZone: string;
 }
 

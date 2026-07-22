@@ -40,8 +40,8 @@ public class NotificationPreferenceService {
         preference.update(
             request.getReactionEnabled(),
             request.getCommentEnabled(),
-            request.getPathEndEnabled(),
-            request.getPathEndTime(),
+            request.getReviewReminderEnabled(),
+            request.getReviewReminderTime(),
             request.getTimeZone()
         );
         return toResponse(preference);
@@ -69,8 +69,8 @@ public class NotificationPreferenceService {
         return NotificationPreferenceResponse.builder()
             .reactionEnabled(preference.isReactionEnabled())
             .commentEnabled(preference.isCommentEnabled())
-            .pathEndEnabled(preference.isPathEndEnabled())
-            .pathEndTime(preference.getPathEndTime().format(TIME_FORMATTER))
+            .reviewReminderEnabled(preference.isReviewReminderEnabled())
+            .reviewReminderTime(preference.getReviewReminderTime().format(TIME_FORMATTER))
             .timeZone(preference.getTimeZone())
             .build();
     }

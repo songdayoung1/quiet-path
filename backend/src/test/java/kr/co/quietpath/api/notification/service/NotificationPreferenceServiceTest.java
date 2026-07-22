@@ -46,10 +46,10 @@ class NotificationPreferenceServiceTest {
 
         NotificationPreferenceResponse response = service.getPreference(1L);
 
-        assertEquals(true, response.isReactionEnabled());
-        assertEquals(true, response.isCommentEnabled());
-        assertEquals(true, response.isPathEndEnabled());
-        assertEquals("21:00", response.getPathEndTime());
+        assertEquals(false, response.isReactionEnabled());
+        assertEquals(false, response.isCommentEnabled());
+        assertEquals(false, response.isReviewReminderEnabled());
+        assertEquals("21:00", response.getReviewReminderTime());
         assertEquals("Asia/Seoul", response.getTimeZone());
         verify(preferenceRepository).save(any(NotificationPreference.class));
     }
@@ -59,8 +59,8 @@ class NotificationPreferenceServiceTest {
         NotificationPreferenceUpdateRequest request = new NotificationPreferenceUpdateRequest();
         request.setReactionEnabled(true);
         request.setCommentEnabled(true);
-        request.setPathEndEnabled(true);
-        request.setPathEndTime(LocalTime.of(20, 30));
+        request.setReviewReminderEnabled(true);
+        request.setReviewReminderTime(LocalTime.of(20, 30));
         request.setTimeZone("invalid-zone");
 
         assertThrows(ApiException.class, () -> service.updatePreference(1L, request));

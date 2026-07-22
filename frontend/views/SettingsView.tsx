@@ -17,7 +17,7 @@ import {
 import { AppState } from '../types';
 import { authApi, isMockAccessToken } from '../api/authApi';
 import { notificationApi, NotificationPreferenceResponse } from '../api/notificationApi';
-import { disableWebPush, enableWebPush } from '../services/webPush';
+import { disableWebPush, enableWebPush, hasWebPushSubscription } from '../services/webPush';
 import { generateNickname } from './NicknameSetupView';
 import { AppModal } from '../components/AppModal';
 
@@ -33,7 +33,7 @@ type PermissionState = 'default' | 'granted' | 'denied';
 type BusyKey =
   | 'likes'
   | 'comments'
-  | 'pathEnd'
+  | 'reviewReminder'
   | 'time'
   | 'theme'
   | 'nickname'
@@ -44,7 +44,7 @@ interface LocalSettings {
   notifications: {
     likes: boolean;
     comments: boolean;
-    pathEnd: boolean;
+    reviewReminder: boolean;
     hour: number;
     minute: number;
   };
@@ -58,15 +58,15 @@ interface ToastItem {
   message: string;
 }
 
-const SETTINGS_KEY = 'qp.settings.v2';
+const SETTINGS_KEY = 'qp.settings.v3';
 const NICKNAME_KEY = 'qp.profile.nickname';
 const THEME_CHANGE_EVENT = 'qp:theme-mode-changed';
 
 const DEFAULT_SETTINGS: LocalSettings = {
   notifications: {
-    likes: true,
-    comments: true,
-    pathEnd: true,
+    likes: false,
+    comments: false,
+    reviewReminder: false,
     hour: 21,
     minute: 0,
   },
@@ -95,7 +95,8 @@ const readLocalSettings = (): LocalSettings => {
       notifications: {
         likes: parsed.notifications?.likes ?? DEFAULT_SETTINGS.notifications.likes,
         comments: parsed.notifications?.comments ?? DEFAULT_SETTINGS.notifications.comments,
-        pathEnd: parsed.notifications?.pathEnd ?? DEFAULT_SETTINGS.notifications.pathEnd,
+        reviewReminder:
+          parsed.notifications?.reviewReminder ?? DEFAULT_SETTINGS.notifications.reviewReminder,
         hour: parsed.notifications?.hour ?? DEFAULT_SETTINGS.notifications.hour,
         minute: parsed.notifications?.minute ?? DEFAULT_SETTINGS.notifications.minute,
       },
@@ -114,18 +115,26 @@ const writeLocalSettings = (settings: LocalSettings) => {
 const notificationsFromResponse = (
   response: NotificationPreferenceResponse
 ): LocalSettings['notifications'] => {
-  const [hour, minute] = response.pathEndTime.split(':').map(Number);
+  const [hour, minute] = response.reviewReminderTime.split(':').map(Number);
   return {
     likes: response.reactionEnabled,
     comments: response.commentEnabled,
-    pathEnd: response.pathEndEnabled,
+    reviewReminder: response.reviewReminderEnabled,
     hour: Number.isFinite(hour) ? hour : DEFAULT_SETTINGS.notifications.hour,
     minute: Number.isFinite(minute) ? minute : DEFAULT_SETTINGS.notifications.minute,
   };
 };
 
 const hasEnabledNotification = (notifications: LocalSettings['notifications']) =>
-  notifications.likes || notifications.comments || notifications.pathEnd;
+  notifications.likes || notifications.comments || notifications.reviewReminder;
+
+const toPreferenceRequest = (notifications: LocalSettings['notifications']) => ({
+  reactionEnabled: notifications.likes,
+  commentEnabled: notifications.comments,
+  reviewReminderEnabled: notifications.reviewReminder,
+  reviewReminderTime: `${String(notifications.hour).padStart(2, '0')}:${String(notifications.minute).padStart(2, '0')}`,
+  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul',
+});
 
 const resolveTheme = (mode: ThemeMode): 'light' | 'dark' => {
   if (mode === 'system') {
@@ -160,20 +169,21 @@ const SectionLabel: React.FC<{ icon: React.ReactNode; title: string }> = ({ icon
 const Toggle: React.FC<{
   value: boolean;
   busy?: boolean;
+  disabled?: boolean;
   onClick: () => void;
-}> = ({ value, busy, onClick }) => (
+}> = ({ value, busy, disabled, onClick }) => (
   <button
     type="button"
     role="switch"
     aria-checked={value}
     onClick={onClick}
-    disabled={busy}
+    disabled={busy || disabled}
     className="relative w-[42px] h-[24px] rounded-full"
     style={{
       background: value ? 'var(--qp-accent)' : 'var(--qp-toggle-off)',
-      opacity: busy ? 0.62 : 1,
+      opacity: busy || disabled ? 0.5 : 1,
       transition: 'background-color 180ms ease',
-      cursor: busy ? 'wait' : 'pointer',
+      cursor: busy ? 'wait' : disabled ? 'not-allowed' : 'pointer',
     }}
   >
     <span
@@ -195,6 +205,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
   const [nickname, setNickname] = useState(() => localStorage.getItem(NICKNAME_KEY) || '고요한물결0421');
   const [busy, setBusy] = useState<Partial<Record<BusyKey, boolean>>>({});
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [browserPushEnabled, setBrowserPushEnabled] = useState(false);
 
   const [nicknameEditing, setNicknameEditing] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState('');
@@ -206,12 +217,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
 
   const resolvedTheme = useMemo(() => resolveTheme(settings.theme), [settings.theme]);
 
-  const syncPermissionFromBrowser = useCallback(() => {
+  const syncPermissionFromBrowser = useCallback(async () => {
     const nextPermission = detectNotificationPermission();
     setSettings((prev) => {
       if (prev.permission === nextPermission) return prev;
       return { ...prev, permission: nextPermission };
     });
+    setBrowserPushEnabled(await hasWebPushSubscription().catch(() => false));
   }, []);
 
   const themeVars: React.CSSProperties =
@@ -312,11 +324,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
   }, [settings.theme]);
 
   useEffect(() => {
-    syncPermissionFromBrowser();
+    void syncPermissionFromBrowser();
 
-    const onFocus = () => syncPermissionFromBrowser();
+    const onFocus = () => void syncPermissionFromBrowser();
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') syncPermissionFromBrowser();
+      if (document.visibilityState === 'visible') void syncPermissionFromBrowser();
     };
 
     window.addEventListener('focus', onFocus);
@@ -365,9 +377,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
         if (cancelled) return;
         const notifications = notificationsFromResponse(preference);
         setSettings((prev) => ({ ...prev, notifications }));
-        if (Notification.permission === 'granted' && hasEnabledNotification(notifications)) {
-          await enableWebPush(token);
-        }
       })
       .catch(() => {
         if (!cancelled) pushToast('error', '알림 설정을 불러오지 못했어요');
@@ -421,17 +430,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
       const permission = isMockAccessToken(token ?? '')
         ? (await Notification.requestPermission()) as PermissionState
         : (await enableWebPush(token!)) && 'granted' as PermissionState;
-      setSettings((prev) => ({ ...prev, permission }));
-      if (permission === 'granted') pushToast('ok', '알림이 켜졌어요');
-      else if (permission === 'denied') pushToast('info', '브라우저 설정에서 권한을 다시 켜주세요');
-      else pushToast('info', '알림 권한이 허용되지 않았어요');
+      if (permission === 'granted') {
+        const recommended = hasEnabledNotification(settings.notifications)
+          ? settings.notifications
+          : {
+              ...settings.notifications,
+              likes: true,
+              comments: true,
+              reviewReminder: true,
+            };
+        const saved = isMockAccessToken(token ?? '')
+          ? recommended
+          : notificationsFromResponse(
+              await notificationApi.updatePreferences(token!, toPreferenceRequest(recommended))
+            );
+        setSettings((prev) => ({ ...prev, permission, notifications: saved }));
+        setBrowserPushEnabled(true);
+        pushToast('ok', '이 브라우저에서 알림을 받을게요');
+      } else {
+        setSettings((prev) => ({ ...prev, permission }));
+        setBrowserPushEnabled(false);
+        if (permission === 'denied') pushToast('info', '브라우저 설정에서 권한을 다시 켜주세요');
+        else pushToast('info', '알림 권한이 허용되지 않았어요');
+      }
+    } catch (error) {
+      setBrowserPushEnabled(false);
+      pushToast('error', error instanceof Error ? error.message : '알림을 켜지 못했어요');
     } finally {
       setBusy((prev) => ({ ...prev, permission: false }));
     }
   };
 
   const persistNotificationSettings = async (
-    key: 'likes' | 'comments' | 'pathEnd' | 'time',
+    key: 'likes' | 'comments' | 'reviewReminder' | 'time',
     notifications: LocalSettings['notifications'],
     okMessage: string
   ) => {
@@ -442,18 +473,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
       if (isMockAccessToken(token)) {
         await sleep(240);
       } else {
-        const response = await notificationApi.updatePreferences(token, {
-          reactionEnabled: notifications.likes,
-          commentEnabled: notifications.comments,
-          pathEndEnabled: notifications.pathEnd,
-          pathEndTime: `${String(notifications.hour).padStart(2, '0')}:${String(notifications.minute).padStart(2, '0')}`,
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul',
-        });
+        const response = await notificationApi.updatePreferences(token, toPreferenceRequest(notifications));
         saved = notificationsFromResponse(response);
         if (hasEnabledNotification(saved) && Notification.permission === 'granted') {
           await enableWebPush(token);
         } else if (!hasEnabledNotification(saved)) {
           await disableWebPush(token);
+          setBrowserPushEnabled(false);
         }
       }
       setSettings((prev) => ({ ...prev, notifications: saved }));
@@ -465,7 +491,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
     }
   };
 
-  const handleToggle = async (key: 'likes' | 'comments' | 'pathEnd', label: string) => {
+  const handleToggle = async (key: 'likes' | 'comments' | 'reviewReminder', label: string) => {
     if (!isLoggedIn) {
       onLogin();
       return;
@@ -566,7 +592,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const showPermissionCard = isLoggedIn && settings.permission !== 'granted';
+  const showPermissionCard = isLoggedIn && !browserPushEnabled;
   const showGuestNotice = !isLoggedIn;
   const hasNotificationTopBlock = showPermissionCard || showGuestNotice;
 
@@ -811,13 +837,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                   className="text-[12px] font-bold"
                   style={{ color: 'var(--qp-warn-text)' }}
                 >
-                  알림 권한이 꺼져 있어요
+                  {settings.permission === 'denied'
+                    ? '브라우저에서 알림이 차단되어 있어요'
+                    : '이 브라우저의 알림이 꺼져 있어요'}
                 </p>
                 <p
                   className="text-[11px] mt-0.5"
                   style={{ color: 'var(--qp-warn-text)', opacity: 0.86 }}
                 >
-                  설정한 알림을 받으려면 권한을 허용해주세요.
+                  알림을 받을 때만 브라우저 권한을 요청할게요.
                 </p>
               </div>
               <button
@@ -829,7 +857,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                   opacity: busy.permission ? 0.6 : 1,
                 }}
               >
-                허용
+                알림 받기
               </button>
             </div>
           )}
@@ -843,7 +871,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
           {[
             { key: 'likes', label: '커뮤니티 좋아요', hint: '내 글에 공감이 도착했을 때' },
             { key: 'comments', label: '커뮤니티 댓글', hint: '내 글에 댓글이 달렸을 때' },
-            { key: 'pathEnd', label: '방향 종료 알림', hint: '설정한 시간에 오늘의 방향을 마무리해요' },
+            { key: 'reviewReminder', label: '회고 알림', hint: '회고하는 날, 설정한 시간에 알려드려요' },
           ].map((item, index) => (
             <div
               key={item.key}
@@ -860,9 +888,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
               </div>
               {isLoggedIn ? (
                 <Toggle
-                  value={settings.notifications[item.key as 'likes' | 'comments' | 'pathEnd']}
+                  value={browserPushEnabled && settings.notifications[item.key as 'likes' | 'comments' | 'reviewReminder']}
                   busy={!!busy[item.key as BusyKey]}
-                  onClick={() => handleToggle(item.key as 'likes' | 'comments' | 'pathEnd', item.label)}
+                  disabled={!browserPushEnabled}
+                  onClick={() => handleToggle(item.key as 'likes' | 'comments' | 'reviewReminder', item.label)}
                 />
               ) : (
                 <button
@@ -876,7 +905,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
             </div>
           ))}
 
-          {settings.notifications.pathEnd && isLoggedIn && (
+          {browserPushEnabled && settings.notifications.reviewReminder && isLoggedIn && (
             <div
               className="px-4 py-3.5"
               style={{
