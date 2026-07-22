@@ -6,17 +6,13 @@ import kr.co.quietpath.api.notification.config.WebPushProperties;
 import kr.co.quietpath.domain.notification.entity.WebPushSubscription;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import nl.martijndwars.webpush.Notification;
-import nl.martijndwars.webpush.PushService;
 import org.apache.http.HttpResponse;
 import org.apache.http.util.EntityUtils;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.jose4j.lang.JoseException;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
-import java.security.Security;
 import java.util.concurrent.ExecutionException;
 
 @Slf4j
@@ -26,8 +22,7 @@ public class WebPushSender {
 
     private final WebPushProperties properties;
     private final ObjectMapper objectMapper;
-
-    private volatile PushService pushService;
+    private final WebPushClient webPushClient;
 
     public WebPushSendResult send(WebPushSubscription subscription, WebPushPayload payload) {
         if (!properties.isConfigured()) {
@@ -37,13 +32,7 @@ public class WebPushSender {
 
         HttpResponse response = null;
         try {
-            Notification notification = new Notification(
-                subscription.getEndpoint(),
-                subscription.getP256dhKey(),
-                subscription.getAuthKey(),
-                serialize(payload)
-            );
-            response = getPushService().send(notification);
+            response = webPushClient.send(subscription, serialize(payload));
             int statusCode = response.getStatusLine().getStatusCode();
             if (statusCode >= 200 && statusCode < 300) {
                 return WebPushSendResult.DELIVERED;
@@ -69,25 +58,5 @@ public class WebPushSender {
 
     private String serialize(WebPushPayload payload) throws JsonProcessingException {
         return objectMapper.writeValueAsString(payload);
-    }
-
-    private PushService getPushService() throws GeneralSecurityException {
-        PushService current = pushService;
-        if (current != null) {
-            return current;
-        }
-        synchronized (this) {
-            if (pushService == null) {
-                if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
-                    Security.addProvider(new BouncyCastleProvider());
-                }
-                pushService = new PushService(
-                    properties.getPublicKey(),
-                    properties.getPrivateKey(),
-                    properties.getSubject()
-                );
-            }
-            return pushService;
-        }
     }
 }
