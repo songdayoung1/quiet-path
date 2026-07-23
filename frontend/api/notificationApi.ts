@@ -23,6 +23,12 @@ export interface WebPushSubscriptionPayload {
   };
 }
 
+export interface WebPushTestResponse {
+  deliveredCount: number;
+  expiredCount: number;
+  failedCount: number;
+}
+
 const jsonHeaders = { 'Content-Type': 'application/json' };
 
 export const notificationApi = {
@@ -67,5 +73,15 @@ export const notificationApi = {
       { accessToken: token }
     );
     if (!response.ok) throw await buildApiError(response);
+  },
+
+  async sendTestPush(token: string): Promise<WebPushTestResponse> {
+    const response = await apiFetch(
+      '/api/v1/notifications/push/test',
+      { method: 'POST' },
+      { accessToken: token }
+    );
+    if (!response.ok) throw await buildApiError(response);
+    return response.json();
   },
 };

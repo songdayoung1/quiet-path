@@ -32,16 +32,19 @@ class WebPushDeliveryServiceTest {
         Long userId = 1L;
         WebPushSubscription expired = subscription(userId, "https://push.example.com/expired");
         WebPushSubscription delivered = subscription(userId, "https://push.example.com/delivered");
+        WebPushSubscription failed = subscription(userId, "https://push.example.com/failed");
         WebPushPayload payload = payload();
-        when(subscriptionRepository.findAllByUserId(userId)).thenReturn(List.of(expired, delivered));
+        when(subscriptionRepository.findAllByUserId(userId)).thenReturn(List.of(expired, delivered, failed));
         when(webPushSender.send(expired, payload)).thenReturn(WebPushSendResult.EXPIRED);
         when(webPushSender.send(delivered, payload)).thenReturn(WebPushSendResult.DELIVERED);
+        when(webPushSender.send(failed, payload)).thenReturn(WebPushSendResult.FAILED);
 
-        int deliveredCount = service.sendToUser(userId, payload);
+        WebPushDeliveryReport report = service.sendToUserDetailed(userId, payload);
 
-        assertEquals(1, deliveredCount);
+        assertEquals(new WebPushDeliveryReport(1, 1, 1), report);
         verify(subscriptionRepository).delete(expired);
         verify(subscriptionRepository, never()).delete(delivered);
+        verify(subscriptionRepository, never()).delete(failed);
     }
 
     @Test

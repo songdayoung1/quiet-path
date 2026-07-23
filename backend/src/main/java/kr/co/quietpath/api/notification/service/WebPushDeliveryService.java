@@ -17,17 +17,27 @@ public class WebPushDeliveryService {
 
     @Transactional
     public int sendToUser(Long userId, WebPushPayload payload) {
+        return sendToUserDetailed(userId, payload).deliveredCount();
+    }
+
+    @Transactional
+    public WebPushDeliveryReport sendToUserDetailed(Long userId, WebPushPayload payload) {
         List<WebPushSubscription> subscriptions = subscriptionRepository.findAllByUserId(userId);
         int deliveredCount = 0;
+        int expiredCount = 0;
+        int failedCount = 0;
 
         for (WebPushSubscription subscription : subscriptions) {
             WebPushSendResult result = webPushSender.send(subscription, payload);
             if (result == WebPushSendResult.DELIVERED) {
                 deliveredCount++;
             } else if (result == WebPushSendResult.EXPIRED) {
+                expiredCount++;
                 subscriptionRepository.delete(subscription);
+            } else {
+                failedCount++;
             }
         }
-        return deliveredCount;
+        return new WebPushDeliveryReport(deliveredCount, expiredCount, failedCount);
     }
 }

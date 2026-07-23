@@ -38,6 +38,7 @@ type BusyKey =
   | 'theme'
   | 'nickname'
   | 'permission'
+  | 'testPush'
   | 'logout';
 
 interface LocalSettings {
@@ -525,6 +526,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
     );
   };
 
+  const handleTestPush = async () => {
+    if (!token || busy.testPush) return;
+    setBusy((prev) => ({ ...prev, testPush: true }));
+    try {
+      const result = await notificationApi.sendTestPush(token);
+      if (result.deliveredCount > 0) {
+        pushToast('ok', `테스트 알림을 ${result.deliveredCount}개 브라우저로 보냈어요`);
+      } else if (result.expiredCount > 0) {
+        setBrowserPushEnabled(false);
+        pushToast('info', '만료된 구독이에요. 알림 받기를 다시 설정해주세요');
+      } else {
+        pushToast('error', `테스트 알림 발송 실패 (${result.failedCount})`);
+      }
+    } catch (error) {
+      pushToast('error', error instanceof Error ? error.message : '테스트 알림을 보내지 못했어요');
+    } finally {
+      setBusy((prev) => ({ ...prev, testPush: false }));
+    }
+  };
+
   const handleTheme = async (theme: ThemeMode) => {
     if (settings.theme === theme || busy.theme) return;
     await persist('theme', { ...settings, theme }, '테마가 저장되었어요');
@@ -970,6 +991,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                 </b>
                 에 부드럽게 알려드릴게요. · {timezone}
               </p>
+              {import.meta.env.DEV && (
+                <button
+                  type="button"
+                  onClick={handleTestPush}
+                  disabled={!!busy.testPush}
+                  className="w-full min-h-[38px] mt-3 rounded-lg text-[12px] font-bold"
+                  style={{
+                    background: 'var(--qp-accent-soft)',
+                    color: 'var(--qp-accent-text)',
+                    opacity: busy.testPush ? 0.55 : 1,
+                  }}
+                >
+                  {busy.testPush ? '테스트 알림 보내는 중...' : '테스트 알림 보내기'}
+                </button>
+              )}
             </div>
           )}
         </div>
