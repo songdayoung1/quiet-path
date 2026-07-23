@@ -25,6 +25,7 @@ public class WebPushClient {
 
     public HttpResponse send(WebPushSubscription subscription, String payload)
         throws GeneralSecurityException, IOException, ExecutionException, JoseException, InterruptedException {
+        ensureBouncyCastleProvider();
         Notification notification = new Notification(
             subscription.getEndpoint(),
             subscription.getP256dhKey(),
@@ -41,9 +42,6 @@ public class WebPushClient {
         }
         synchronized (this) {
             if (pushService == null) {
-                if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
-                    Security.addProvider(new BouncyCastleProvider());
-                }
                 pushService = new PushService(
                     properties.getPublicKey(),
                     properties.getPrivateKey(),
@@ -51,6 +49,17 @@ public class WebPushClient {
                 );
             }
             return pushService;
+        }
+    }
+
+    private void ensureBouncyCastleProvider() {
+        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) != null) {
+            return;
+        }
+        synchronized (Security.class) {
+            if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+                Security.addProvider(new BouncyCastleProvider());
+            }
         }
     }
 }
