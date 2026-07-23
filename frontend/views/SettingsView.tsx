@@ -475,9 +475,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
       } else {
         const response = await notificationApi.updatePreferences(token, toPreferenceRequest(notifications));
         saved = notificationsFromResponse(response);
-        if (hasEnabledNotification(saved) && Notification.permission === 'granted') {
+        if (
+          hasEnabledNotification(saved) &&
+          !browserPushEnabled &&
+          Notification.permission === 'granted'
+        ) {
           await enableWebPush(token);
-        } else if (!hasEnabledNotification(saved)) {
+          setBrowserPushEnabled(true);
+        } else if (!hasEnabledNotification(saved) && browserPushEnabled) {
           await disableWebPush(token);
           setBrowserPushEnabled(false);
         }
