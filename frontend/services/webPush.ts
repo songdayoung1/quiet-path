@@ -22,6 +22,17 @@ const decodeApplicationServerKey = (value: string) => {
   return Uint8Array.from(decoded, (character) => character.charCodeAt(0));
 };
 
+const usesApplicationServerKey = (
+  subscription: PushSubscription,
+  expectedKey: Uint8Array
+) => {
+  const currentKey = subscription.options.applicationServerKey;
+  if (!currentKey) return false;
+  const currentBytes = new Uint8Array(currentKey);
+  return currentBytes.length === expectedKey.length &&
+    currentBytes.every((value, index) => value === expectedKey[index]);
+};
+
 const toPayload = (subscription: PushSubscription): WebPushSubscriptionPayload => {
   const serialized = subscription.toJSON();
   const p256dh = serialized.keys?.p256dh;
@@ -54,12 +65,18 @@ export const enableWebPush = async (token: string) => {
     throw new Error('웹 푸시 서버 설정이 준비되지 않았습니다.');
   }
 
+  const applicationServerKey = decodeApplicationServerKey(config.publicKey);
   const registration = await getRegistration();
   let subscription = await registration.pushManager.getSubscription();
+  if (subscription && !usesApplicationServerKey(subscription, applicationServerKey)) {
+    await notificationApi.unsubscribe(token, subscription.endpoint).catch(() => undefined);
+    await subscription.unsubscribe();
+    subscription = null;
+  }
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: decodeApplicationServerKey(config.publicKey),
+      applicationServerKey,
     });
   }
 

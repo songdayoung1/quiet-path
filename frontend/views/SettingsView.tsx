@@ -530,6 +530,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
     if (!token || busy.testPush) return;
     setBusy((prev) => ({ ...prev, testPush: true }));
     try {
+      await enableWebPush(token);
+      setBrowserPushEnabled(true);
       const result = await notificationApi.sendTestPush(token);
       if (result.deliveredCount > 0) {
         pushToast('ok', `테스트 알림을 ${result.deliveredCount}개 브라우저로 보냈어요`);

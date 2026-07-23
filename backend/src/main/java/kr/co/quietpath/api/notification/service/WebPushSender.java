@@ -12,6 +12,7 @@ import org.jose4j.lang.JoseException;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.concurrent.ExecutionException;
 
@@ -40,7 +41,15 @@ public class WebPushSender {
             if (statusCode == 404 || statusCode == 410) {
                 return WebPushSendResult.EXPIRED;
             }
-            log.warn("Web push failed: subscriptionId={}, status={}", subscription.getId(), statusCode);
+            String responseBody = response.getEntity() == null
+                ? ""
+                : EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8);
+            log.warn(
+                "Web push failed: subscriptionId={}, status={}, response={}",
+                subscription.getId(),
+                statusCode,
+                responseBody.length() > 500 ? responseBody.substring(0, 500) : responseBody
+            );
             return WebPushSendResult.FAILED;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
