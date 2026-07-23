@@ -61,6 +61,9 @@ interface ToastItem {
 const SETTINGS_KEY = 'qp.settings.v3';
 const NICKNAME_KEY = 'qp.profile.nickname';
 const THEME_CHANGE_EVENT = 'qp:theme-mode-changed';
+const REVIEW_REMINDER_MINUTES = import.meta.env.DEV
+  ? Array.from({ length: 60 }, (_, minute) => minute)
+  : [0, 15, 30, 45];
 
 const DEFAULT_SETTINGS: LocalSettings = {
   notifications: {
@@ -953,7 +956,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                     border: '1px solid var(--qp-divider)',
                   }}
                 >
-                  {[0, 15, 30, 45].map((minute) => (
+                  {REVIEW_REMINDER_MINUTES.map((minute) => (
                     <option key={minute} value={minute}>
                       {String(minute).padStart(2, '0')}분
                     </option>
