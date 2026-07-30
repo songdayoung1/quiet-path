@@ -62,9 +62,8 @@ interface ToastItem {
 const SETTINGS_KEY = 'qp.settings.v3';
 const NICKNAME_KEY = 'qp.profile.nickname';
 const THEME_CHANGE_EVENT = 'qp:theme-mode-changed';
-const REVIEW_REMINDER_MINUTES = import.meta.env.DEV
-  ? Array.from({ length: 60 }, (_, minute) => minute)
-  : [0, 15, 30, 45];
+const REVIEW_REMINDER_MINUTES = [0, 15, 30, 45];
+const SHOW_WEB_PUSH_TEST_BUTTON = false;
 
 const DEFAULT_SETTINGS: LocalSettings = {
   notifications: {
@@ -993,7 +992,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                 </b>
                 에 부드럽게 알려드릴게요. · {timezone}
               </p>
-              {import.meta.env.DEV && (
+              {SHOW_WEB_PUSH_TEST_BUTTON && (
                 <button
                   type="button"
                   onClick={handleTestPush}
