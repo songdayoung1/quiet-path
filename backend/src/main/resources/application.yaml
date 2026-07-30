@@ -15,6 +15,10 @@ server:
       force: true
 
 app:
+  web-push:
+    public-key: ${APP_WEB_PUSH_PUBLIC_KEY:}
+    private-key: ${APP_WEB_PUSH_PRIVATE_KEY:}
+    subject: ${APP_WEB_PUSH_SUBJECT:}
   record-image:
     storage: ${APP_RECORD_IMAGE_STORAGE:local}
     max-file-size-bytes: ${APP_RECORD_IMAGE_MAX_FILE_SIZE_BYTES:10485760}

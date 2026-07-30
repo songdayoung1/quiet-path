@@ -22,6 +22,7 @@ public enum ErrorCode {
     TARGET_NOT_FOUND(HttpStatus.NOT_FOUND, "TARGET_NOT_FOUND", "대상을 찾을 수 없습니다."),
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMENT_NOT_FOUND", "Comment를 찾을 수 없습니다."),
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION_NOT_FOUND", "Notification을 찾을 수 없습니다."),
+    WEB_PUSH_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "WEB_PUSH_NOT_CONFIGURED", "웹 푸시 설정이 준비되지 않았습니다."),
     INVALID_PERIOD(HttpStatus.BAD_REQUEST, "INVALID_PERIOD", "기간 설정이 올바르지 않습니다."),
     DIRECTION_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "DIRECTION_NAME_REQUIRED", "directionName은 필수입니다."),
     CONTENT_REQUIRED(HttpStatus.BAD_REQUEST, "CONTENT_REQUIRED", "content는 필수입니다."),

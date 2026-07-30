@@ -170,6 +170,52 @@ CREATE TABLE notifications (
     CONSTRAINT fk_notifications_actor_user FOREIGN KEY (actor_user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE notification_preferences (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    reaction_enabled TINYINT NOT NULL DEFAULT 1,
+    comment_enabled TINYINT NOT NULL DEFAULT 1,
+    review_reminder_enabled TINYINT NOT NULL DEFAULT 0,
+    review_reminder_time TIME NOT NULL DEFAULT '21:00:00',
+    time_zone VARCHAR(50) NOT NULL DEFAULT 'Asia/Seoul',
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uk_notification_preferences_user (user_id),
+    INDEX idx_notification_preferences_review_due (
+        review_reminder_enabled,
+        time_zone,
+        review_reminder_time,
+        user_id
+    ),
+    CONSTRAINT fk_notification_preferences_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE web_push_subscriptions (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    endpoint VARCHAR(2048) NOT NULL,
+    endpoint_hash CHAR(64) NOT NULL,
+    p256dh_key VARCHAR(255) NOT NULL,
+    auth_key VARCHAR(255) NOT NULL,
+    user_agent VARCHAR(500),
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    UNIQUE KEY uk_web_push_subscriptions_endpoint_hash (endpoint_hash),
+    INDEX idx_web_push_subscriptions_user (user_id),
+    CONSTRAINT fk_web_push_subscriptions_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE notification_deliveries (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    type VARCHAR(30) NOT NULL,
+    target_id BIGINT NOT NULL,
+    scheduled_date DATE NOT NULL,
+    created_at DATETIME NOT NULL,
+    UNIQUE KEY uk_notification_deliveries_event (user_id, type, target_id, scheduled_date),
+    CONSTRAINT fk_notification_deliveries_user FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE path_summaries (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     path_id BIGINT NOT NULL,

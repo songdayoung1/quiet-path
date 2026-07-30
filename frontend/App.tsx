@@ -21,6 +21,7 @@ import { Settings, Compass, AlertCircle } from 'lucide-react';
 import { AppModal } from './components/AppModal';
 import { CATEGORIES } from './constants';
 import { getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from './utils/recordScope';
+import { disableWebPush } from './services/webPush';
 
 const OAUTH_PENDING_CODE_KEY = 'qp.oauth.pending.code';
 const OAUTH_PENDING_ERROR_KEY = 'qp.oauth.pending.error';
@@ -1044,6 +1045,9 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     const accessToken = state.auth.token;
+    if (accessToken && !isMockAccessToken(accessToken)) {
+      await disableWebPush(accessToken).catch(() => undefined);
+    }
     if (!accessToken || !isMockAccessToken(accessToken)) {
       await authApi.logout().catch(() => undefined);
     }
