@@ -3,6 +3,7 @@ package kr.co.quietpath.api.notification.service;
 import kr.co.quietpath.api.notification.config.WebPushProperties;
 import kr.co.quietpath.domain.notification.entity.WebPushSubscription;
 import lombok.RequiredArgsConstructor;
+import nl.martijndwars.webpush.Encoding;
 import nl.martijndwars.webpush.Notification;
 import nl.martijndwars.webpush.PushService;
 import org.apache.http.HttpResponse;
@@ -32,7 +33,7 @@ public class WebPushClient {
             subscription.getAuthKey(),
             payload
         );
-        return getPushService().send(notification);
+        return getPushService().send(notification, Encoding.AES128GCM);
     }
 
     private PushService getPushService() throws GeneralSecurityException {
