@@ -68,7 +68,7 @@ export interface Direction {
   aiSummary?: string; // The "Future Retrieval" summary
 }
 
-export type ViewState = 'ONBOARDING' | 'ACCOUNT_CONNECT' | 'OAUTH_CALLBACK' | 'NICKNAME_SETUP' | 'NOW' | 'RECORDS' | 'DIRECTION' | 'COMMUNITY' | 'WRITE_LOG' | 'SETTINGS' | 'PAST_DIRECTIONS';
+export type ViewState = 'ONBOARDING' | 'ACCOUNT_CONNECT' | 'OAUTH_CALLBACK' | 'NICKNAME_SETUP' | 'NOW' | 'RECORDS' | 'DIRECTION' | 'COMMUNITY' | 'WRITE_LOG' | 'SETTINGS' | 'NOTIFICATIONS' | 'PAST_DIRECTIONS';
 
 export type UserLevel = 'Beginning' | 'Recorder' | 'Observer' | 'Maintainer' | 'Reflector';
 

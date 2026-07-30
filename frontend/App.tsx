@@ -9,6 +9,7 @@ import { OnboardingView } from './views/OnboardingView';
 import { CommunityView } from './views/CommunityView';
 import { PastDirectionsView } from './views/PastDirectionsView';
 import { SettingsView } from './views/SettingsView';
+import { NotificationsView } from './views/NotificationsView';
 import { OAuthCallbackView } from './views/OAuthCallbackView';
 import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
@@ -17,7 +18,8 @@ import type { ApiErrorWithStatus } from './api/apiClient';
 import { authApi, isMockAccessToken } from './api/authApi';
 import { pathApi, PastPathListItem, PathActiveResponse, PathCreateResponse } from './api/pathApi';
 import { recordApi, RecordResponse } from './api/recordApi';
-import { Settings, Compass, AlertCircle } from 'lucide-react';
+import { notificationApi, type NotificationItem } from './api/notificationApi';
+import { Settings, Compass, AlertCircle, Bell } from 'lucide-react';
 import { AppModal } from './components/AppModal';
 import { CATEGORIES } from './constants';
 import { getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from './utils/recordScope';
@@ -305,8 +307,10 @@ const App: React.FC = () => {
   const [isExpiredDirectionResolving, setIsExpiredDirectionResolving] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const refreshAuthRequestRef = useRef<Promise<string | null> | null>(null);
   const hasInitializedAppRef = useRef(false);
+  const notificationReturnViewRef = useRef<ViewState>('NOW');
   const minExpiredDirectionReviewAt = buildFutureDateInputValue(1);
   const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
   const shellFrameStyle = useMemo<React.CSSProperties>(
@@ -396,6 +400,7 @@ const App: React.FC = () => {
         const params = new URLSearchParams(window.location.search);
         const urlCode = params.get('code');
         const urlError = params.get('error');
+        const requestedView = params.get('view');
 
         if (urlCode) {
             window.sessionStorage.setItem(OAUTH_PENDING_CODE_KEY, urlCode);
@@ -405,6 +410,8 @@ const App: React.FC = () => {
         }
 
         if (urlCode || urlError) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (requestedView) {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
@@ -482,7 +489,7 @@ const App: React.FC = () => {
                 if (restored.me.onboardingStatus === 'NEW') {
                    setCurrentView('NICKNAME_SETUP');
                 } else {
-                   setCurrentView('NOW');
+                   setCurrentView(requestedView === 'community' ? 'COMMUNITY' : 'NOW');
                 }
             } catch (err) {
                 if (isRefreshSessionInvalid(err)) {
@@ -510,6 +517,42 @@ const App: React.FC = () => {
       saveState(state);
     }
   }, [state, isLoaded]);
+
+  const refreshUnreadNotificationCount = useCallback(async () => {
+    const token = state.auth.token;
+    if (!state.auth.isLoggedIn || !token) {
+      setUnreadNotificationCount(0);
+      return;
+    }
+    try {
+      const response = await notificationApi.getNotifications(token, {
+        page: 0,
+        size: 1,
+        unreadOnly: true,
+      });
+      setUnreadNotificationCount(response.totalElements);
+    } catch {
+      // 알림 배지 조회 실패는 현재 화면 사용을 막지 않는다.
+    }
+  }, [state.auth.isLoggedIn, state.auth.token]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    void refreshUnreadNotificationCount();
+
+    const onFocus = () => void refreshUnreadNotificationCount();
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'QP_NOTIFICATION_RECEIVED') {
+        void refreshUnreadNotificationCount();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    navigator.serviceWorker?.addEventListener('message', onServiceWorkerMessage);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      navigator.serviceWorker?.removeEventListener('message', onServiceWorkerMessage);
+    };
+  }, [isLoaded, currentView, refreshUnreadNotificationCount]);
 
   const handleOnboardingComplete = async (initialDirection: Direction) => {
       let nextDirection = initialDirection;
@@ -1064,6 +1107,29 @@ const App: React.FC = () => {
 
   const currentPathTodayRecord = getCurrentPathTodayRecord(state.records, state.currentDirection);
 
+  const openNotifications = () => {
+    if (currentView !== 'INITIALIZING' && currentView !== 'NOTIFICATIONS') {
+      notificationReturnViewRef.current = currentView;
+    }
+    setCurrentView('NOTIFICATIONS');
+  };
+
+  const closeNotifications = () => {
+    setCurrentView(notificationReturnViewRef.current);
+  };
+
+  const openNotificationTarget = (notification: NotificationItem) => {
+    if (notification.targetType === 'RECORD') {
+      setCurrentView('COMMUNITY');
+      return;
+    }
+    if (notification.targetType === 'PATH') {
+      handleOpenDirectionView();
+      return;
+    }
+    closeNotifications();
+  };
+
   const NavItem = ({ view, label }: { view: ViewState | 'INITIALIZING'; label: string }) => {
     const isActive = currentView === view;
     return (
@@ -1212,7 +1278,7 @@ const App: React.FC = () => {
     >
       
       {/* Header Overlay (Gradient Blur) */}
-      {currentView !== 'SETTINGS' && (
+      {currentView !== 'SETTINGS' && currentView !== 'NOTIFICATIONS' && (
         <div 
           className="sticky top-0 h-20 -mb-20 z-20 pointer-events-none transition-opacity duration-500"
           style={{
@@ -1226,88 +1292,116 @@ const App: React.FC = () => {
       )}
 
       {/* Top Bar */}
-      {currentView !== 'SETTINGS' && (
-        <div className="h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
+      {currentView !== 'SETTINGS' && currentView !== 'NOTIFICATIONS' && (
+        <div className="relative h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
           <div className="w-6" />
           <h1
-            className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-80"
+            className="absolute left-1/2 -translate-x-1/2 text-[10px] font-bold tracking-[0.3em] uppercase opacity-80"
             style={{ color: resolvedTheme === 'dark' ? '#CBD5E1' : '#7B8794' }}
           >
             Quiet Path
           </h1>
-          <button 
-            onClick={() => {
-              setSettingsButtonHovered(false);
-              setSettingsButtonPressed(false);
-              setCurrentView('SETTINGS');
-            }}
-            onMouseEnter={() => setSettingsButtonHovered(true)}
-            onMouseLeave={() => {
-              setSettingsButtonHovered(false);
-              setSettingsButtonPressed(false);
-            }}
-            onPointerDown={() => setSettingsButtonPressed(true)}
-            onPointerUp={() => setSettingsButtonPressed(false)}
-            onPointerCancel={() => setSettingsButtonPressed(false)}
-            aria-label="설정 열기"
-            className="group cursor-pointer rounded-full p-2 transition-all duration-200 focus-visible:outline-none"
-            style={{
-              cursor: 'pointer',
-              color: settingsButtonPressed
-                ? resolvedTheme === 'dark'
-                  ? '#EDE9FE'
-                  : '#6D28D9'
-                : settingsButtonHovered
-                  ? resolvedTheme === 'dark'
-                    ? '#E9D5FF'
-                    : '#7C3AED'
-                  : resolvedTheme === 'dark'
-                    ? '#94A3B8'
-                    : '#64748B',
-              backgroundColor: settingsButtonPressed
-                ? resolvedTheme === 'dark'
-                  ? 'rgba(88,28,135,0.56)'
-                  : 'rgba(237,233,254,0.98)'
-                : settingsButtonHovered
-                  ? resolvedTheme === 'dark'
-                    ? 'rgba(51,65,85,0.86)'
-                    : 'rgba(255,255,255,0.96)'
-                  : resolvedTheme === 'dark'
+          <div className="flex items-center gap-1">
+            {state.auth.isLoggedIn && state.auth.token && (
+              <button
+                type="button"
+                onClick={openNotifications}
+                aria-label={unreadNotificationCount > 0
+                  ? `알림 열기, 읽지 않은 알림 ${unreadNotificationCount}개`
+                  : '알림 열기'}
+                className="relative cursor-pointer rounded-full p-2 transition-all duration-200 focus-visible:outline-none"
+                style={{
+                  color: resolvedTheme === 'dark' ? '#94A3B8' : '#64748B',
+                  backgroundColor: resolvedTheme === 'dark'
                     ? 'rgba(15,23,42,0.18)'
                     : 'rgba(255,255,255,0.28)',
-              boxShadow: settingsButtonPressed
-                ? resolvedTheme === 'dark'
-                  ? '0 14px 30px rgba(15,23,42,0.40), 0 0 0 1px rgba(196,181,253,0.28) inset'
-                  : '0 12px 28px rgba(148,163,184,0.24), 0 0 0 1px rgba(124,58,237,0.10) inset'
-                : settingsButtonHovered
-                  ? resolvedTheme === 'dark'
-                    ? '0 12px 28px rgba(15,23,42,0.32), 0 0 0 1px rgba(196,181,253,0.18) inset'
-                    : '0 10px 24px rgba(148,163,184,0.18), 0 0 0 1px rgba(124,58,237,0.08) inset'
-                  : 'none',
-              transform: settingsButtonPressed
-                ? 'scale(0.95)'
-                : settingsButtonHovered
-                  ? 'scale(1.08)'
-                  : 'scale(1)',
-            }}
-          >
-            <Settings
-              size={18}
-              className="transition-transform duration-200"
-              style={{
-                transform: settingsButtonPressed
-                  ? 'rotate(28deg) scale(0.97)'
-                  : settingsButtonHovered
-                    ? 'rotate(18deg)'
-                    : 'rotate(0deg)',
+                }}
+              >
+                <Bell size={18} />
+                {unreadNotificationCount > 0 && (
+                  <span
+                    className="absolute -right-0.5 -top-0.5 min-w-[17px] h-[17px] px-1 rounded-full grid place-items-center text-[9px] font-bold text-white"
+                    style={{ background: '#8B5CF6' }}
+                  >
+                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setSettingsButtonHovered(false);
+                setSettingsButtonPressed(false);
+                setCurrentView('SETTINGS');
               }}
-            />
-          </button>
+              onMouseEnter={() => setSettingsButtonHovered(true)}
+              onMouseLeave={() => {
+                setSettingsButtonHovered(false);
+                setSettingsButtonPressed(false);
+              }}
+              onPointerDown={() => setSettingsButtonPressed(true)}
+              onPointerUp={() => setSettingsButtonPressed(false)}
+              onPointerCancel={() => setSettingsButtonPressed(false)}
+              aria-label="설정 열기"
+              className="group cursor-pointer rounded-full p-2 transition-all duration-200 focus-visible:outline-none"
+              style={{
+                cursor: 'pointer',
+                color: settingsButtonPressed
+                  ? resolvedTheme === 'dark'
+                    ? '#EDE9FE'
+                    : '#6D28D9'
+                  : settingsButtonHovered
+                    ? resolvedTheme === 'dark'
+                      ? '#E9D5FF'
+                      : '#7C3AED'
+                    : resolvedTheme === 'dark'
+                      ? '#94A3B8'
+                      : '#64748B',
+                backgroundColor: settingsButtonPressed
+                  ? resolvedTheme === 'dark'
+                    ? 'rgba(88,28,135,0.56)'
+                    : 'rgba(237,233,254,0.98)'
+                  : settingsButtonHovered
+                    ? resolvedTheme === 'dark'
+                      ? 'rgba(51,65,85,0.86)'
+                      : 'rgba(255,255,255,0.96)'
+                    : resolvedTheme === 'dark'
+                      ? 'rgba(15,23,42,0.18)'
+                      : 'rgba(255,255,255,0.28)',
+                boxShadow: settingsButtonPressed
+                  ? resolvedTheme === 'dark'
+                    ? '0 14px 30px rgba(15,23,42,0.40), 0 0 0 1px rgba(196,181,253,0.28) inset'
+                    : '0 12px 28px rgba(148,163,184,0.24), 0 0 0 1px rgba(124,58,237,0.10) inset'
+                  : settingsButtonHovered
+                    ? resolvedTheme === 'dark'
+                      ? '0 12px 28px rgba(15,23,42,0.32), 0 0 0 1px rgba(196,181,253,0.18) inset'
+                      : '0 10px 24px rgba(148,163,184,0.18), 0 0 0 1px rgba(124,58,237,0.08) inset'
+                    : 'none',
+                transform: settingsButtonPressed
+                  ? 'scale(0.95)'
+                  : settingsButtonHovered
+                    ? 'scale(1.08)'
+                    : 'scale(1)',
+              }}
+            >
+              <Settings
+                size={18}
+                className="transition-transform duration-200"
+                style={{
+                  transform: settingsButtonPressed
+                    ? 'rotate(28deg) scale(0.97)'
+                    : settingsButtonHovered
+                      ? 'rotate(18deg)'
+                      : 'rotate(0deg)',
+                }}
+              />
+            </button>
+          </div>
         </div>
       )}
 
       {/* Main Content Area */}
-      <main className={currentView === 'SETTINGS' ? 'flex-1 px-0 pt-0 pb-0' : 'flex-1 px-6 pt-2 pb-32'}>
+      <main className={currentView === 'SETTINGS' || currentView === 'NOTIFICATIONS' ? 'flex-1 px-0 pt-0 pb-0' : 'flex-1 px-6 pt-2 pb-32'}>
         {currentView === 'NOW' && (
           <HomeView
             state={state}
@@ -1364,6 +1458,15 @@ const App: React.FC = () => {
               onLogin={() => setCurrentView('ACCOUNT_CONNECT')}
               onLogout={handleLogout}
            />
+        )}
+        {currentView === 'NOTIFICATIONS' && state.auth.token && (
+          <NotificationsView
+            accessToken={state.auth.token}
+            onClose={closeNotifications}
+            onOpenTarget={openNotificationTarget}
+            onReadOne={() => setUnreadNotificationCount((count) => Math.max(0, count - 1))}
+            onReadAll={() => setUnreadNotificationCount(0)}
+          />
         )}
       </main>
 
@@ -1501,7 +1604,7 @@ const App: React.FC = () => {
       />
 
       {/* Floating Bottom Navigation */}
-      {currentView !== 'WRITE_LOG' && currentView !== 'SETTINGS' && (
+      {currentView !== 'WRITE_LOG' && currentView !== 'SETTINGS' && currentView !== 'NOTIFICATIONS' && (
         <div className="fixed bottom-6 left-0 w-full flex justify-center z-40 px-6 pointer-events-none">
            <nav
              className="h-[64px] px-2 backdrop-blur-2xl rounded-[28px] flex items-center justify-between w-full max-w-[340px] pointer-events-auto"

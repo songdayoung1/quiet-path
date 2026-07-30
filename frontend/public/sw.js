@@ -13,7 +13,15 @@ self.addEventListener('push', (event) => {
     data: { url: payload.url || '/' },
     tag: payload.tag || 'quiet-path-notification',
   };
-  event.waitUntil(self.registration.showNotification(title, options));
+  const notifyOpenClients = self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then((clients) => clients.forEach((client) => {
+      client.postMessage({ type: 'QP_NOTIFICATION_RECEIVED' });
+    }));
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(title, options),
+    notifyOpenClients,
+  ]));
 });
 
 self.addEventListener('notificationclick', (event) => {
