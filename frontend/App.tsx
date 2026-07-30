@@ -15,7 +15,7 @@ import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
 import { configureApiClient } from './api/apiClient';
 import type { ApiErrorWithStatus } from './api/apiClient';
-import { authApi, isMockAccessToken } from './api/authApi';
+import { authApi, createLocalQaLoginCode, isMockAccessToken } from './api/authApi';
 import { pathApi, PastPathListItem, PathActiveResponse, PathCreateResponse } from './api/pathApi';
 import { recordApi, RecordResponse } from './api/recordApi';
 import { notificationApi, type NotificationItem } from './api/notificationApi';
@@ -1184,6 +1184,10 @@ const App: React.FC = () => {
              <AccountConnectView 
                 onBack={() => setCurrentView('ONBOARDING')}
                 onStartKakao={() => authApi.startKakaoLogin()}
+                onNavigateToLocalQa={() => {
+                    setAuthCodeParam(createLocalQaLoginCode());
+                    setCurrentView('OAUTH_CALLBACK');
+                }}
                 onNavigateToMockKakao={(code) => {
                     // 테스트 플로우: 리로드 없이 OAuth 화면으로 전환
                     setAuthCodeParam(code);
