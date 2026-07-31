@@ -308,6 +308,7 @@ const App: React.FC = () => {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [notificationListRefreshKey, setNotificationListRefreshKey] = useState(0);
   const refreshAuthRequestRef = useRef<Promise<string | null> | null>(null);
   const unreadCountRequestRef = useRef<{
     token: string;
@@ -315,10 +316,12 @@ const App: React.FC = () => {
     promise: Promise<void>;
   } | null>(null);
   const unreadCountRequestSequenceRef = useRef(0);
+  const notificationListRefreshTimerRef = useRef<number | null>(null);
   const currentAuthRef = useRef<{
     isLoggedIn: boolean;
     token: string | null;
   }>({ isLoggedIn: false, token: null });
+  const currentViewRef = useRef<ViewState | 'INITIALIZING'>('INITIALIZING');
   const hasInitializedAppRef = useRef(false);
   const notificationReturnViewRef = useRef<ViewState>('NOW');
   const minExpiredDirectionReviewAt = buildFutureDateInputValue(1);
@@ -337,6 +340,7 @@ const App: React.FC = () => {
     isLoggedIn: state.auth.isLoggedIn,
     token: state.auth.token,
   };
+  currentViewRef.current = currentView;
 
   useEffect(() => {
     const syncTheme = (mode?: ThemeMode) => {
@@ -574,11 +578,26 @@ const App: React.FC = () => {
     const onServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data?.type === 'QP_NOTIFICATION_RECEIVED') {
         void refreshUnreadNotificationCount();
+        if (currentViewRef.current === 'NOTIFICATIONS') {
+          if (notificationListRefreshTimerRef.current !== null) {
+            window.clearTimeout(notificationListRefreshTimerRef.current);
+          }
+          notificationListRefreshTimerRef.current = window.setTimeout(() => {
+            notificationListRefreshTimerRef.current = null;
+            if (currentViewRef.current === 'NOTIFICATIONS') {
+              setNotificationListRefreshKey((key) => key + 1);
+            }
+          }, 250);
+        }
       }
     };
     navigator.serviceWorker?.addEventListener('message', onServiceWorkerMessage);
     return () => {
       navigator.serviceWorker?.removeEventListener('message', onServiceWorkerMessage);
+      if (notificationListRefreshTimerRef.current !== null) {
+        window.clearTimeout(notificationListRefreshTimerRef.current);
+        notificationListRefreshTimerRef.current = null;
+      }
     };
   }, [isLoaded, refreshUnreadNotificationCount]);
 
@@ -1494,6 +1513,7 @@ const App: React.FC = () => {
         {currentView === 'NOTIFICATIONS' && state.auth.token && (
           <NotificationsView
             accessToken={state.auth.token}
+            refreshKey={notificationListRefreshKey}
             onClose={closeNotifications}
             onOpenTarget={openNotificationTarget}
             onReadOne={() => setUnreadNotificationCount((count) => Math.max(0, count - 1))}

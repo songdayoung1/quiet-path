@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Bell,
   CheckCheck,
@@ -17,6 +17,7 @@ import { getThemePalette, useResolvedTheme } from '../theme';
 
 interface NotificationsViewProps {
   accessToken: string;
+  refreshKey: number;
   onClose: () => void;
   onOpenTarget: (notification: NotificationItem) => void;
   onReadOne: () => void;
@@ -72,6 +73,7 @@ const notificationColors = (type: string, dark: boolean) => {
 
 export const NotificationsView: React.FC<NotificationsViewProps> = ({
   accessToken,
+  refreshKey,
   onClose,
   onOpenTarget,
   onReadOne,
@@ -87,14 +89,19 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
   const [isReadingAll, setIsReadingAll] = useState(false);
   const [pendingIds, setPendingIds] = useState<Record<number, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  const loadedAccessTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
+    const isInitialLoad = loadedAccessTokenRef.current !== accessToken;
+    if (isInitialLoad) {
+      setIsLoading(true);
+    }
     setError(null);
     notificationApi.getNotifications(accessToken, { page: 0, size: PAGE_SIZE })
       .then((response) => {
         if (cancelled) return;
+        loadedAccessTokenRef.current = accessToken;
         setItems(response.items);
         setPage(response.page);
         setTotalPages(response.totalPages);
@@ -111,7 +118,7 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, refreshKey]);
 
   const loadMore = async () => {
     if (isLoadingMore || page + 1 >= totalPages) return;
