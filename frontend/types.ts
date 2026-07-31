@@ -13,6 +13,9 @@ export interface Record {
   isPinned?: boolean; // "Important Moment"
   moodCode?: string; // Mood Sticker Code
   imageUrl?: string; // Image Attachment
+  imagePositionX?: number;
+  imagePositionY?: number;
+  imageScale?: number;
   isShared?: boolean; // Shared to Community
 }
 
@@ -65,7 +68,7 @@ export interface Direction {
   aiSummary?: string; // The "Future Retrieval" summary
 }
 
-export type ViewState = 'ONBOARDING' | 'ACCOUNT_CONNECT' | 'OAUTH_CALLBACK' | 'NICKNAME_SETUP' | 'NOW' | 'RECORDS' | 'DIRECTION' | 'COMMUNITY' | 'WRITE_LOG' | 'SETTINGS' | 'PAST_DIRECTIONS';
+export type ViewState = 'ONBOARDING' | 'ACCOUNT_CONNECT' | 'OAUTH_CALLBACK' | 'NICKNAME_SETUP' | 'NOW' | 'RECORDS' | 'DIRECTION' | 'COMMUNITY' | 'WRITE_LOG' | 'SETTINGS' | 'NOTIFICATIONS' | 'PAST_DIRECTIONS';
 
 export type UserLevel = 'Beginning' | 'Recorder' | 'Observer' | 'Maintainer' | 'Reflector';
 
@@ -85,7 +88,6 @@ export type OnboardingStatus = 'NEW' | 'EXISTING';
 export interface AuthState {
   isLoggedIn: boolean;
   token: string | null;
-  refreshToken: string | null;
   userId?: string | null;
   onboardingStatus?: OnboardingStatus;
 }

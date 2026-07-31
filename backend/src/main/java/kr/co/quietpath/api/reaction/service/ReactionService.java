@@ -10,6 +10,8 @@ import kr.co.quietpath.api.reaction.dto.response.ReactionCreateResponse;
 import kr.co.quietpath.api.reaction.dto.response.ReactionDeleteResponse;
 import kr.co.quietpath.api.reaction.dto.response.ReactionMeResponse;
 import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
+import kr.co.quietpath.api.notification.service.CommunityNotificationRequestedEvent;
+import kr.co.quietpath.api.notification.service.CommunityNotificationType;
 import kr.co.quietpath.domain.reaction.entity.Reaction;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
@@ -17,6 +19,7 @@ import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +38,7 @@ public class ReactionService {
     private final RecordRepository recordRepository;
     private final UserRepository userRepository;
     private final WeeklyTop3CacheService weeklyTop3CacheService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     public ReactionCreateResponse createReaction(Long userId, ReactionCreateRequest request) {
         validateTargetType(request.getTargetType());
@@ -56,6 +60,14 @@ public class ReactionService {
 
         long reactionCount = reactionRepository.countByTargetTypeAndTargetId(request.getTargetType(), request.getTargetId());
         weeklyTop3CacheService.evict();
+        applicationEventPublisher.publishEvent(new CommunityNotificationRequestedEvent(
+            CommunityNotificationType.REACTION,
+            reaction.getId(),
+            record.getUser().getId(),
+            user.getId(),
+            user.getNickname(),
+            record.getId()
+        ));
         return ReactionCreateResponse.builder()
             .reactionId(reaction.getId())
             .targetType(request.getTargetType())

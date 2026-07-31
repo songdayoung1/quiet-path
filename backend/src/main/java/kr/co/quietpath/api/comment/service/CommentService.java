@@ -10,6 +10,8 @@ import kr.co.quietpath.api.comment.dto.response.CommentUpdateResponse;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
+import kr.co.quietpath.api.notification.service.CommunityNotificationRequestedEvent;
+import kr.co.quietpath.api.notification.service.CommunityNotificationType;
 import kr.co.quietpath.domain.comment.entity.Comment;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.record.entity.Record;
@@ -17,6 +19,7 @@ import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,6 +39,7 @@ public class CommentService {
     private final UserRepository userRepository;
     private final WeeklyTop3CacheService weeklyTop3CacheService;
     private final CommentPageCacheService commentPageCacheService;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     // 댓글 생성 후 댓글 목록 캐시와 주간 Top3 캐시를 함께 비운다.
     // 댓글 수와 Top3 댓글 수 집계가 둘 다 바뀔 수 있기 때문이다.
@@ -43,7 +47,7 @@ public class CommentService {
     public CommentCreateResponse createComment(Long userId, CommentCreateRequest request) {
         Record record = getRecord(request.getRecordId());
         validatePublic(record);
-        getUser(userId);
+        User user = getUser(userId);
 
         Comment comment = Comment.builder()
             .recordId(request.getRecordId())
@@ -55,6 +59,14 @@ public class CommentService {
         long commentCount = commentRepository.countByRecordIdAndDeletedFalse(comment.getRecordId());
         commentPageCacheService.evictRecord(comment.getRecordId());
         weeklyTop3CacheService.evict();
+        applicationEventPublisher.publishEvent(new CommunityNotificationRequestedEvent(
+            CommunityNotificationType.COMMENT,
+            comment.getId(),
+            record.getUser().getId(),
+            user.getId(),
+            user.getNickname(),
+            record.getId()
+        ));
 
         return CommentCreateResponse.builder()
             .commentId(comment.getId())

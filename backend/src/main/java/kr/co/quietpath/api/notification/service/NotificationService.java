@@ -8,6 +8,7 @@ import kr.co.quietpath.api.notification.dto.response.NotificationItem;
 import kr.co.quietpath.api.notification.dto.response.NotificationListResponse;
 import kr.co.quietpath.api.notification.dto.response.NotificationReadAllResponse;
 import kr.co.quietpath.api.notification.dto.response.NotificationReadResponse;
+import kr.co.quietpath.api.notification.dto.response.NotificationUnreadCountResponse;
 import kr.co.quietpath.domain.notification.entity.Notification;
 import kr.co.quietpath.domain.notification.repository.NotificationRepository;
 import kr.co.quietpath.domain.user.entity.User;
@@ -36,6 +37,13 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+
+    @Transactional(readOnly = true)
+    public NotificationUnreadCountResponse getUnreadCount(Long userId) {
+        return NotificationUnreadCountResponse.builder()
+            .unreadCount(notificationRepository.countByRecipientUserIdAndReadFalse(userId))
+            .build();
+    }
 
     @Transactional(readOnly = true)
     public NotificationListResponse getNotifications(Long userId, NotificationListQuery query) {

@@ -325,10 +325,22 @@ const CommunitySkeleton: React.FC = () => {
 
   return (
     <div className="px-4 space-y-3">
-      <div className="h-[132px] rounded-3xl border animate-pulse" style={{ background: palette.cardBgMuted, borderColor: palette.border }} />
       <div className="h-[220px] rounded-3xl border animate-pulse" style={{ background: palette.cardBgSoft, borderColor: palette.border }} />
       <div className="h-[220px] rounded-3xl border animate-pulse" style={{ background: palette.cardBg, borderColor: palette.border }} />
     </div>
+  );
+};
+
+const WeeklyTopSkeleton: React.FC = () => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
+
+  return (
+    <div
+      className="mx-4 mb-4 h-[286px] rounded-3xl border animate-pulse"
+      style={{ background: palette.cardBgMuted, borderColor: palette.border }}
+      aria-label="이번 주 인기 기록을 불러오는 중"
+    />
   );
 };
 
@@ -390,6 +402,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const palette = getThemePalette(theme);
   const [selectedCategory, setSelectedCategory] = useState<FeedCategory>('all');
   const [weeklyTopItems, setWeeklyTopItems] = useState<WeeklyTop3ItemResponse[]>([]);
+  const [isWeeklyTopLoading, setIsWeeklyTopLoading] = useState(true);
   const [feedItems, setFeedItems] = useState<FeedItemResponse[]>([]);
   const [hasNext, setHasNext] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -408,7 +421,15 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const activeFeedRequestsRef = useRef(new Set<string>());
   const activeWeeklyTopRequestsRef = useRef(new Set<string>());
   const viewContextRef = useRef<string | null>(null);
-  const requestContextKey = `${selectedCategory}:${accessToken ?? 'guest'}:${isGuest ? 'guest' : 'member'}`;
+  const accessTokenRef = useRef(accessToken);
+  accessTokenRef.current = accessToken;
+  const viewerScope = isGuest
+    ? 'guest'
+    : currentUserId
+      ? `user:${currentUserId}`
+      : null;
+  const requestScope = viewerScope ?? 'uncached-member';
+  const requestContextKey = `${selectedCategory}:${requestScope}`;
   viewContextRef.current = requestContextKey;
 
   const handleRestrictedAction = useCallback(() => {
@@ -420,22 +441,24 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   const refreshWeeklyTop3 = useCallback(async (options?: { bypassCache?: boolean }) => {
     if (selectedCategory !== 'all') {
       setWeeklyTopItems([]);
+      setIsWeeklyTopLoading(false);
       setTopActiveRecordId(null);
       return;
     }
 
-    const requestKey = `${selectedCategory}:${accessToken ?? 'guest'}`;
+    const requestKey = `${selectedCategory}:${requestScope}`;
     if (activeWeeklyTopRequestsRef.current.has(requestKey)) {
       return;
     }
     activeWeeklyTopRequestsRef.current.add(requestKey);
+    setIsWeeklyTopLoading(true);
     const requestSeq = ++weeklyTopRequestSeqRef.current;
     const requestContext = requestContextKey;
 
     try {
       const response = isGuest
-        ? await feedApi.getWeeklyTop3(null, options)
-        : await feedApi.getWeeklyTop3(accessToken, options);
+        ? await feedApi.getWeeklyTop3(null, { ...options, cacheScope: viewerScope })
+        : await feedApi.getWeeklyTop3(accessTokenRef.current, { ...options, cacheScope: viewerScope });
       if (weeklyTopRequestSeqRef.current !== requestSeq || viewContextRef.current !== requestContext || selectedCategory !== 'all') {
         return;
       }
@@ -447,8 +470,11 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       setWeeklyTopItems([]);
     } finally {
       activeWeeklyTopRequestsRef.current.delete(requestKey);
+      if (viewContextRef.current === requestContext) {
+        setIsWeeklyTopLoading(false);
+      }
     }
-  }, [accessToken, isGuest, requestContextKey, selectedCategory]);
+  }, [isGuest, requestContextKey, requestScope, selectedCategory, viewerScope]);
 
   const loadFeedPage = useCallback(
     async (cursor: string | null, append: boolean) => {
@@ -465,7 +491,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         loadingMoreRef.current = true;
         setIsLoadingMore(true);
       } else {
-        requestKey = `${selectedCategory}:${accessToken ?? 'guest'}:${cursor ?? 'first'}:${isGuest ? 'guest' : 'member'}`;
+        requestKey = `${selectedCategory}:${requestScope}:${cursor ?? 'first'}`;
         if (activeFeedRequestsRef.current.has(requestKey)) {
           return;
         }
@@ -483,12 +509,14 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         const response = isGuest
           ? await feedApi.getFeed({
               token: null,
+              cacheScope: viewerScope,
               category: selectedCategory,
               cursor: null,
               size: 20,
             })
           : await feedApi.getFeed({
-              token: accessToken,
+              token: accessTokenRef.current,
+              cacheScope: viewerScope,
               category: selectedCategory,
               cursor,
               size: 20,
@@ -522,7 +550,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
         }
       }
     },
-    [accessToken, isGuest, requestContextKey, selectedCategory]
+    [isGuest, requestContextKey, requestScope, selectedCategory, viewerScope]
   );
 
   useEffect(() => {
@@ -543,7 +571,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
   useEffect(() => {
     setCommentTarget(null);
     setTopActiveRecordId(null);
-  }, [selectedCategory, accessToken, isGuest]);
+  }, [selectedCategory, currentUserId, isGuest]);
 
   useEffect(() => {
     const node = loadMoreRef.current;
@@ -689,19 +717,23 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
       </nav>
 
       {selectedCategory === 'all' && (
-        <WeeklyTopCarousel
-          items={weeklyTopItems}
-          commentTarget={commentTarget}
-          pendingReactionIds={pendingReactionIds}
-          accessToken={accessToken}
-          onRefreshAuth={onRefreshAuth}
-          currentUserId={currentUserId}
-          onLike={(item) => void handleToggleReaction(item)}
-          onComment={handleOpenComments}
-          onCloseComments={() => setCommentTarget(null)}
-          onCommentCountChange={handleCommentCountChange}
-          onActiveRecordChange={setTopActiveRecordId}
-        />
+        isWeeklyTopLoading && weeklyTopItems.length === 0
+          ? <WeeklyTopSkeleton />
+          : (
+            <WeeklyTopCarousel
+              items={weeklyTopItems}
+              commentTarget={commentTarget}
+              pendingReactionIds={pendingReactionIds}
+              accessToken={accessToken}
+              onRefreshAuth={onRefreshAuth}
+              currentUserId={currentUserId}
+              onLike={(item) => void handleToggleReaction(item)}
+              onComment={handleOpenComments}
+              onCloseComments={() => setCommentTarget(null)}
+              onCommentCountChange={handleCommentCountChange}
+              onActiveRecordChange={setTopActiveRecordId}
+            />
+          )
       )}
 
       {!isInitialLoading && !error && (

@@ -5,11 +5,11 @@ import kr.co.quietpath.api.auth.config.KakaoAuthProperties;
 import kr.co.quietpath.api.auth.dto.OnboardingStatus;
 import kr.co.quietpath.api.auth.dto.kakao.KakaoTokenResponse;
 import kr.co.quietpath.api.auth.dto.kakao.KakaoUserResponse;
-import kr.co.quietpath.api.auth.dto.response.AuthCallbackResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthLogoutResponse;
 import kr.co.quietpath.api.auth.dto.response.AuthMeResponse;
-import kr.co.quietpath.api.auth.dto.response.AuthRefreshResponse;
 import kr.co.quietpath.api.auth.security.JwtTokenProvider;
+import kr.co.quietpath.api.auth.service.result.AuthLoginResult;
+import kr.co.quietpath.api.auth.service.result.AuthRefreshResult;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.domain.auth.entity.RefreshTokenSession;
@@ -51,6 +51,9 @@ public class AuthService {
 
     private static final String AUTHORIZATION_CODE = "authorization_code";
     private static final String RESPONSE_TYPE_CODE = "code";
+    private static final String LOCAL_QA_PROVIDER_USER_ID = "quiet-path-local-qa";
+    private static final String LOCAL_QA_NICKNAME = "로컬테스터";
+    private static final int LOCAL_QA_NICKNAME_SUFFIX_LIMIT = 99;
     private static final List<String> NICKNAME_STEMS = List.of(
         "조용한물결빛",
         "고요한새벽숲",
@@ -88,7 +91,7 @@ public class AuthService {
             .toUriString();
     }
 
-    public AuthCallbackResponse loginWithKakaoCode(String code) {
+    public AuthLoginResult loginWithKakaoCode(String code) {
         if (!StringUtils.hasText(code)) {
             throw new ApiException(ErrorCode.INVALID_REQUEST);
         }
@@ -121,14 +124,25 @@ public class AuthService {
             onboardingStatus = OnboardingStatus.EXISTING;
         }
 
-        String sessionId = UUID.randomUUID().toString();
-        String appAccessToken = jwtTokenProvider.createAccessToken(user.getId(), sessionId);
-        String appRefreshToken = issueRefreshToken(user.getId(), sessionId);
-        return AuthCallbackResponse.builder()
-            .token(appAccessToken)
-            .refreshToken(appRefreshToken)
-            .onboardingStatus(onboardingStatus)
-            .build();
+        return issueLoginResult(user, onboardingStatus);
+    }
+
+    public AuthLoginResult loginWithLocalQaAccount() {
+        User user = userRepository.findByProviderAndProviderUserId(
+                ProviderType.LOCAL,
+                LOCAL_QA_PROVIDER_USER_ID
+            )
+            .orElse(null);
+
+        if (user == null) {
+            user = User.createLocal(LOCAL_QA_PROVIDER_USER_ID, generateLocalQaNickname());
+            user.updateLastLogin();
+            userRepository.save(user);
+        } else {
+            user.updateLastLogin();
+        }
+
+        return issueLoginResult(user, OnboardingStatus.EXISTING);
     }
 
     @Transactional(readOnly = true)
@@ -143,39 +157,41 @@ public class AuthService {
             .build();
     }
 
-    public AuthRefreshResponse refresh(String refreshToken) {
+    public AuthRefreshResult refresh(String refreshToken) {
         if (!StringUtils.hasText(refreshToken)) {
+            log.debug("Refresh rejected: cookie is missing");
             throw new ApiException(ErrorCode.REFRESH_TOKEN_REQUIRED);
         }
 
         String currentTokenHash = hashToken(refreshToken);
         String lockKey = REFRESH_ROTATION_LOCK_PREFIX + currentTokenHash;
         if (!Boolean.TRUE.equals(stringRedisTemplate.opsForValue().setIfAbsent(lockKey, "1", REFRESH_ROTATION_LOCK_TTL))) {
+            log.warn("Refresh rejected: token rotation is already in progress");
             throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
         }
 
         try {
             // Redis TTL이 만료되면 키 자체가 없으므로 INVALID로 처리된다.
             RefreshTokenSession session = refreshTokenSessionRepository.findByTokenHash(currentTokenHash)
-                .orElseThrow(() -> new ApiException(ErrorCode.REFRESH_TOKEN_INVALID));
+                .orElseThrow(() -> {
+                    log.warn("Refresh rejected: Redis session is missing or expired");
+                    return new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
+                });
 
             String rotatedRefreshToken = generateOpaqueRefreshToken();
             session.rotate(hashToken(rotatedRefreshToken), getRefreshTokenTtlSeconds());
             refreshTokenSessionRepository.save(session);
 
             String newAccessToken = jwtTokenProvider.createAccessToken(session.getUserId(), session.getSessionId());
-            return AuthRefreshResponse.builder()
-                .token(newAccessToken)
-                .refreshToken(rotatedRefreshToken)
-                .build();
+            return new AuthRefreshResult(newAccessToken, rotatedRefreshToken);
         } finally {
             stringRedisTemplate.delete(lockKey);
         }
     }
 
-    public AuthLogoutResponse logout(Long userId, String sessionId) {
-        if (StringUtils.hasText(sessionId)) {
-            refreshTokenSessionRepository.findByUserIdAndSessionId(userId, sessionId)
+    public AuthLogoutResponse logout(String refreshToken) {
+        if (StringUtils.hasText(refreshToken)) {
+            refreshTokenSessionRepository.findByTokenHash(hashToken(refreshToken))
                 .ifPresent(refreshTokenSessionRepository::delete);
         }
         return AuthLogoutResponse.builder()
@@ -300,6 +316,19 @@ public class AuthService {
         throw new ApiException(ErrorCode.NICKNAME_GENERATION_FAILED);
     }
 
+    private String generateLocalQaNickname() {
+        if (!userRepository.existsByNickname(LOCAL_QA_NICKNAME)) {
+            return LOCAL_QA_NICKNAME;
+        }
+        for (int suffix = 1; suffix <= LOCAL_QA_NICKNAME_SUFFIX_LIMIT; suffix++) {
+            String candidate = LOCAL_QA_NICKNAME + String.format("%02d", suffix);
+            if (!userRepository.existsByNickname(candidate)) {
+                return candidate;
+            }
+        }
+        throw new ApiException(ErrorCode.NICKNAME_GENERATION_FAILED);
+    }
+
     private String normalizeNickname(String nickname) {
         return nickname == null ? "" : nickname.trim();
     }
@@ -321,6 +350,13 @@ public class AuthService {
             RefreshTokenSession.issue(userId, sessionId, hashToken(refreshToken), getRefreshTokenTtlSeconds())
         );
         return refreshToken;
+    }
+
+    private AuthLoginResult issueLoginResult(User user, OnboardingStatus onboardingStatus) {
+        String sessionId = UUID.randomUUID().toString();
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), sessionId);
+        String refreshToken = issueRefreshToken(user.getId(), sessionId);
+        return new AuthLoginResult(accessToken, refreshToken, onboardingStatus);
     }
 
     private Long getRefreshTokenTtlSeconds() {

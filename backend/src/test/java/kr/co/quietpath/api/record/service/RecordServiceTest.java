@@ -13,6 +13,8 @@ import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
+import kr.co.quietpath.domain.record.entity.RecordImage;
+import kr.co.quietpath.domain.record.repository.RecordImageRepository;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
@@ -25,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,6 +42,9 @@ class RecordServiceTest {
 
     @Mock
     private RecordRepository recordRepository;
+
+    @Mock
+    private RecordImageRepository recordImageRepository;
 
     @Mock
     private UserRepository userRepository;
@@ -151,7 +157,13 @@ class RecordServiceTest {
         Record first = buildRecord(user, LocalDate.of(2026, 6, 24));
         first.pinMemory();
         Record second = buildRecord(user, LocalDate.of(2026, 6, 10));
-        second.updateContent("기록", null, null, "반짝", "https://image.test/sample.png");
+        second.updateContent("기록", null, null, "반짝");
+        second.attachImage(RecordImage.builder()
+            .imageUrl("https://image.test/sample.png")
+            .positionX(new BigDecimal("50.00"))
+            .positionY(new BigDecimal("50.00"))
+            .scale(new BigDecimal("1.00"))
+            .build());
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(recordRepository.findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByPinnedAtDescRecordDateDescIdDesc(

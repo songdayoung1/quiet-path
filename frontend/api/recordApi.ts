@@ -1,22 +1,28 @@
 import { apiFetch, buildApiError } from './apiClient';
 
 export type RecordVisibility = 'PUBLIC' | 'PRIVATE';
+export type RecordImageAction = 'KEEP' | 'REPLACE' | 'REMOVE';
 
-export interface RecordCreateRequest {
+export interface RecordImagePosition {
+  imagePositionX?: number;
+  imagePositionY?: number;
+  imageScale?: number;
+}
+
+export interface RecordCreateRequest extends RecordImagePosition {
   content: string;
   oneWordText?: string;
   tomorrowText?: string;
   moodCode?: string;
-  imageUrl?: string;
   visibility: RecordVisibility;
 }
 
-export interface RecordUpdateRequest {
+export interface RecordUpdateRequest extends RecordImagePosition {
   content: string;
   oneWordText?: string;
   tomorrowText?: string;
   moodCode?: string;
-  imageUrl?: string;
+  imageAction: RecordImageAction;
 }
 
 export interface RecordResponse {
@@ -31,6 +37,9 @@ export interface RecordResponse {
   tomorrowText?: string | null;
   moodCode: string | null;
   imageUrl?: string | null;
+  imagePositionX?: number | null;
+  imagePositionY?: number | null;
+  imageScale?: number | null;
   visibility: RecordVisibility;
   isPinned?: boolean | null;
   sharedAt?: string | null;
@@ -47,6 +56,9 @@ export interface RecordUpdateResponse {
   tomorrowText?: string | null;
   moodCode: string | null;
   imageUrl?: string | null;
+  imagePositionX?: number | null;
+  imagePositionY?: number | null;
+  imageScale?: number | null;
   visibility: RecordVisibility;
   updatedAt?: string;
 }
@@ -129,13 +141,11 @@ export const recordApi = {
     return response.json();
   },
 
-  async create(token: string, request: RecordCreateRequest): Promise<RecordCreateResponse> {
+  async create(token: string, request: RecordCreateRequest, image?: File | null): Promise<RecordCreateResponse> {
+    const formData = buildRecordFormData(request, image);
     const response = await apiFetch('/api/v1/records', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
+      body: formData,
     }, {
       accessToken: token,
     });
@@ -150,14 +160,13 @@ export const recordApi = {
   async update(
     token: string,
     recordId: number,
-    request: RecordUpdateRequest
+    request: RecordUpdateRequest,
+    image?: File | null
   ): Promise<RecordUpdateResponse> {
+    const formData = buildRecordFormData(request, image);
     const response = await apiFetch(`/api/v1/records/${recordId}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
+      body: formData,
     }, {
       accessToken: token,
     });
@@ -220,4 +229,16 @@ export const recordApi = {
       throw await buildApiError(response);
     }
   },
+};
+
+const buildRecordFormData = (request: object, image?: File | null) => {
+  const formData = new FormData();
+  formData.append(
+    'record',
+    new Blob([JSON.stringify(request)], { type: 'application/json' })
+  );
+  if (image) {
+    formData.append('image', image, image.name);
+  }
+  return formData;
 };

@@ -6,6 +6,7 @@ import kr.co.quietpath.api.comment.service.CommentPageCacheService;
 import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
 import kr.co.quietpath.api.record.dto.request.RecordCreateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
+import kr.co.quietpath.api.record.dto.request.RecordImageAction;
 import kr.co.quietpath.api.record.dto.request.RecordVisibilityRequest;
 import kr.co.quietpath.api.record.dto.response.RecordCreateResponse;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
@@ -22,6 +23,9 @@ import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.record.entity.Record;
+import kr.co.quietpath.domain.record.entity.RecordImage;
+import kr.co.quietpath.domain.record.image.StoredRecordImage;
+import kr.co.quietpath.domain.record.repository.RecordImageRepository;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
@@ -35,12 +39,12 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class RecordService {
 
     private static final String STATUS_ACTIVE = "ACTIVE";
@@ -49,6 +53,7 @@ public class RecordService {
     private static final Set<String> ALLOWED_MOOD_CODES = Set.of("포근", "멍함", "반짝", "잔잔", "버팀", "두근");
 
     private final RecordRepository recordRepository;
+    private final RecordImageRepository recordImageRepository;
     private final UserRepository userRepository;
     private final PathRepository pathRepository;
     private final ReactionRepository reactionRepository;
@@ -56,7 +61,17 @@ public class RecordService {
     private final WeeklyTop3CacheService weeklyTop3CacheService;
     private final CommentPageCacheService commentPageCacheService;
 
+    @Transactional
     public RecordCreateResponse createRecord(Long userId, RecordCreateRequest request) {
+        return createRecord(userId, request, null);
+    }
+
+    @Transactional
+    public RecordCreateResponse createRecord(
+        Long userId,
+        RecordCreateRequest request,
+        StoredRecordImage storedImage
+    ) {
         User user = getUser(userId);
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
         Path activePath = pathRepository.findByUserIdAndStatus(userId, STATUS_ACTIVE)
@@ -81,8 +96,13 @@ public class RecordService {
             .oneWordText(normalizeOptionalText(request.getOneWordText()))
             .tomorrowText(normalizeOptionalText(request.getTomorrowText()))
             .moodCode(moodCode)
-            .imageUrl(normalizeOptionalText(request.getImageUrl()))
             .build();
+
+        if (storedImage != null) {
+            RecordImage recordImage = createRecordImage(storedImage, request);
+            recordImageRepository.save(recordImage);
+            record.attachImage(recordImage);
+        }
 
         try {
             recordRepository.save(record);
@@ -104,6 +124,9 @@ public class RecordService {
             .tomorrowText(record.getTomorrowText())
             .moodCode(record.getMoodCode())
             .imageUrl(record.getImageUrl())
+            .imagePositionX(resolvePositionX(record))
+            .imagePositionY(resolvePositionY(record))
+            .imageScale(resolveScale(record))
             .visibility(record.getVisibility())
             .sharedAt(record.getSharedAt() != null ? formatDateTime(record.getSharedAt()) : null)
             .createdAt(formatDateTime(record.getCreatedAt()))
@@ -185,6 +208,9 @@ public class RecordService {
                 .tomorrowText(record.getTomorrowText())
                 .moodCode(record.getMoodCode())
                 .imageUrl(record.getImageUrl())
+                .imagePositionX(resolvePositionX(record))
+                .imagePositionY(resolvePositionY(record))
+                .imageScale(resolveScale(record))
                 .visibility(record.getVisibility())
                 .sharedAt(record.getSharedAt() != null ? formatDateTime(record.getSharedAt()) : null)
                 .createdAt(formatDateTime(record.getCreatedAt()))
@@ -222,6 +248,10 @@ public class RecordService {
             .content(resolveContent(record))
             .moodCode(record.getMoodCode())
             .visibility(record.getVisibility())
+            .imageUrl(record.getImageUrl())
+            .imagePositionX(resolvePositionX(record))
+            .imagePositionY(resolvePositionY(record))
+            .imageScale(resolveScale(record))
             .owner(ownerSummary)
             .reactionCount(reactionCount)
             .isReacted(isReacted)
@@ -231,7 +261,19 @@ public class RecordService {
             .build();
     }
 
+    @Transactional
     public RecordUpdateResponse updateRecord(Long userId, Long recordId, RecordUpdateRequest request) {
+        return updateRecord(userId, recordId, request, RecordImageAction.KEEP, null).response();
+    }
+
+    @Transactional
+    public RecordUpdateExecution updateRecord(
+        Long userId,
+        Long recordId,
+        RecordUpdateRequest request,
+        RecordImageAction imageAction,
+        StoredRecordImage storedImage
+    ) {
         Record record = getRecord(recordId);
         validateOwner(userId, record);
         validateEditable(record);
@@ -241,26 +283,31 @@ public class RecordService {
             request.getContent(),
             normalizeOptionalText(request.getOneWordText()),
             normalizeOptionalText(request.getTomorrowText()),
-            moodCode,
-            normalizeOptionalText(request.getImageUrl())
+            moodCode
         );
+        String previousStorageKey = applyImageChange(record, request, imageAction, storedImage);
         // 공개 글의 본문이 바뀌면 Top3 카드 내용도 stale 될 수 있다.
         if (VISIBILITY_PUBLIC.equals(record.getVisibility())) {
             weeklyTop3CacheService.evict();
         }
 
-        return RecordUpdateResponse.builder()
+        RecordUpdateResponse response = RecordUpdateResponse.builder()
             .id(record.getId())
             .content(resolveContent(record))
             .oneWordText(record.getOneWordText())
             .tomorrowText(record.getTomorrowText())
             .moodCode(record.getMoodCode())
             .imageUrl(record.getImageUrl())
+            .imagePositionX(resolvePositionX(record))
+            .imagePositionY(resolvePositionY(record))
+            .imageScale(resolveScale(record))
             .visibility(record.getVisibility())
             .updatedAt(formatDateTime(record.getUpdatedAt()))
             .build();
+        return new RecordUpdateExecution(response, previousStorageKey);
     }
 
+    @Transactional
     public void deleteRecord(Long userId, Long recordId) {
         Record record = getRecord(recordId);
         validateOwner(userId, record);
@@ -272,6 +319,7 @@ public class RecordService {
         }
     }
 
+    @Transactional
     public RecordShareResponse shareRecord(Long userId, Long recordId) {
         Record record = getRecord(recordId);
         validateOwner(userId, record);
@@ -288,6 +336,7 @@ public class RecordService {
             .build();
     }
 
+    @Transactional
     public RecordVisibilityResponse updateVisibility(Long userId, Long recordId, RecordVisibilityRequest request) {
         Record record = getRecord(recordId);
         validateOwner(userId, record);
@@ -305,6 +354,7 @@ public class RecordService {
             .build();
     }
 
+    @Transactional
     public RecordPinResponse updatePin(Long userId, Long recordId, Boolean pinned) {
         if (pinned == null) {
             throw new ApiException(ErrorCode.INVALID_REQUEST);
@@ -418,12 +468,104 @@ public class RecordService {
             .tomorrowText(record.getTomorrowText())
             .moodCode(record.getMoodCode())
             .imageUrl(record.getImageUrl())
+            .imagePositionX(resolvePositionX(record))
+            .imagePositionY(resolvePositionY(record))
+            .imageScale(resolveScale(record))
             .visibility(record.getVisibility())
             .isPinned(record.getPinnedAt() != null)
             .sharedAt(record.getSharedAt() != null ? formatDateTime(record.getSharedAt()) : null)
             .createdAt(formatDateTime(record.getCreatedAt()))
             .updatedAt(formatDateTime(record.getUpdatedAt()))
             .build();
+    }
+
+    private RecordImage createRecordImage(StoredRecordImage storedImage, RecordCreateRequest request) {
+        return createRecordImage(
+            storedImage,
+            request.getImagePositionX(),
+            request.getImagePositionY(),
+            request.getImageScale()
+        );
+    }
+
+    private RecordImage createRecordImage(StoredRecordImage storedImage, RecordUpdateRequest request) {
+        return createRecordImage(
+            storedImage,
+            request.getImagePositionX(),
+            request.getImagePositionY(),
+            request.getImageScale()
+        );
+    }
+
+    private RecordImage createRecordImage(
+        StoredRecordImage storedImage,
+        BigDecimal positionX,
+        BigDecimal positionY,
+        BigDecimal scale
+    ) {
+        return RecordImage.builder()
+            .storageKey(storedImage.storageKey())
+            .imageUrl(storedImage.imageUrl())
+            .positionX(positionX)
+            .positionY(positionY)
+            .scale(scale)
+            .build();
+    }
+
+    private String applyImageChange(
+        Record record,
+        RecordUpdateRequest request,
+        RecordImageAction action,
+        StoredRecordImage storedImage
+    ) {
+        RecordImage previousImage = record.getImage();
+        String previousStorageKey = previousImage != null ? previousImage.getStorageKey() : null;
+
+        if (action == RecordImageAction.KEEP) {
+            updateExistingImagePosition(previousImage, request);
+            return null;
+        }
+        if (action == RecordImageAction.REPLACE) {
+            if (storedImage == null) {
+                throw new ApiException(ErrorCode.INVALID_IMAGE_FILE);
+            }
+            RecordImage newImage = createRecordImage(storedImage, request);
+            recordImageRepository.save(newImage);
+            record.attachImage(newImage);
+            if (previousImage != null) {
+                recordImageRepository.delete(previousImage);
+            }
+            return previousStorageKey;
+        }
+
+        record.removeImage();
+        if (previousImage != null) {
+            recordImageRepository.delete(previousImage);
+        }
+        return previousStorageKey;
+    }
+
+    private void updateExistingImagePosition(RecordImage image, RecordUpdateRequest request) {
+        if (image == null) {
+            return;
+        }
+        image.updateDisplayPosition(
+            request.getImagePositionX() != null ? request.getImagePositionX() : image.getPositionX(),
+            request.getImagePositionY() != null ? request.getImagePositionY() : image.getPositionY(),
+            request.getImageScale() != null ? request.getImageScale() : image.getScale()
+        );
+    }
+
+    private BigDecimal resolvePositionX(Record record) {
+        return record.getImage() != null ? record.getImage().getPositionX() : null;
+    }
+
+    private BigDecimal resolvePositionY(Record record) {
+        return record.getImage() != null ? record.getImage().getPositionY() : null;
+    }
+
+    private BigDecimal resolveScale(Record record) {
+        return record.getImage() != null ? record.getImage().getScale() : null;
     }
 
     private String formatDate(LocalDate date) {

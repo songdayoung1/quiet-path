@@ -2,17 +2,21 @@ package kr.co.quietpath.api.auth.service;
 
 import kr.co.quietpath.api.auth.config.JwtProperties;
 import kr.co.quietpath.api.auth.config.KakaoAuthProperties;
-import kr.co.quietpath.api.auth.dto.response.AuthRefreshResponse;
+import kr.co.quietpath.api.auth.dto.OnboardingStatus;
 import kr.co.quietpath.api.auth.security.JwtTokenProvider;
+import kr.co.quietpath.api.auth.service.result.AuthLoginResult;
+import kr.co.quietpath.api.auth.service.result.AuthRefreshResult;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.domain.auth.entity.RefreshTokenSession;
 import kr.co.quietpath.domain.auth.repository.RefreshTokenSessionRepository;
+import kr.co.quietpath.domain.user.entity.ProviderType;
 import kr.co.quietpath.domain.user.entity.User;
 import kr.co.quietpath.domain.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -27,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -57,6 +62,56 @@ class AuthServiceTest {
 
     @InjectMocks
     private AuthService authService;
+
+    @Test
+    void localQaLogin_createsReusableAccountAndIssuesTokens() {
+        when(userRepository.findByProviderAndProviderUserId(
+            ProviderType.LOCAL,
+            "quiet-path-local-qa"
+        )).thenReturn(Optional.empty());
+        when(userRepository.existsByNickname("로컬테스터")).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            setId(user, 42L);
+            return user;
+        });
+        when(jwtTokenProvider.createAccessToken(eq(42L), anyString())).thenReturn("local-access-token");
+        when(jwtProperties.getRefreshTokenTtlSeconds()).thenReturn(1_209_600L);
+
+        AuthLoginResult result = authService.loginWithLocalQaAccount();
+
+        assertEquals("local-access-token", result.accessToken());
+        assertTrue(result.refreshToken() != null && !result.refreshToken().isBlank());
+        assertEquals(OnboardingStatus.EXISTING, result.onboardingStatus());
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        User savedUser = userCaptor.getValue();
+        assertEquals(ProviderType.LOCAL, savedUser.getProvider());
+        assertEquals("quiet-path-local-qa", savedUser.getProviderUserId());
+        assertEquals("로컬테스터", savedUser.getNickname());
+        verify(refreshTokenSessionRepository).save(any(RefreshTokenSession.class));
+    }
+
+    @Test
+    void localQaLogin_reusesExistingAccount() {
+        User user = User.createLocal("quiet-path-local-qa", "로컬테스터");
+        setId(user, 42L);
+        when(userRepository.findByProviderAndProviderUserId(
+            ProviderType.LOCAL,
+            "quiet-path-local-qa"
+        )).thenReturn(Optional.of(user));
+        when(jwtTokenProvider.createAccessToken(eq(42L), anyString())).thenReturn("local-access-token");
+        when(jwtProperties.getRefreshTokenTtlSeconds()).thenReturn(1_209_600L);
+
+        AuthLoginResult result = authService.loginWithLocalQaAccount();
+
+        assertEquals("local-access-token", result.accessToken());
+        assertEquals(OnboardingStatus.EXISTING, result.onboardingStatus());
+        assertTrue(user.getLastLoginAt() != null);
+        verify(userRepository, never()).save(any(User.class));
+        verify(refreshTokenSessionRepository).save(any(RefreshTokenSession.class));
+    }
 
     @Test
     void refresh_withoutToken_returns400() {
@@ -90,11 +145,11 @@ class AuthServiceTest {
         when(jwtProperties.getRefreshTokenTtlSeconds()).thenReturn(1_209_600L);
         when(jwtTokenProvider.createAccessToken(1L, "session-1")).thenReturn("new-access-token");
 
-        AuthRefreshResponse response = authService.refresh("plain-refresh-token");
+        AuthRefreshResult response = authService.refresh("plain-refresh-token");
 
-        assertEquals("new-access-token", response.getToken());
-        assertTrue(response.getRefreshToken() != null && !response.getRefreshToken().isBlank());
-        assertNotEquals("plain-refresh-token", response.getRefreshToken());
+        assertEquals("new-access-token", response.accessToken());
+        assertTrue(response.refreshToken() != null && !response.refreshToken().isBlank());
+        assertNotEquals("plain-refresh-token", response.refreshToken());
         assertNotEquals("hashed-old-token", session.getTokenHash());
         assertEquals(1_209_600L, session.getTtlSeconds());
         verify(refreshTokenSessionRepository).save(session);
@@ -140,10 +195,10 @@ class AuthServiceTest {
             "hashed-old-token",
             300L
         );
-        when(refreshTokenSessionRepository.findByUserIdAndSessionId(1L, "session-1"))
+        when(refreshTokenSessionRepository.findByTokenHash(anyString()))
             .thenReturn(Optional.of(session));
 
-        boolean success = authService.logout(1L, "session-1").isSuccess();
+        boolean success = authService.logout("plain-refresh-token").isSuccess();
 
         assertTrue(success);
         verify(refreshTokenSessionRepository).delete(session);
@@ -151,10 +206,10 @@ class AuthServiceTest {
 
     @Test
     void logout_blankSessionId_doesNotLookupRepository() {
-        boolean success = authService.logout(1L, " ").isSuccess();
+        boolean success = authService.logout(" ").isSuccess();
 
         assertTrue(success);
-        verify(refreshTokenSessionRepository, never()).findByUserIdAndSessionId(1L, " ");
+        verify(refreshTokenSessionRepository, never()).findByTokenHash(anyString());
     }
 
     @Test

@@ -3,6 +3,7 @@ import { Record as RecordType } from '../../types';
 import { Image as ImageIcon } from 'lucide-react';
 import { WaterDropCharacter, CharacterTone } from '../WaterDropCharacter';
 import { getThemePalette, useResolvedTheme } from '../../theme';
+import { RecordImage } from '../RecordImage';
 
 interface AlbumTabProps {
   photoRecords: RecordType[];
@@ -68,10 +69,10 @@ export const AlbumTab: React.FC<AlbumTabProps> = ({
             onKeyDown={(e) => e.key === 'Enter' && onSelectRecord(record)}
           >
             <div className="w-full h-full rounded-xl overflow-hidden" style={{ background: palette.cardBgSoft }}>
-              <img
-                src={record.imageUrl}
+              <RecordImage
+                record={record}
                 alt="Scene"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="w-full h-full transition-transform duration-500"
               />
             </div>
             <span

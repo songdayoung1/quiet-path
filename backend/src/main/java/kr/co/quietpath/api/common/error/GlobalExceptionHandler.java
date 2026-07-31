@@ -5,6 +5,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -30,14 +31,16 @@ public class GlobalExceptionHandler {
                 .status(ErrorCode.CONTENT_REQUIRED.getHttpStatus())
                 .body(ErrorResponse.of(ErrorCode.CONTENT_REQUIRED));
         }
-        if (fieldError != null && "refreshToken".equals(fieldError.getField())) {
-            return ResponseEntity
-                .status(ErrorCode.REFRESH_TOKEN_REQUIRED.getHttpStatus())
-                .body(ErrorResponse.of(ErrorCode.REFRESH_TOKEN_REQUIRED));
-        }
         return ResponseEntity
             .status(ErrorCode.INVALID_REQUEST.getHttpStatus())
             .body(ErrorResponse.of(ErrorCode.INVALID_REQUEST));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+        return ResponseEntity
+            .status(ErrorCode.IMAGE_TOO_LARGE.getHttpStatus())
+            .body(ErrorResponse.of(ErrorCode.IMAGE_TOO_LARGE));
     }
 
     @ExceptionHandler(IllegalStateException.class)

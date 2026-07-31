@@ -3,6 +3,7 @@ package kr.co.quietpath.api.notification.service;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.notification.dto.response.NotificationReadAllResponse;
+import kr.co.quietpath.api.notification.dto.response.NotificationUnreadCountResponse;
 import kr.co.quietpath.domain.notification.entity.Notification;
 import kr.co.quietpath.domain.notification.repository.NotificationRepository;
 import kr.co.quietpath.domain.user.repository.UserRepository;
@@ -34,6 +35,15 @@ class NotificationServiceTest {
 
     @InjectMocks
     private NotificationService notificationService;
+
+    @Test
+    void getUnreadCount_returnsRepositoryCount() {
+        when(notificationRepository.countByRecipientUserIdAndReadFalse(1L)).thenReturn(3L);
+
+        NotificationUnreadCountResponse response = notificationService.getUnreadCount(1L);
+
+        assertEquals(3L, response.getUnreadCount());
+    }
 
     @Test
     void readNotification_notOwner_returns403() {

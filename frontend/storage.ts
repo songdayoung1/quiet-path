@@ -10,7 +10,7 @@ const INITIAL_STATE: AppState = {
   hasLoggedToday: false,
   hasSeenOnboarding: false,
   userLevel: 'Beginning',
-  auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+  auth: { isLoggedIn: false, token: null, userId: null },
 };
 
 const stripServerDrivenState = (state: AppState): AppState => ({
@@ -77,6 +77,22 @@ const calculateLevel = (recordCount: number): UserLevel => {
 const isMockRecord = (record: Record): boolean => record.id.startsWith('dummy_');
 const isMockDirection = (direction: Direction | null | undefined): boolean => direction?.id === 'init-dir';
 
+const sanitizeAuth = (auth: unknown): AppState['auth'] => {
+  const candidate = auth && typeof auth === 'object'
+    ? auth as Record<string, unknown>
+    : {};
+  const onboardingStatus = candidate.onboardingStatus === 'NEW' || candidate.onboardingStatus === 'EXISTING'
+    ? candidate.onboardingStatus
+    : undefined;
+
+  return {
+    isLoggedIn: candidate.isLoggedIn === true,
+    token: typeof candidate.token === 'string' ? candidate.token : null,
+    userId: typeof candidate.userId === 'string' ? candidate.userId : null,
+    onboardingStatus,
+  };
+};
+
 const sanitizeState = (state: AppState): AppState => {
   const sanitizedRecords = (state.records || []).filter((record) => !isMockRecord(record));
   const sanitizedCurrentDirection = isMockDirection(state.currentDirection) ? null : state.currentDirection;
@@ -87,6 +103,7 @@ const sanitizeState = (state: AppState): AppState => {
     currentDirection: sanitizedCurrentDirection,
     pastDirections: sanitizedPastDirections,
     records: sanitizedRecords,
+    auth: sanitizeAuth(state.auth),
   };
 };
 
@@ -102,7 +119,6 @@ const buildPersistedState = (state: AppState): AppState => {
     auth: {
       ...INITIAL_STATE.auth,
       ...(sanitized.auth || {}),
-      refreshToken: sanitized.auth?.refreshToken ?? null,
       userId: sanitized.auth?.userId ?? null,
     },
   });
@@ -140,7 +156,6 @@ export const loadState = (): AppState => {
       auth: {
         ...INITIAL_STATE.auth,
         ...(sanitized.auth || {}),
-        refreshToken: sanitized.auth?.refreshToken ?? null,
         userId: sanitized.auth?.userId ?? null,
       },
       hasLoggedToday: isToday,
@@ -188,7 +203,6 @@ export const persistAuthState = (
             ...INITIAL_STATE.auth,
             ...(baseState.auth || {}),
             ...auth,
-            refreshToken: auth.refreshToken ?? null,
             userId: auth.userId ?? null,
           },
         })

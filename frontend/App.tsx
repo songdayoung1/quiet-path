@@ -9,18 +9,21 @@ import { OnboardingView } from './views/OnboardingView';
 import { CommunityView } from './views/CommunityView';
 import { PastDirectionsView } from './views/PastDirectionsView';
 import { SettingsView } from './views/SettingsView';
+import { NotificationsView } from './views/NotificationsView';
 import { OAuthCallbackView } from './views/OAuthCallbackView';
 import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
 import { configureApiClient } from './api/apiClient';
 import type { ApiErrorWithStatus } from './api/apiClient';
-import { authApi } from './api/authApi';
+import { authApi, createLocalQaLoginCode, isMockAccessToken } from './api/authApi';
 import { pathApi, PastPathListItem, PathActiveResponse, PathCreateResponse } from './api/pathApi';
 import { recordApi, RecordResponse } from './api/recordApi';
-import { Settings, Compass, AlertCircle } from 'lucide-react';
+import { notificationApi, type NotificationItem } from './api/notificationApi';
+import { Settings, Compass, AlertCircle, Bell } from 'lucide-react';
 import { AppModal } from './components/AppModal';
 import { CATEGORIES } from './constants';
 import { getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from './utils/recordScope';
+import { disableWebPush } from './services/webPush';
 
 const OAUTH_PENDING_CODE_KEY = 'qp.oauth.pending.code';
 const OAUTH_PENDING_ERROR_KEY = 'qp.oauth.pending.error';
@@ -235,6 +238,9 @@ const buildRecordFromResponse = (
     tomorrowText: record.tomorrowText ?? undefined,
     moodCode: record.moodCode ?? undefined,
     imageUrl: record.imageUrl ?? undefined,
+    imagePositionX: record.imagePositionX ?? undefined,
+    imagePositionY: record.imagePositionY ?? undefined,
+    imageScale: record.imageScale ?? undefined,
     isShared: record.visibility === 'PUBLIC',
     isPinned: record.isPinned ?? undefined,
   };
@@ -256,13 +262,6 @@ const clearServerDrivenState = (prev: AppState): AppState => ({
   hasLoggedToday: false,
   userLevel: 'Beginning',
 });
-
-type AuthSessionSnapshot = {
-  isLoggedIn: boolean;
-  accessToken: string | null;
-  refreshToken: string | null;
-  userId: string | null;
-};
 
 type ExpiredDirectionResolutionState = {
   directionId: string;
@@ -289,7 +288,7 @@ const App: React.FC = () => {
     hasLoggedToday: false,
     hasSeenOnboarding: false,
     userLevel: 'Beginning',
-    auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null }
+    auth: { isLoggedIn: false, token: null, userId: null }
   });
 
   const [currentView, setCurrentView] = useState<ViewState | 'INITIALIZING'>('INITIALIZING');
@@ -308,13 +307,23 @@ const App: React.FC = () => {
   const [isExpiredDirectionResolving, setIsExpiredDirectionResolving] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => readThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [notificationListRefreshKey, setNotificationListRefreshKey] = useState(0);
   const refreshAuthRequestRef = useRef<Promise<string | null> | null>(null);
-  const authSessionRef = useRef<AuthSessionSnapshot>({
-    isLoggedIn: false,
-    accessToken: null,
-    refreshToken: null,
-    userId: null,
-  });
+  const unreadCountRequestRef = useRef<{
+    token: string;
+    requestId: number;
+    promise: Promise<void>;
+  } | null>(null);
+  const unreadCountRequestSequenceRef = useRef(0);
+  const notificationListRefreshTimerRef = useRef<number | null>(null);
+  const currentAuthRef = useRef<{
+    isLoggedIn: boolean;
+    token: string | null;
+  }>({ isLoggedIn: false, token: null });
+  const currentViewRef = useRef<ViewState | 'INITIALIZING'>('INITIALIZING');
+  const hasInitializedAppRef = useRef(false);
+  const notificationReturnViewRef = useRef<ViewState>('NOW');
   const minExpiredDirectionReviewAt = buildFutureDateInputValue(1);
   const appFlowABgStyle = useMemo(() => buildFlowBackground(resolvedTheme), [resolvedTheme]);
   const shellFrameStyle = useMemo<React.CSSProperties>(
@@ -327,6 +336,11 @@ const App: React.FC = () => {
     }),
     [appFlowABgStyle, resolvedTheme]
   );
+  currentAuthRef.current = {
+    isLoggedIn: state.auth.isLoggedIn,
+    token: state.auth.token,
+  };
+  currentViewRef.current = currentView;
 
   useEffect(() => {
     const syncTheme = (mode?: ThemeMode) => {
@@ -373,22 +387,6 @@ const App: React.FC = () => {
     return () => media.removeEventListener?.('change', onChange);
   }, [themeMode]);
 
-  const syncAuthSessionRef = useCallback((nextAuth: Partial<AuthSessionSnapshot>) => {
-    authSessionRef.current = {
-      ...authSessionRef.current,
-      ...nextAuth,
-    };
-  }, []);
-
-  useEffect(() => {
-    syncAuthSessionRef({
-      isLoggedIn: state.auth.isLoggedIn,
-      accessToken: state.auth.token,
-      refreshToken: state.auth.refreshToken,
-      userId: state.auth.userId ?? null,
-    });
-  }, [state.auth.isLoggedIn, state.auth.refreshToken, state.auth.token, state.auth.userId, syncAuthSessionRef]);
-
   useEffect(() => {
     if (!expiredDirectionResolution) {
       return;
@@ -403,26 +401,24 @@ const App: React.FC = () => {
   }, [expiredDirectionResolution, state.currentDirection]);
 
   useEffect(() => {
+    // StrictMode의 개발 환경 effect 재실행으로 refresh token이 두 번 회전하는 것을 막는다.
+    if (hasInitializedAppRef.current) {
+      return;
+    }
+    hasInitializedAppRef.current = true;
+
     const initApp = async () => {
         const loaded = loadState();
-        if (!loaded.auth) loaded.auth = { isLoggedIn: false, token: null, refreshToken: null, userId: null };
-        if (loaded.auth && typeof loaded.auth.refreshToken === 'undefined') {
-          loaded.auth.refreshToken = null;
-        }
+        if (!loaded.auth) loaded.auth = { isLoggedIn: false, token: null, userId: null };
         if (loaded.auth && typeof loaded.auth.userId === 'undefined') {
           loaded.auth.userId = null;
         }
         setState(loaded);
-        syncAuthSessionRef({
-          isLoggedIn: loaded.auth.isLoggedIn,
-          accessToken: loaded.auth.token,
-          refreshToken: loaded.auth.refreshToken,
-          userId: loaded.auth.userId ?? null,
-        });
 
         const params = new URLSearchParams(window.location.search);
         const urlCode = params.get('code');
         const urlError = params.get('error');
+        const requestedView = params.get('view');
 
         if (urlCode) {
             window.sessionStorage.setItem(OAUTH_PENDING_CODE_KEY, urlCode);
@@ -432,6 +428,8 @@ const App: React.FC = () => {
         }
 
         if (urlCode || urlError) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (requestedView) {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
@@ -444,29 +442,23 @@ const App: React.FC = () => {
         } else if (pendingError) {
             setAuthCodeParam('error_user');
             setCurrentView('OAUTH_CALLBACK');
-        } else if (loaded.auth.token || loaded.auth.refreshToken) {
+        } else {
             const restoreWithRefresh = async () => {
               let accessToken = loaded.auth.token ?? null;
-              let refreshToken = loaded.auth.refreshToken ?? null;
 
               if (accessToken) {
                 try {
-                  const me = await authApi.getMe(accessToken);
-                  return { me, accessToken, refreshToken };
+                  const me = await authApi.getMe(accessToken, { retryOnUnauthorized: false });
+                  return { me, accessToken };
                 } catch (err) {
                   // access token 만료 가능성: refresh로 1회 복구 시도
                 }
               }
 
-              if (!refreshToken) {
-                throw new Error('세션이 만료되었습니다.');
-              }
-
-              const refreshed = await authApi.refresh(refreshToken);
+              const refreshed = await authApi.refresh();
               accessToken = refreshed.token;
-              refreshToken = refreshed.refreshToken;
-              const me = await authApi.getMe(accessToken);
-              return { me, accessToken, refreshToken };
+              const me = await authApi.getMe(accessToken, { retryOnUnauthorized: false });
+              return { me, accessToken };
             };
 
             try {
@@ -499,22 +491,14 @@ const App: React.FC = () => {
                     auth: {
                       isLoggedIn: true,
                       token: restored.accessToken,
-                      refreshToken: restored.refreshToken,
                       userId: restored.me.id,
                       onboardingStatus: restored.me.onboardingStatus
                     }
                 }));
-                syncAuthSessionRef({
-                  isLoggedIn: true,
-                  accessToken: restored.accessToken,
-                  refreshToken: restored.refreshToken,
-                  userId: restored.me.id,
-                });
                 persistAuthState(
                   {
                     isLoggedIn: true,
                     token: restored.accessToken,
-                    refreshToken: restored.refreshToken,
                     userId: restored.me.id,
                     onboardingStatus: restored.me.onboardingStatus,
                   },
@@ -523,46 +507,99 @@ const App: React.FC = () => {
                 if (restored.me.onboardingStatus === 'NEW') {
                    setCurrentView('NICKNAME_SETUP');
                 } else {
-                   setCurrentView('NOW');
+                   setCurrentView(requestedView === 'community' ? 'COMMUNITY' : 'NOW');
                 }
             } catch (err) {
                 if (isRefreshSessionInvalid(err)) {
                   setState(prev => ({
                     ...clearServerDrivenState(prev),
-                    auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null }
+                    auth: { isLoggedIn: false, token: null, userId: null }
                   }));
-                  syncAuthSessionRef({
-                    isLoggedIn: false,
-                    accessToken: null,
-                    refreshToken: null,
-                    userId: null,
-                  });
                   persistAuthState(
-                    { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+                    { isLoggedIn: false, token: null, userId: null },
                     { hasSeenOnboarding: loaded.hasSeenOnboarding, clearServerState: true }
                   );
-                  setCurrentView('ONBOARDING');
+                  setCurrentView(loaded.hasSeenOnboarding ? 'NOW' : 'ONBOARDING');
                 } else {
                   setCurrentView(loaded.hasSeenOnboarding ? 'NOW' : 'ONBOARDING');
                 }
-            }
-        } else {
-            if (!loaded.hasSeenOnboarding) {
-                setCurrentView('ONBOARDING');
-            } else {
-                setCurrentView('NOW');
             }
         }
         setIsLoaded(true);
     };
     initApp();
-  }, [syncAuthSessionRef]);
+  }, []);
 
   useEffect(() => {
     if (isLoaded) {
       saveState(state);
     }
   }, [state, isLoaded]);
+
+  const refreshUnreadNotificationCount = useCallback(async () => {
+    const { isLoggedIn, token } = currentAuthRef.current;
+    if (!isLoggedIn || !token) {
+      unreadCountRequestRef.current = null;
+      setUnreadNotificationCount(0);
+      return;
+    }
+
+    const activeRequest = unreadCountRequestRef.current;
+    if (activeRequest?.token === token) {
+      return activeRequest.promise;
+    }
+
+    const requestId = ++unreadCountRequestSequenceRef.current;
+    const promise = (async () => {
+      try {
+        const response = await notificationApi.getUnreadCount(token);
+        if (currentAuthRef.current.token === token) {
+          setUnreadNotificationCount(response.unreadCount);
+        }
+      } catch {
+        // 알림 배지 조회 실패는 현재 화면 사용을 막지 않는다.
+      } finally {
+        if (unreadCountRequestRef.current?.requestId === requestId) {
+          unreadCountRequestRef.current = null;
+        }
+      }
+    })();
+    unreadCountRequestRef.current = { token, requestId, promise };
+    return promise;
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    void refreshUnreadNotificationCount();
+  }, [isLoaded, state.auth.isLoggedIn, state.auth.userId, refreshUnreadNotificationCount]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const onServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'QP_NOTIFICATION_RECEIVED') {
+        void refreshUnreadNotificationCount();
+        if (currentViewRef.current === 'NOTIFICATIONS') {
+          if (notificationListRefreshTimerRef.current !== null) {
+            window.clearTimeout(notificationListRefreshTimerRef.current);
+          }
+          notificationListRefreshTimerRef.current = window.setTimeout(() => {
+            notificationListRefreshTimerRef.current = null;
+            if (currentViewRef.current === 'NOTIFICATIONS') {
+              setNotificationListRefreshKey((key) => key + 1);
+            }
+          }, 250);
+        }
+      }
+    };
+    navigator.serviceWorker?.addEventListener('message', onServiceWorkerMessage);
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', onServiceWorkerMessage);
+      if (notificationListRefreshTimerRef.current !== null) {
+        window.clearTimeout(notificationListRefreshTimerRef.current);
+        notificationListRefreshTimerRef.current = null;
+      }
+    };
+  }, [isLoaded, refreshUnreadNotificationCount]);
 
   const handleOnboardingComplete = async (initialDirection: Direction) => {
       let nextDirection = initialDirection;
@@ -892,48 +929,22 @@ const App: React.FC = () => {
     }
   };
 
-  const refreshCommunityAccessToken = useCallback(async (): Promise<string | null> => {
-    const refreshToken = authSessionRef.current.refreshToken;
-    if (!refreshToken) {
-      setState(prev => ({
-        ...clearServerDrivenState(prev),
-        auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
-      }));
-      syncAuthSessionRef({
-        isLoggedIn: false,
-        accessToken: null,
-        refreshToken: null,
-        userId: null,
-      });
-      persistAuthState(
-        { isLoggedIn: false, token: null, refreshToken: null, userId: null },
-        { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
-      );
-      return null;
-    }
-
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
     if (refreshAuthRequestRef.current) {
       return refreshAuthRequestRef.current;
     }
 
     refreshAuthRequestRef.current = (async () => {
       try {
-        const refreshed = await authApi.refresh(refreshToken);
-        let nextUserId = authSessionRef.current.userId ?? null;
+        const refreshed = await authApi.refresh();
+        let nextUserId = state.auth.userId ?? null;
 
         try {
-          const me = await authApi.getMe(refreshed.token);
+          const me = await authApi.getMe(refreshed.token, { retryOnUnauthorized: false });
           nextUserId = me.id;
         } catch {
-          nextUserId = authSessionRef.current.userId ?? null;
+          nextUserId = state.auth.userId ?? null;
         }
-
-        syncAuthSessionRef({
-          isLoggedIn: true,
-          accessToken: refreshed.token,
-          refreshToken: refreshed.refreshToken,
-          userId: nextUserId,
-        });
 
         setState(prev => ({
           ...prev,
@@ -941,7 +952,6 @@ const App: React.FC = () => {
             ...prev.auth,
             isLoggedIn: true,
             token: refreshed.token,
-            refreshToken: refreshed.refreshToken,
             userId: nextUserId ?? prev.auth.userId ?? null,
           },
         }));
@@ -949,7 +959,6 @@ const App: React.FC = () => {
           {
             isLoggedIn: true,
             token: refreshed.token,
-            refreshToken: refreshed.refreshToken,
             userId: nextUserId,
             onboardingStatus: state.auth.onboardingStatus,
           },
@@ -964,16 +973,10 @@ const App: React.FC = () => {
         if (isRefreshSessionInvalid(error)) {
           setState(prev => ({
             ...clearServerDrivenState(prev),
-            auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+            auth: { isLoggedIn: false, token: null, userId: null },
           }));
-          syncAuthSessionRef({
-            isLoggedIn: false,
-            accessToken: null,
-            refreshToken: null,
-            userId: null,
-          });
           persistAuthState(
-            { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+            { isLoggedIn: false, token: null, userId: null },
             { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
           );
         }
@@ -984,15 +987,15 @@ const App: React.FC = () => {
     })();
 
     return refreshAuthRequestRef.current;
-  }, [state.auth.onboardingStatus, state.hasSeenOnboarding, syncAuthSessionRef]);
+  }, [state.auth.onboardingStatus, state.auth.userId, state.hasSeenOnboarding]);
 
   useEffect(() => {
-    configureApiClient({ refreshAccessToken: refreshCommunityAccessToken });
+    configureApiClient({ refreshAccessToken });
 
     return () => {
       configureApiClient({ refreshAccessToken: null });
     };
-  }, [refreshCommunityAccessToken]);
+  }, [refreshAccessToken]);
 
   const handleStartDirection = async (updates: Partial<Direction>) => {
     if (state.currentDirection) return;
@@ -1074,13 +1077,13 @@ const App: React.FC = () => {
     setCurrentView('WRITE_LOG');
   };
 
-  const handleLoginSuccess = async (status: 'NEW' | 'EXISTING', token: string, refreshToken: string) => {
+  const handleLoginSuccess = async (status: 'NEW' | 'EXISTING', token: string) => {
       window.sessionStorage.removeItem(OAUTH_PENDING_CODE_KEY);
       window.sessionStorage.removeItem(OAUTH_PENDING_ERROR_KEY);
 
       let me: Awaited<ReturnType<typeof authApi.getMe>> | null = null;
       try {
-        me = await authApi.getMe(token);
+        me = await authApi.getMe(token, { retryOnUnauthorized: false });
       } catch {
         me = null;
       }
@@ -1091,22 +1094,14 @@ const App: React.FC = () => {
          auth: {
            isLoggedIn: true,
            token,
-           refreshToken,
            userId: me?.id ?? null,
            onboardingStatus: status,
          }
       }));
-      syncAuthSessionRef({
-        isLoggedIn: true,
-        accessToken: token,
-        refreshToken,
-        userId: me?.id ?? null,
-      });
       persistAuthState(
         {
           isLoggedIn: true,
           token,
-          refreshToken,
           userId: me?.id ?? null,
           onboardingStatus: status,
         },
@@ -1126,7 +1121,6 @@ const App: React.FC = () => {
                   ...prev.auth,
                   isLoggedIn: true,
                   token,
-                  refreshToken,
                   userId: me?.id ?? prev.auth.userId ?? null,
                   onboardingStatus: status,
                 },
@@ -1140,43 +1134,48 @@ const App: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    let accessToken = state.auth.token;
-    let refreshToken = state.auth.refreshToken;
-
-    if (accessToken) {
-      try {
-        await authApi.logout(accessToken);
-      } catch {
-        if (refreshToken) {
-          try {
-            const refreshed = await authApi.refresh(refreshToken);
-            accessToken = refreshed.token;
-            refreshToken = refreshed.refreshToken;
-            await authApi.logout(accessToken);
-          } catch {
-            // 서버 revoke 실패 시에도 로컬 세션은 종료
-          }
-        }
-      }
+    const accessToken = state.auth.token;
+    if (accessToken && !isMockAccessToken(accessToken)) {
+      await disableWebPush(accessToken).catch(() => undefined);
+    }
+    if (!accessToken || !isMockAccessToken(accessToken)) {
+      await authApi.logout().catch(() => undefined);
     }
     setState(prev => ({
       ...clearServerDrivenState(prev),
-      auth: { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+      auth: { isLoggedIn: false, token: null, userId: null },
     }));
-    syncAuthSessionRef({
-      isLoggedIn: false,
-      accessToken: null,
-      refreshToken: null,
-      userId: null,
-    });
     persistAuthState(
-      { isLoggedIn: false, token: null, refreshToken: null, userId: null },
+      { isLoggedIn: false, token: null, userId: null },
       { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
     );
     setCurrentView('NOW');
   };
 
   const currentPathTodayRecord = getCurrentPathTodayRecord(state.records, state.currentDirection);
+
+  const openNotifications = () => {
+    if (currentView !== 'INITIALIZING' && currentView !== 'NOTIFICATIONS') {
+      notificationReturnViewRef.current = currentView;
+    }
+    setCurrentView('NOTIFICATIONS');
+  };
+
+  const closeNotifications = () => {
+    setCurrentView(notificationReturnViewRef.current);
+  };
+
+  const openNotificationTarget = (notification: NotificationItem) => {
+    if (notification.targetType === 'RECORD') {
+      setCurrentView('COMMUNITY');
+      return;
+    }
+    if (notification.targetType === 'PATH') {
+      handleOpenDirectionView();
+      return;
+    }
+    closeNotifications();
+  };
 
   const NavItem = ({ view, label }: { view: ViewState | 'INITIALIZING'; label: string }) => {
     const isActive = currentView === view;
@@ -1232,6 +1231,10 @@ const App: React.FC = () => {
              <AccountConnectView 
                 onBack={() => setCurrentView('ONBOARDING')}
                 onStartKakao={() => authApi.startKakaoLogin()}
+                onNavigateToLocalQa={() => {
+                    setAuthCodeParam(createLocalQaLoginCode());
+                    setCurrentView('OAUTH_CALLBACK');
+                }}
                 onNavigateToMockKakao={(code) => {
                     // 테스트 플로우: 리로드 없이 OAuth 화면으로 전환
                     setAuthCodeParam(code);
@@ -1326,7 +1329,7 @@ const App: React.FC = () => {
     >
       
       {/* Header Overlay (Gradient Blur) */}
-      {currentView !== 'SETTINGS' && (
+      {currentView !== 'SETTINGS' && currentView !== 'NOTIFICATIONS' && (
         <div 
           className="sticky top-0 h-20 -mb-20 z-20 pointer-events-none transition-opacity duration-500"
           style={{
@@ -1340,88 +1343,116 @@ const App: React.FC = () => {
       )}
 
       {/* Top Bar */}
-      {currentView !== 'SETTINGS' && (
-        <div className="h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
+      {currentView !== 'SETTINGS' && currentView !== 'NOTIFICATIONS' && (
+        <div className="relative h-14 flex items-center justify-between px-8 z-30 sticky top-0 bg-transparent">
           <div className="w-6" />
           <h1
-            className="text-[10px] font-bold tracking-[0.3em] uppercase opacity-80"
+            className="absolute left-1/2 -translate-x-1/2 text-[10px] font-bold tracking-[0.3em] uppercase opacity-80"
             style={{ color: resolvedTheme === 'dark' ? '#CBD5E1' : '#7B8794' }}
           >
             Quiet Path
           </h1>
-          <button 
-            onClick={() => {
-              setSettingsButtonHovered(false);
-              setSettingsButtonPressed(false);
-              setCurrentView('SETTINGS');
-            }}
-            onMouseEnter={() => setSettingsButtonHovered(true)}
-            onMouseLeave={() => {
-              setSettingsButtonHovered(false);
-              setSettingsButtonPressed(false);
-            }}
-            onPointerDown={() => setSettingsButtonPressed(true)}
-            onPointerUp={() => setSettingsButtonPressed(false)}
-            onPointerCancel={() => setSettingsButtonPressed(false)}
-            aria-label="설정 열기"
-            className="group cursor-pointer rounded-full p-2 transition-all duration-200 focus-visible:outline-none"
-            style={{
-              cursor: 'pointer',
-              color: settingsButtonPressed
-                ? resolvedTheme === 'dark'
-                  ? '#EDE9FE'
-                  : '#6D28D9'
-                : settingsButtonHovered
-                  ? resolvedTheme === 'dark'
-                    ? '#E9D5FF'
-                    : '#7C3AED'
-                  : resolvedTheme === 'dark'
-                    ? '#94A3B8'
-                    : '#64748B',
-              backgroundColor: settingsButtonPressed
-                ? resolvedTheme === 'dark'
-                  ? 'rgba(88,28,135,0.56)'
-                  : 'rgba(237,233,254,0.98)'
-                : settingsButtonHovered
-                  ? resolvedTheme === 'dark'
-                    ? 'rgba(51,65,85,0.86)'
-                    : 'rgba(255,255,255,0.96)'
-                  : resolvedTheme === 'dark'
+          <div className="flex items-center gap-1">
+            {state.auth.isLoggedIn && state.auth.token && (
+              <button
+                type="button"
+                onClick={openNotifications}
+                aria-label={unreadNotificationCount > 0
+                  ? `알림 열기, 읽지 않은 알림 ${unreadNotificationCount}개`
+                  : '알림 열기'}
+                className="relative cursor-pointer rounded-full p-2 transition-all duration-200 focus-visible:outline-none"
+                style={{
+                  color: resolvedTheme === 'dark' ? '#94A3B8' : '#64748B',
+                  backgroundColor: resolvedTheme === 'dark'
                     ? 'rgba(15,23,42,0.18)'
                     : 'rgba(255,255,255,0.28)',
-              boxShadow: settingsButtonPressed
-                ? resolvedTheme === 'dark'
-                  ? '0 14px 30px rgba(15,23,42,0.40), 0 0 0 1px rgba(196,181,253,0.28) inset'
-                  : '0 12px 28px rgba(148,163,184,0.24), 0 0 0 1px rgba(124,58,237,0.10) inset'
-                : settingsButtonHovered
-                  ? resolvedTheme === 'dark'
-                    ? '0 12px 28px rgba(15,23,42,0.32), 0 0 0 1px rgba(196,181,253,0.18) inset'
-                    : '0 10px 24px rgba(148,163,184,0.18), 0 0 0 1px rgba(124,58,237,0.08) inset'
-                  : 'none',
-              transform: settingsButtonPressed
-                ? 'scale(0.95)'
-                : settingsButtonHovered
-                  ? 'scale(1.08)'
-                  : 'scale(1)',
-            }}
-          >
-            <Settings
-              size={18}
-              className="transition-transform duration-200"
-              style={{
-                transform: settingsButtonPressed
-                  ? 'rotate(28deg) scale(0.97)'
-                  : settingsButtonHovered
-                    ? 'rotate(18deg)'
-                    : 'rotate(0deg)',
+                }}
+              >
+                <Bell size={18} />
+                {unreadNotificationCount > 0 && (
+                  <span
+                    className="absolute -right-0.5 -top-0.5 min-w-[17px] h-[17px] px-1 rounded-full grid place-items-center text-[9px] font-bold text-white"
+                    style={{ background: '#8B5CF6' }}
+                  >
+                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setSettingsButtonHovered(false);
+                setSettingsButtonPressed(false);
+                setCurrentView('SETTINGS');
               }}
-            />
-          </button>
+              onMouseEnter={() => setSettingsButtonHovered(true)}
+              onMouseLeave={() => {
+                setSettingsButtonHovered(false);
+                setSettingsButtonPressed(false);
+              }}
+              onPointerDown={() => setSettingsButtonPressed(true)}
+              onPointerUp={() => setSettingsButtonPressed(false)}
+              onPointerCancel={() => setSettingsButtonPressed(false)}
+              aria-label="설정 열기"
+              className="group cursor-pointer rounded-full p-2 transition-all duration-200 focus-visible:outline-none"
+              style={{
+                cursor: 'pointer',
+                color: settingsButtonPressed
+                  ? resolvedTheme === 'dark'
+                    ? '#EDE9FE'
+                    : '#6D28D9'
+                  : settingsButtonHovered
+                    ? resolvedTheme === 'dark'
+                      ? '#E9D5FF'
+                      : '#7C3AED'
+                    : resolvedTheme === 'dark'
+                      ? '#94A3B8'
+                      : '#64748B',
+                backgroundColor: settingsButtonPressed
+                  ? resolvedTheme === 'dark'
+                    ? 'rgba(88,28,135,0.56)'
+                    : 'rgba(237,233,254,0.98)'
+                  : settingsButtonHovered
+                    ? resolvedTheme === 'dark'
+                      ? 'rgba(51,65,85,0.86)'
+                      : 'rgba(255,255,255,0.96)'
+                    : resolvedTheme === 'dark'
+                      ? 'rgba(15,23,42,0.18)'
+                      : 'rgba(255,255,255,0.28)',
+                boxShadow: settingsButtonPressed
+                  ? resolvedTheme === 'dark'
+                    ? '0 14px 30px rgba(15,23,42,0.40), 0 0 0 1px rgba(196,181,253,0.28) inset'
+                    : '0 12px 28px rgba(148,163,184,0.24), 0 0 0 1px rgba(124,58,237,0.10) inset'
+                  : settingsButtonHovered
+                    ? resolvedTheme === 'dark'
+                      ? '0 12px 28px rgba(15,23,42,0.32), 0 0 0 1px rgba(196,181,253,0.18) inset'
+                      : '0 10px 24px rgba(148,163,184,0.18), 0 0 0 1px rgba(124,58,237,0.08) inset'
+                    : 'none',
+                transform: settingsButtonPressed
+                  ? 'scale(0.95)'
+                  : settingsButtonHovered
+                    ? 'scale(1.08)'
+                    : 'scale(1)',
+              }}
+            >
+              <Settings
+                size={18}
+                className="transition-transform duration-200"
+                style={{
+                  transform: settingsButtonPressed
+                    ? 'rotate(28deg) scale(0.97)'
+                    : settingsButtonHovered
+                      ? 'rotate(18deg)'
+                      : 'rotate(0deg)',
+                }}
+              />
+            </button>
+          </div>
         </div>
       )}
 
       {/* Main Content Area */}
-      <main className={currentView === 'SETTINGS' ? 'flex-1 px-0 pt-0 pb-0' : 'flex-1 px-6 pt-2 pb-32'}>
+      <main className={currentView === 'SETTINGS' || currentView === 'NOTIFICATIONS' ? 'flex-1 px-0 pt-0 pb-0' : 'flex-1 px-6 pt-2 pb-32'}>
         {currentView === 'NOW' && (
           <HomeView
             state={state}
@@ -1478,6 +1509,16 @@ const App: React.FC = () => {
               onLogin={() => setCurrentView('ACCOUNT_CONNECT')}
               onLogout={handleLogout}
            />
+        )}
+        {currentView === 'NOTIFICATIONS' && state.auth.token && (
+          <NotificationsView
+            accessToken={state.auth.token}
+            refreshKey={notificationListRefreshKey}
+            onClose={closeNotifications}
+            onOpenTarget={openNotificationTarget}
+            onReadOne={() => setUnreadNotificationCount((count) => Math.max(0, count - 1))}
+            onReadAll={() => setUnreadNotificationCount(0)}
+          />
         )}
       </main>
 
@@ -1615,7 +1656,7 @@ const App: React.FC = () => {
       />
 
       {/* Floating Bottom Navigation */}
-      {currentView !== 'WRITE_LOG' && currentView !== 'SETTINGS' && (
+      {currentView !== 'WRITE_LOG' && currentView !== 'SETTINGS' && currentView !== 'NOTIFICATIONS' && (
         <div className="fixed bottom-6 left-0 w-full flex justify-center z-40 px-6 pointer-events-none">
            <nav
              className="h-[64px] px-2 backdrop-blur-2xl rounded-[28px] flex items-center justify-between w-full max-w-[340px] pointer-events-auto"

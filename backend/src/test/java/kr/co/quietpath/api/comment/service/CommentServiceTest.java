@@ -6,6 +6,8 @@ import kr.co.quietpath.api.comment.dto.response.CommentListResponse;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
+import kr.co.quietpath.api.notification.service.CommunityNotificationRequestedEvent;
+import kr.co.quietpath.api.notification.service.CommunityNotificationType;
 import kr.co.quietpath.domain.comment.entity.Comment;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.path.entity.Path;
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,6 +53,9 @@ class CommentServiceTest {
     @Mock
     private CommentPageCacheService commentPageCacheService;
 
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
+
     @InjectMocks
     private CommentService commentService;
 
@@ -72,7 +78,7 @@ class CommentServiceTest {
         request.setRecordId(10L);
         request.setContent("좋은 기록이네요");
 
-        Record record = buildRecord("PUBLIC");
+        Record record = buildRecord("PUBLIC", 2L);
         when(recordRepository.findByIdAndIsHiddenFalse(10L)).thenReturn(Optional.of(record));
         when(userRepository.findById(1L)).thenReturn(Optional.of(buildUser(1L)));
         when(commentRepository.countByRecordIdAndDeletedFalse(10L)).thenReturn(3L);
@@ -91,6 +97,16 @@ class CommentServiceTest {
         verify(commentRepository).save(argThat(comment -> comment.getRecordId().equals(10L)));
         verify(commentPageCacheService).evictRecord(10L);
         verify(weeklyTop3CacheService).evict();
+        verify(applicationEventPublisher).publishEvent(argThat((Object event) -> {
+            CommunityNotificationRequestedEvent notificationEvent =
+                (CommunityNotificationRequestedEvent) event;
+            return notificationEvent.type() == CommunityNotificationType.COMMENT
+                && notificationEvent.sourceId().equals(101L)
+                && notificationEvent.recipientUserId().equals(2L)
+                && notificationEvent.actorUserId().equals(1L)
+                && notificationEvent.actorNickname().equals("nick1")
+                && notificationEvent.recordId().equals(10L);
+        }));
     }
 
     @Test
@@ -155,9 +171,13 @@ class CommentServiceTest {
     }
 
     private Record buildRecord(String visibility) {
-        User user = buildUser(1L);
+        return buildRecord(visibility, 1L);
+    }
+
+    private Record buildRecord(String visibility, Long ownerId) {
+        User user = buildUser(ownerId);
         Path path = Path.builder()
-            .userId(1L)
+            .userId(ownerId)
             .categoryCode("DEFAULT")
             .directionName("질문")
             .directionText("설명")
@@ -173,6 +193,7 @@ class CommentServiceTest {
             .tomorrowText(null)
             .moodCode(null)
             .build();
+        setField(record, "id", 10L);
         if ("PUBLIC".equals(visibility)) {
             record.share();
         }

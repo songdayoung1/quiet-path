@@ -3,6 +3,7 @@ import { Download, PencilLine, Trash2, X } from 'lucide-react';
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
 import { getRecordParagraphs } from '../utils/recordText';
 import { WaterDropCharacter, type CharacterMood } from './WaterDropCharacter';
+import { RecordImage } from './RecordImage';
 
 interface Props {
   record: RecordType;
@@ -205,7 +206,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
                 className="relative overflow-hidden rounded-[26px] border border-white/85"
                 style={posterCardStyle}
               >
-                <img src={record.imageUrl} alt="기록 사진" className="absolute inset-0 h-full w-full object-cover" />
+                <RecordImage record={record} alt="기록 사진" className="absolute inset-0 h-full w-full" />
                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.08)_34%,rgba(10,20,42,0.12)_58%,rgba(10,20,42,0.44)_78%,rgba(10,20,42,0.82)_100%)]" />
                 <div className="relative aspect-[4/3]">
                   <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
@@ -284,7 +285,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
             ) : hasPhoto ? (
               <article className="overflow-hidden rounded-[26px] border border-white/85" style={diaryPhotoSurfaceStyle}>
                 <div className="relative aspect-[4/3] overflow-hidden">
-                  <img src={record.imageUrl} alt="기록 사진" className="h-full w-full object-cover" />
+                  <RecordImage record={record} alt="기록 사진" className="h-full w-full" />
                   <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.03)_60%,rgba(10,20,42,0.46)_100%)]" />
                   <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
                     <div className="text-white">

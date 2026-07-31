@@ -61,6 +61,7 @@ export const apiFetch = async (
     retryOnUnauthorized?: boolean;
   }
 ) => {
+  // 최초 요청과 refresh 후 재시도가 같은 구성을 쓰도록 Bearer 토큰 주입을 한곳에 모은다.
   const request = async (accessToken?: string | null) => {
     const headers = new Headers(init.headers);
     if (accessToken) {
@@ -76,6 +77,7 @@ export const apiFetch = async (
   const shouldRetry = options?.retryOnUnauthorized ?? !!options?.accessToken;
   let response = await request(options?.accessToken ?? null);
 
+  // 보호 API의 401만 한 번 복구하고, 새 access token으로 원 요청을 그대로 재실행한다.
   if (response.status !== 401 || !shouldRetry || !options?.accessToken || !refreshAccessTokenHandler) {
     return response;
   }

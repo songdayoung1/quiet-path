@@ -7,15 +7,18 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Comment;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "records",
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_path_date", columnNames = {"path_id", "record_date"}),
-        @UniqueConstraint(name = "uk_records_share_code", columnNames = {"share_code"})
+        @UniqueConstraint(name = "uk_records_share_code", columnNames = {"share_code"}),
+        @UniqueConstraint(name = "uk_records_image", columnNames = {"image_id"})
     },
     indexes = {
         @Index(name = "idx_user_record_date_id", columnList = "user_id, record_date, id"),
@@ -58,8 +61,10 @@ public class Record {
     @Column(name = "mood_code", length = 30)
     private String moodCode;
 
-    @Column(name = "image_url", length = 500)
-    private String imageUrl;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "image_id")
+    @Comment("기록에 연결된 단건 이미지 식별자")
+    private RecordImage image;
 
     @Column(name = "is_hidden", nullable = false)
     private Boolean isHidden;
@@ -94,8 +99,7 @@ public class Record {
         String sceneText,
         String oneWordText,
         String tomorrowText,
-        String moodCode,
-        String imageUrl
+        String moodCode
     ) {
         this.user = user;
         this.path = path;
@@ -105,7 +109,6 @@ public class Record {
         this.oneWordText = oneWordText;
         this.tomorrowText = tomorrowText;
         this.moodCode = moodCode;
-        this.imageUrl = imageUrl;
         this.isHidden = false;
         this.visibility = "PRIVATE";
         this.reactionCount = 0;
@@ -135,14 +138,26 @@ public class Record {
         String sceneText,
         String oneWordText,
         String tomorrowText,
-        String moodCode,
-        String imageUrl
+        String moodCode
     ) {
         this.sceneText = sceneText;
         this.oneWordText = oneWordText;
         this.tomorrowText = tomorrowText;
         this.moodCode = moodCode;
-        this.imageUrl = imageUrl;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public String getImageUrl() {
+        return image != null ? image.getImageUrl() : null;
+    }
+
+    public void attachImage(RecordImage image) {
+        this.image = Objects.requireNonNull(image, "image는 필수입니다.");
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void removeImage() {
+        this.image = null;
         this.updatedAt = LocalDateTime.now();
     }
 

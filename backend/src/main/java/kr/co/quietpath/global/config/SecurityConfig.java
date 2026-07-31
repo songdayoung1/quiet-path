@@ -2,6 +2,7 @@ package kr.co.quietpath.global.config;
 
 import kr.co.quietpath.api.auth.config.JwtProperties;
 import kr.co.quietpath.api.auth.config.KakaoAuthProperties;
+import kr.co.quietpath.api.auth.config.RefreshTokenCookieProperties;
 import kr.co.quietpath.api.auth.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -32,7 +33,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @EnableConfigurationProperties({
     KakaoAuthProperties.class,
-    JwtProperties.class
+    JwtProperties.class,
+    RefreshTokenCookieProperties.class
 })
 public class SecurityConfig {
 
@@ -53,7 +55,9 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/swagger-ui/**",
                     "/v3/api-docs/**",
-                    "/api/v1/auth/**"
+                    "/api/v1/auth/**",
+                    "/uploads/**",
+                    "/error"
                 ).permitAll()
                 .requestMatchers(
                     HttpMethod.GET,
