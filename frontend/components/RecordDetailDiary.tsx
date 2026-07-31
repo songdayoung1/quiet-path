@@ -1,6 +1,7 @@
 import React from 'react';
 import { Download, PencilLine, Trash2, X } from 'lucide-react';
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
+import { loadImageTextTones, type ImageTextTones } from '../utils/imageContrast';
 import { getRecordParagraphs } from '../utils/recordText';
 import { WaterDropCharacter, type CharacterMood } from './WaterDropCharacter';
 import { RecordImage } from './RecordImage';
@@ -67,6 +68,10 @@ export const RecordDetailDiary: React.FC<Props> = ({
   onShare,
   onDelete,
 }) => {
+  const [photoTextTones, setPhotoTextTones] = React.useState<ImageTextTones>({
+    left: 'light',
+    right: 'light',
+  });
   const date = new Date(record.timestamp);
   const mood = record.moodCode;
   const moodTone = mood ? MOOD_TONE[mood] : undefined;
@@ -81,6 +86,40 @@ export const RecordDetailDiary: React.FC<Props> = ({
   const detailDisplayMode: RecordCardDisplayMode = hasPhoto ? displayMode : 'diary';
   const isPosterMode = hasPhoto && detailDisplayMode === 'poster';
   const posterActionText = actionParagraphs.join(' ');
+  const leftUsesDarkText = photoTextTones.left === 'dark';
+  const rightUsesDarkText = photoTextTones.right === 'dark';
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    if (!record.imageUrl) {
+      setPhotoTextTones({ left: 'light', right: 'light' });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPhotoTextTones({ left: 'light', right: 'light' });
+    loadImageTextTones(record.imageUrl, {
+      positionX: record.imagePositionX,
+      positionY: record.imagePositionY,
+      scale: record.imageScale,
+    })
+      .then((tones) => {
+        if (!cancelled) {
+          setPhotoTextTones(tones);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPhotoTextTones({ left: 'light', right: 'light' });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [record.imagePositionX, record.imagePositionY, record.imageScale, record.imageUrl]);
 
   const cardSurfaceStyle: React.CSSProperties = {
     background: 'linear-gradient(160deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.74) 100%)',
@@ -286,21 +325,50 @@ export const RecordDetailDiary: React.FC<Props> = ({
               <article className="overflow-hidden rounded-[26px] border border-white/85" style={diaryPhotoSurfaceStyle}>
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <RecordImage record={record} alt="기록 사진" className="h-full w-full" />
-                  <div className="absolute inset-x-0 top-0 h-[42%] bg-[linear-gradient(180deg,rgba(255,255,255,0.72)_0%,rgba(255,255,255,0.28)_58%,rgba(255,255,255,0)_100%)]" />
                   <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
-                    <div className="text-slate-900">
-                      <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-slate-700/80">
+                    <div
+                      className={leftUsesDarkText ? 'text-slate-900' : 'text-white'}
+                      style={{
+                        textShadow: leftUsesDarkText
+                          ? '0 1px 3px rgba(255,255,255,0.72)'
+                          : '0 1px 3px rgba(15,23,42,0.48)',
+                      }}
+                    >
+                      <p className={`mb-1 font-mono text-[10px] font-bold tracking-[0.2em] ${
+                        leftUsesDarkText ? 'text-slate-700/80' : 'text-white/92'
+                      }`}>
                         {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
                       </p>
-                      <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-slate-900">
+                      <p className={`text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] ${
+                        leftUsesDarkText ? 'text-slate-900' : 'text-white'
+                      }`}>
                         {String(date.getDate()).padStart(2, '0')}
                       </p>
                     </div>
                     <div className="flex flex-col items-center gap-2.5">
-                      <span className="text-center font-mono text-[10px] tracking-wider text-slate-700">{fmtTime(date)}</span>
+                      <span
+                        className={`text-center font-mono text-[10px] tracking-wider ${
+                          rightUsesDarkText ? 'text-slate-700' : 'text-white'
+                        }`}
+                        style={{
+                          textShadow: rightUsesDarkText
+                            ? '0 1px 3px rgba(255,255,255,0.72)'
+                            : '0 1px 3px rgba(15,23,42,0.48)',
+                        }}
+                      >
+                        {fmtTime(date)}
+                      </span>
                       {mood && (
-                        <span className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-slate-900/10 bg-white/60 px-3 py-1.5 backdrop-blur-sm">
-                          <span className="text-xs font-bold leading-none text-slate-800">{mood}</span>
+                        <span className={`inline-flex items-center justify-center rounded-xl border-[1.5px] px-3 py-1.5 backdrop-blur-sm ${
+                          rightUsesDarkText
+                            ? 'border-slate-900/10 bg-white/[0.52]'
+                            : 'border-white/[0.42] bg-slate-950/[0.12]'
+                        }`}>
+                          <span className={`text-xs font-bold leading-none ${
+                            rightUsesDarkText ? 'text-slate-800' : 'text-white'
+                          }`}>
+                            {mood}
+                          </span>
                         </span>
                       )}
                     </div>

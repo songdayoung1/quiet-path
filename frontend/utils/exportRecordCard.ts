@@ -1,5 +1,6 @@
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
 import { buildLatestRecordByDateMap } from './heatmap';
+import { getImageTextTones, type ImageTextTone } from './imageContrast';
 import { getRecordParagraphs } from './recordText';
 
 const CANVAS_WIDTH = 1080;
@@ -8,6 +9,29 @@ const MONTHS_FULL = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JU
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const WEEKDAY_LABELS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 const fmtTime = (d: Date) => d.toTimeString().slice(0, 5);
+
+const getPhotoTextColors = (tone: ImageTextTone) => tone === 'dark'
+  ? {
+      primary: '#0F172A',
+      secondary: 'rgba(51,65,85,0.82)',
+      chipFill: 'rgba(255,255,255,0.52)',
+      chipBorder: 'rgba(15,23,42,0.12)',
+    }
+  : {
+      primary: '#FFFFFF',
+      secondary: 'rgba(255,255,255,0.9)',
+      chipFill: 'rgba(15,23,42,0.12)',
+      chipBorder: 'rgba(255,255,255,0.42)',
+    };
+
+const setPhotoTextShadow = (ctx: CanvasRenderingContext2D, tone: ImageTextTone) => {
+  ctx.shadowColor = tone === 'dark'
+    ? 'rgba(255,255,255,0.72)'
+    : 'rgba(15,23,42,0.48)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+};
 
 const MOOD_CHIP_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   '포근': { bg: 'rgba(245,243,255,0.92)', border: 'rgba(196,181,253,0.75)', text: '#7C3AED' },
@@ -1040,6 +1064,13 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
 
 const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   const image = await loadImage(record.imageUrl!);
+  const photoTextTones = getImageTextTones(image, {
+    positionX: record.imagePositionX,
+    positionY: record.imagePositionY,
+    scale: record.imageScale,
+  });
+  const leftTextColors = getPhotoTextColors(photoTextTones.left);
+  const rightTextColors = getPhotoTextColors(photoTextTones.right);
   const simCtx = document.createElement('canvas').getContext('2d');
   const CANVAS_HEIGHT = 1440;
   const cardX = 72;
@@ -1129,12 +1160,6 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   );
   ctx.fillStyle = 'rgba(255,255,255,0.96)';
   ctx.fillRect(cardX, cardY + imageHeight, cardWidth, cardHeight - imageHeight);
-  const imageOverlay = ctx.createLinearGradient(0, cardY, 0, cardY + imageHeight * 0.48);
-  imageOverlay.addColorStop(0, 'rgba(255,255,255,0.78)');
-  imageOverlay.addColorStop(0.55, 'rgba(255,255,255,0.32)');
-  imageOverlay.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = imageOverlay;
-  ctx.fillRect(cardX, cardY, cardWidth, imageHeight * 0.48);
   ctx.restore();
 
   roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
@@ -1142,18 +1167,23 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   ctx.lineWidth = 3;
   ctx.stroke();
 
+  ctx.save();
+  setPhotoTextShadow(ctx, photoTextTones.left);
   drawExportWordmark(ctx, {
     mascotImage: wordmarkMascotImg,
     x: contentLeftX - 6,
     y: cardY + 78,
     mascotSize: 36,
-    textColor: 'rgba(30,41,59,0.9)',
+    textColor: leftTextColors.secondary,
     fontSize: 22,
     letterSpacing: 3.5,
     gap: 8,
   });
+  ctx.restore();
 
   const dirLeftX = cardX + cardWidth - 340;
+  ctx.save();
+  setPhotoTextShadow(ctx, photoTextTones.right);
   ctx.textAlign = 'left';
   drawDirectionSummaryWithText(
     ctx,
@@ -1161,35 +1191,45 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
     cardY + 83,
     268,
     directionText,
-    '#1E293B',
-    'rgba(71,85,105,0.72)',
+    rightTextColors.primary,
+    rightTextColors.secondary,
   );
+  ctx.restore();
 
+  ctx.save();
+  setPhotoTextShadow(ctx, photoTextTones.left);
   ctx.textAlign = 'left';
-  ctx.fillStyle = 'rgba(51,65,85,0.82)';
+  ctx.fillStyle = leftTextColors.secondary;
   ctx.font = '800 18px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText(`${WEEKDAYS[date.getDay()]} · ${MONTHS[date.getMonth()]}`, contentLeftX, cardY + 224);
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = leftTextColors.primary;
   ctx.font = '800 110px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText(String(date.getDate()).padStart(2, '0'), contentLeftX - 4, cardY + 322);
+  ctx.restore();
 
+  ctx.save();
+  setPhotoTextShadow(ctx, photoTextTones.right);
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#334155';
+  ctx.fillStyle = rightTextColors.primary;
   ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText(fmtTime(date), cardX + cardWidth - 72, cardY + 224);
+  ctx.restore();
 
   if (record.moodCode) {
     ctx.font = '700 24px "SF Pro Display", "Pretendard", sans-serif';
     const moodWidth = Math.max(ctx.measureText(record.moodCode).width + 60, 120);
     roundedRect(ctx, cardX + cardWidth - 72 - moodWidth, cardY + 270, moodWidth, 52, 26);
-    ctx.fillStyle = 'rgba(255,255,255,0.64)';
+    ctx.fillStyle = rightTextColors.chipFill;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(15,23,42,0.12)';
+    ctx.strokeStyle = rightTextColors.chipBorder;
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    ctx.fillStyle = '#1E293B';
+    ctx.save();
+    setPhotoTextShadow(ctx, photoTextTones.right);
+    ctx.fillStyle = rightTextColors.primary;
     ctx.textAlign = 'center';
     ctx.fillText(record.moodCode, cardX + cardWidth - 72 - moodWidth / 2, cardY + 302);
+    ctx.restore();
   }
 
   if (mainMascotImg) {
