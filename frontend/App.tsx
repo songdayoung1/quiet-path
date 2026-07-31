@@ -309,6 +309,16 @@ const App: React.FC = () => {
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(readThemeMode()));
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const refreshAuthRequestRef = useRef<Promise<string | null> | null>(null);
+  const unreadCountRequestRef = useRef<{
+    token: string;
+    requestId: number;
+    promise: Promise<void>;
+  } | null>(null);
+  const unreadCountRequestSequenceRef = useRef(0);
+  const currentAuthRef = useRef<{
+    isLoggedIn: boolean;
+    token: string | null;
+  }>({ isLoggedIn: false, token: null });
   const hasInitializedAppRef = useRef(false);
   const notificationReturnViewRef = useRef<ViewState>('NOW');
   const minExpiredDirectionReviewAt = buildFutureDateInputValue(1);
@@ -323,6 +333,10 @@ const App: React.FC = () => {
     }),
     [appFlowABgStyle, resolvedTheme]
   );
+  currentAuthRef.current = {
+    isLoggedIn: state.auth.isLoggedIn,
+    token: state.auth.token,
+  };
 
   useEffect(() => {
     const syncTheme = (mode?: ThemeMode) => {
@@ -519,40 +533,54 @@ const App: React.FC = () => {
   }, [state, isLoaded]);
 
   const refreshUnreadNotificationCount = useCallback(async () => {
-    const token = state.auth.token;
-    if (!state.auth.isLoggedIn || !token) {
+    const { isLoggedIn, token } = currentAuthRef.current;
+    if (!isLoggedIn || !token) {
+      unreadCountRequestRef.current = null;
       setUnreadNotificationCount(0);
       return;
     }
-    try {
-      const response = await notificationApi.getNotifications(token, {
-        page: 0,
-        size: 1,
-        unreadOnly: true,
-      });
-      setUnreadNotificationCount(response.totalElements);
-    } catch {
-      // 알림 배지 조회 실패는 현재 화면 사용을 막지 않는다.
+
+    const activeRequest = unreadCountRequestRef.current;
+    if (activeRequest?.token === token) {
+      return activeRequest.promise;
     }
-  }, [state.auth.isLoggedIn, state.auth.token]);
+
+    const requestId = ++unreadCountRequestSequenceRef.current;
+    const promise = (async () => {
+      try {
+        const response = await notificationApi.getUnreadCount(token);
+        if (currentAuthRef.current.token === token) {
+          setUnreadNotificationCount(response.unreadCount);
+        }
+      } catch {
+        // 알림 배지 조회 실패는 현재 화면 사용을 막지 않는다.
+      } finally {
+        if (unreadCountRequestRef.current?.requestId === requestId) {
+          unreadCountRequestRef.current = null;
+        }
+      }
+    })();
+    unreadCountRequestRef.current = { token, requestId, promise };
+    return promise;
+  }, []);
 
   useEffect(() => {
     if (!isLoaded) return;
     void refreshUnreadNotificationCount();
+  }, [isLoaded, state.auth.isLoggedIn, state.auth.userId, refreshUnreadNotificationCount]);
 
-    const onFocus = () => void refreshUnreadNotificationCount();
+  useEffect(() => {
+    if (!isLoaded) return;
     const onServiceWorkerMessage = (event: MessageEvent) => {
       if (event.data?.type === 'QP_NOTIFICATION_RECEIVED') {
         void refreshUnreadNotificationCount();
       }
     };
-    window.addEventListener('focus', onFocus);
     navigator.serviceWorker?.addEventListener('message', onServiceWorkerMessage);
     return () => {
-      window.removeEventListener('focus', onFocus);
       navigator.serviceWorker?.removeEventListener('message', onServiceWorkerMessage);
     };
-  }, [isLoaded, currentView, refreshUnreadNotificationCount]);
+  }, [isLoaded, refreshUnreadNotificationCount]);
 
   const handleOnboardingComplete = async (initialDirection: Direction) => {
       let nextDirection = initialDirection;

@@ -66,8 +66,13 @@ export interface NotificationReadAllResponse {
   updatedCount: number;
 }
 
+export interface NotificationUnreadCountResponse {
+  unreadCount: number;
+}
+
 const jsonHeaders = { 'Content-Type': 'application/json' };
 const mockReadNotificationIds = new Set<number>();
+const notificationListRequests = new Map<string, Promise<NotificationListResponse>>();
 
 const mockNotifications = (): NotificationItem[] => [
   {
@@ -130,8 +135,40 @@ export const notificationApi = {
     if (query.size !== undefined) params.set('size', String(query.size));
     if (query.unreadOnly !== undefined) params.set('unreadOnly', String(query.unreadOnly));
     const suffix = params.size > 0 ? `?${params.toString()}` : '';
+    const requestKey = `${token}:${suffix}`;
+    const existingRequest = notificationListRequests.get(requestKey);
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    const request = (async () => {
+      const response = await apiFetch(
+        `/api/v1/notifications${suffix}`,
+        { method: 'GET' },
+        { accessToken: token }
+      );
+      if (!response.ok) throw await buildApiError(response);
+      return response.json();
+    })();
+    notificationListRequests.set(requestKey, request);
+
+    try {
+      return await request;
+    } finally {
+      if (notificationListRequests.get(requestKey) === request) {
+        notificationListRequests.delete(requestKey);
+      }
+    }
+  },
+
+  async getUnreadCount(token: string): Promise<NotificationUnreadCountResponse> {
+    if (import.meta.env.DEV && isMockAccessToken(token)) {
+      return {
+        unreadCount: mockNotifications().filter((item) => !item.read).length,
+      };
+    }
     const response = await apiFetch(
-      `/api/v1/notifications${suffix}`,
+      '/api/v1/notifications/unread-count',
       { method: 'GET' },
       { accessToken: token }
     );
