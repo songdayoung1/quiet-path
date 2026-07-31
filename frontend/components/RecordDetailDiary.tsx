@@ -342,10 +342,6 @@ export const RecordDetailDiary: React.FC<Props> = ({
                 </div>
 
                 <div className="relative px-6 pb-6 pt-9">
-                  <div aria-hidden className="pointer-events-none absolute right-8 top-7 opacity-[0.08]">
-                    <WaterDropCharacter size={74} mood={characterMood} animate={false} />
-                  </div>
-
                   <p
                     className={`mb-5 text-center text-[10px] font-bold tracking-[0.12em] ${
                       posterUsesDarkText ? 'text-slate-700/70' : 'text-white/70'

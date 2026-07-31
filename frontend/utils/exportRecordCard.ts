@@ -889,10 +889,6 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       ctx.restore();
     }
 
-    if (mainMascotImg) {
-      drawMascotImage(ctx, mainMascotImg, cardX + cardWidth - 100, cardY + cardHeight - 470, 92, 0.15);
-    }
-
     const actionBlocks = wrapParagraphBlocks(ctx, record.action, contentWidth - 80, 4);
     let cursorY = cardY + cardHeight - 540;
 
