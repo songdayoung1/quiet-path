@@ -73,6 +73,10 @@ export interface NotificationUnreadCountResponse {
 const jsonHeaders = { 'Content-Type': 'application/json' };
 const mockReadNotificationIds = new Set<number>();
 const notificationListRequests = new Map<string, Promise<NotificationListResponse>>();
+const notificationPreferenceRequests = new Map<
+  string,
+  Promise<NotificationPreferenceResponse>
+>();
 
 const mockNotifications = (): NotificationItem[] => [
   {
@@ -210,9 +214,29 @@ export const notificationApi = {
   },
 
   async getPreferences(token: string): Promise<NotificationPreferenceResponse> {
-    const response = await apiFetch('/api/v1/notifications/preferences', { method: 'GET' }, { accessToken: token });
-    if (!response.ok) throw await buildApiError(response);
-    return response.json();
+    const existingRequest = notificationPreferenceRequests.get(token);
+    if (existingRequest) {
+      return existingRequest;
+    }
+
+    const request = (async () => {
+      const response = await apiFetch(
+        '/api/v1/notifications/preferences',
+        { method: 'GET' },
+        { accessToken: token }
+      );
+      if (!response.ok) throw await buildApiError(response);
+      return response.json();
+    })();
+    notificationPreferenceRequests.set(token, request);
+
+    try {
+      return await request;
+    } finally {
+      if (notificationPreferenceRequests.get(token) === request) {
+        notificationPreferenceRequests.delete(token);
+      }
+    }
   },
 
   async updatePreferences(
