@@ -33,6 +33,15 @@ const setPhotoTextShadow = (ctx: CanvasRenderingContext2D, tone: ImageTextTone) 
   ctx.shadowOffsetY = 1;
 };
 
+const setPosterBodyTextShadow = (ctx: CanvasRenderingContext2D, tone: ImageTextTone) => {
+  ctx.shadowColor = tone === 'dark'
+    ? 'rgba(255,255,255,0.92)'
+    : 'rgba(15,23,42,0.68)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 2;
+};
+
 const MOOD_CHIP_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   '포근': { bg: 'rgba(245,243,255,0.92)', border: 'rgba(196,181,253,0.75)', text: '#7C3AED' },
   '반짝': { bg: 'rgba(255,251,235,0.92)', border: 'rgba(253,230,138,0.80)', text: '#D97706' },
@@ -888,7 +897,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     let cursorY = cardY + cardHeight - 540;
 
     ctx.save();
-    setPhotoTextShadow(ctx, photoTextTones.body);
+    setPosterBodyTextShadow(ctx, photoTextTones.body);
     ctx.textAlign = 'center';
     ctx.fillStyle = bodyTextColors.secondary;
     ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
@@ -909,23 +918,20 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       const pillWidth = Math.min(contentWidth - 20, textWidth + 180);
 
       roundedRect(ctx, CANVAS_WIDTH / 2 - pillWidth / 2, cursorY, pillWidth, 82, 41);
-      ctx.fillStyle = bodyTextColors.chipFill;
+      ctx.fillStyle = 'rgba(245,243,255,0.92)';
       ctx.fill();
-      ctx.strokeStyle = bodyTextColors.chipBorder;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(196,181,253,0.6)';
+      ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      ctx.save();
-      setPhotoTextShadow(ctx, photoTextTones.body);
-      ctx.fillStyle = bodyTextColors.primary;
+      ctx.fillStyle = '#94A3B8';
       ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
       ctx.fillText('한 단어', CANVAS_WIDTH / 2 - textWidth / 2 - 28, cursorY + 50);
-      ctx.fillStyle = bodyTextColors.primary;
+      ctx.fillStyle = '#CBD2D9';
       ctx.fillRect(CANVAS_WIDTH / 2 - textWidth / 2 + 14, cursorY + 41, 26, 2);
-      ctx.fillStyle = bodyTextColors.primary;
+      ctx.fillStyle = '#7C3AED';
       ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
       ctx.fillText(quoteText, CANVAS_WIDTH / 2 + 50, cursorY + 52);
-      ctx.restore();
     }
 
     if (loadedMascots.length > 0) {

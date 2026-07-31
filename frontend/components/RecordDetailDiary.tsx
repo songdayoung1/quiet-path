@@ -92,8 +92,8 @@ export const RecordDetailDiary: React.FC<Props> = ({
   const rightUsesDarkText = photoTextTones.right === 'dark';
   const posterUsesDarkText = photoTextTones.body === 'dark';
   const posterTextShadow = posterUsesDarkText
-    ? '0 1px 3px rgba(255,255,255,0.72)'
-    : '0 1px 3px rgba(15,23,42,0.48)';
+    ? '0 0 2px rgba(255,255,255,0.98), 0 1px 6px rgba(255,255,255,0.9), 0 3px 14px rgba(255,255,255,0.62)'
+    : '0 0 2px rgba(15,23,42,0.82), 0 1px 6px rgba(15,23,42,0.68), 0 3px 14px rgba(15,23,42,0.48)';
 
   React.useEffect(() => {
     const card = posterCardRef.current;
@@ -370,20 +370,10 @@ export const RecordDetailDiary: React.FC<Props> = ({
 
                   {hasOneWord && (
                     <div className="mt-8 flex justify-center">
-                      <div className={`flex items-center gap-[10px] rounded-full border px-5 py-3 backdrop-blur-sm ${
-                        posterUsesDarkText
-                          ? 'border-slate-900/10 bg-white/[0.36]'
-                          : 'border-white/[0.38] bg-slate-950/[0.12]'
-                      }`}>
-                        <span className={`text-[10px] font-bold tracking-[0.12em] ${
-                          posterUsesDarkText ? 'text-slate-700' : 'text-white'
-                        }`}>한 단어</span>
-                        <span className={`h-px w-[14px] ${
-                          posterUsesDarkText ? 'bg-slate-700' : 'bg-white'
-                        }`} />
-                        <span className={`text-[18px] font-semibold italic tracking-[-0.01em] ${
-                          posterUsesDarkText ? 'text-slate-900' : 'text-white'
-                        }`}>
+                      <div className="flex items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                        <span className={defaultSectionLabelClassName}>한 단어</span>
+                        <span className="h-px w-[14px] bg-mist-200" />
+                        <span className="text-[18px] font-semibold italic tracking-[-0.01em] text-point-600">
                           "{record.oneWordText}"
                         </span>
                       </div>
