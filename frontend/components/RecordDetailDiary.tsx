@@ -286,21 +286,21 @@ export const RecordDetailDiary: React.FC<Props> = ({
               <article className="overflow-hidden rounded-[26px] border border-white/85" style={diaryPhotoSurfaceStyle}>
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <RecordImage record={record} alt="기록 사진" className="h-full w-full" />
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.03)_60%,rgba(10,20,42,0.46)_100%)]" />
+                  <div className="absolute inset-x-0 top-0 h-[42%] bg-[linear-gradient(180deg,rgba(255,255,255,0.72)_0%,rgba(255,255,255,0.28)_58%,rgba(255,255,255,0)_100%)]" />
                   <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
-                    <div className="text-white">
-                      <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-white/92">
+                    <div className="text-slate-900">
+                      <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-slate-700/80">
                         {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
                       </p>
-                      <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-white">
+                      <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-slate-900">
                         {String(date.getDate()).padStart(2, '0')}
                       </p>
                     </div>
                     <div className="flex flex-col items-center gap-2.5">
-                      <span className="font-mono text-[10px] tracking-wider text-center text-white">{fmtTime(date)}</span>
+                      <span className="text-center font-mono text-[10px] tracking-wider text-slate-700">{fmtTime(date)}</span>
                       {mood && (
-                        <span className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-white/42 bg-white/14 px-3 py-1.5 backdrop-blur-sm">
-                          <span className="text-xs font-bold leading-none text-white">{mood}</span>
+                        <span className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-slate-900/10 bg-white/60 px-3 py-1.5 backdrop-blur-sm">
+                          <span className="text-xs font-bold leading-none text-slate-800">{mood}</span>
                         </span>
                       )}
                     </div>

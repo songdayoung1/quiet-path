@@ -1129,14 +1129,12 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   );
   ctx.fillStyle = 'rgba(255,255,255,0.96)';
   ctx.fillRect(cardX, cardY + imageHeight, cardWidth, cardHeight - imageHeight);
-  const imageOverlay = ctx.createLinearGradient(0, cardY, 0, cardY + imageHeight);
-  imageOverlay.addColorStop(0, 'rgba(10,20,42,0.72)');
-  imageOverlay.addColorStop(0.22, 'rgba(10,20,42,0.08)');
-  imageOverlay.addColorStop(0.48, 'rgba(10,20,42,0.08)');
-  imageOverlay.addColorStop(0.7, 'rgba(10,20,42,0.04)');
-  imageOverlay.addColorStop(1, 'rgba(10,20,42,0.46)');
+  const imageOverlay = ctx.createLinearGradient(0, cardY, 0, cardY + imageHeight * 0.48);
+  imageOverlay.addColorStop(0, 'rgba(255,255,255,0.78)');
+  imageOverlay.addColorStop(0.55, 'rgba(255,255,255,0.32)');
+  imageOverlay.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = imageOverlay;
-  ctx.fillRect(cardX, cardY, cardWidth, imageHeight);
+  ctx.fillRect(cardX, cardY, cardWidth, imageHeight * 0.48);
   ctx.restore();
 
   roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
@@ -1149,7 +1147,7 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
     x: contentLeftX - 6,
     y: cardY + 78,
     mascotSize: 36,
-    textColor: 'rgba(255,255,255,0.95)',
+    textColor: 'rgba(30,41,59,0.9)',
     fontSize: 22,
     letterSpacing: 3.5,
     gap: 8,
@@ -1163,20 +1161,20 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
     cardY + 83,
     268,
     directionText,
-    '#FFFFFF',
-    'rgba(255,255,255,0.6)',
+    '#1E293B',
+    'rgba(71,85,105,0.72)',
   );
 
   ctx.textAlign = 'left';
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillStyle = 'rgba(51,65,85,0.82)';
   ctx.font = '800 18px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText(`${WEEKDAYS[date.getDay()]} · ${MONTHS[date.getMonth()]}`, contentLeftX, cardY + 224);
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = '#0F172A';
   ctx.font = '800 110px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText(String(date.getDate()).padStart(2, '0'), contentLeftX - 4, cardY + 322);
 
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = '#334155';
   ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText(fmtTime(date), cardX + cardWidth - 72, cardY + 224);
 
@@ -1184,12 +1182,12 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
     ctx.font = '700 24px "SF Pro Display", "Pretendard", sans-serif';
     const moodWidth = Math.max(ctx.measureText(record.moodCode).width + 60, 120);
     roundedRect(ctx, cardX + cardWidth - 72 - moodWidth, cardY + 270, moodWidth, 52, 26);
-    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillStyle = 'rgba(255,255,255,0.64)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+    ctx.strokeStyle = 'rgba(15,23,42,0.12)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = '#1E293B';
     ctx.textAlign = 'center';
     ctx.fillText(record.moodCode, cardX + cardWidth - 72 - moodWidth / 2, cardY + 302);
   }
