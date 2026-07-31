@@ -47,12 +47,10 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
 
   const handleExportCard = async (record: RecordType) => {
     try {
-      const result = await exportRecordCard(record);
+      await exportRecordCard(record);
       openShareNotice(
-        result.mode === 'share' ? '카드를 공유했어요' : '카드를 저장했어요',
-        result.mode === 'share'
-          ? '기기 공유 시트를 통해 기록 카드를 전달했어요.'
-          : '기록 카드 이미지를 기기에 저장했어요.'
+        '카드를 저장했어요',
+        '기록 카드 이미지를 브라우저에서 다운로드했어요.'
       );
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -272,7 +270,7 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
                         <span className="text-base leading-none">🖼️</span>
                         <div className="flex flex-col">
                           <span className="text-[11px] font-bold mb-0.5" style={{ color: palette.strongText }}>카드 내보내기</span>
-                          <span className="text-[9px] leading-none" style={{ color: palette.faintText }}>공유 또는 이미지 저장</span>
+                          <span className="text-[9px] leading-none" style={{ color: palette.faintText }}>브라우저에 이미지 저장</span>
                         </div>
                       </button>
                     </div>

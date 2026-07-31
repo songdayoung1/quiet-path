@@ -164,12 +164,10 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   const handleExportRecord = async (record: RecordType) => {
     setIsExportingRecordCard(true);
     try {
-      const result = await exportRecordCard(record, record.imageUrl ? { mode: 'poster' } : undefined);
+      await exportRecordCard(record, record.imageUrl ? { mode: 'poster' } : undefined);
       openNoticeModal(
-        result.mode === 'share' ? '카드를 공유했어요' : '카드를 저장했어요',
-        result.mode === 'share'
-          ? '기기 공유 시트를 통해 기록 카드를 전달했어요.'
-          : '기록 카드 이미지를 기기에 저장했어요.'
+        '카드를 저장했어요',
+        '기록 카드 이미지를 브라우저에서 다운로드했어요.'
       );
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {

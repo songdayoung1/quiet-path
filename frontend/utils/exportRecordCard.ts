@@ -1,4 +1,5 @@
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
+import { buildLatestRecordByDateMap } from './heatmap';
 import { getRecordParagraphs } from './recordText';
 
 const CANVAS_WIDTH = 1080;
@@ -44,7 +45,7 @@ const MOOD_ACTIVITY_CELL_COLORS: Record<string, string> = {
   '잔잔': '#BFDBFE',
   '버팀': '#86EFAC',
   '두근': '#FDA4AF',
-  '멍함': '#E2E8F0',
+  '멍함': '#94A3B8',
 };
 
 const getMoodExportColor = (mood?: string) =>
@@ -1282,11 +1283,6 @@ const downloadBlob = (blob: Blob, fileName: string) => {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
-const isDesktopEnvironment = () => {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia('(pointer:fine)').matches;
-};
-
 // ─── Monthly Collage ────────────────────────────────────────────────────────
 
 const COLLAGE_CANVAS_HEIGHT = 1350;
@@ -1554,34 +1550,6 @@ export const exportMonthlyCollage = async (
   }
 
   const fileDate = `${year}-${String(month).padStart(2, '0')}`;
-  const files = blobs.map((blob, i) => {
-    const suffix = totalPages > 1 ? `-${i + 1}of${totalPages}` : '';
-    return new File([blob], `quiet-path-collage-${fileDate}${suffix}.png`, { type: 'image/png' });
-  });
-
-  const canNativeShare =
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files });
-
-  if (isDesktopEnvironment()) {
-    for (let i = 0; i < blobs.length; i++) {
-      const suffix = totalPages > 1 ? `-${i + 1}of${totalPages}` : '';
-      downloadBlob(blobs[i], `quiet-path-collage-${fileDate}${suffix}.png`);
-    }
-    return { mode: 'download' as const, pages: totalPages };
-  }
-
-  if (canNativeShare) {
-    await navigator.share({
-      files,
-      title: 'Quiet Path 기록 콜라주',
-      text: `${year}년 ${month}월의 기록을 콜라주로 내보냈어요.`,
-    });
-    return { mode: 'share' as const, pages: totalPages };
-  }
-
   for (let i = 0; i < blobs.length; i++) {
     const suffix = totalPages > 1 ? `-${i + 1}of${totalPages}` : '';
     downloadBlob(blobs[i], `quiet-path-collage-${fileDate}${suffix}.png`);
@@ -1604,14 +1572,10 @@ const buildMonthlyCalendarCells = (
 ): CalendarExportCell[] => {
   const recordByDay = new Map<number, RecordType>();
 
-  records.forEach((record) => {
+  const latestRecords = buildLatestRecordByDateMap(records) as Map<string, RecordType>;
+  latestRecords.forEach((record) => {
     const date = new Date(record.timestamp);
-    const day = date.getDate();
-    const previous = recordByDay.get(day);
-
-    if (!previous || record.timestamp > previous.timestamp) {
-      recordByDay.set(day, record);
-    }
+    recordByDay.set(date.getDate(), record);
   });
 
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -1904,32 +1868,6 @@ export const exportMonthlyCalendar = async (
   const blob = await createMonthlyCalendarBlob(monthRecords, year, month, wordmarkMascotImg);
   const fileDate = `${year}-${String(month).padStart(2, '0')}`;
   const fileName = `quiet-path-monthly-calendar-${fileDate}.png`;
-  const file = new File([blob], fileName, { type: 'image/png' });
-
-  const canNativeShare =
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files: [file] });
-
-  if (isDesktopEnvironment()) {
-    downloadBlob(blob, fileName);
-    return { mode: 'download' as const };
-  }
-
-  if (isDesktopEnvironment()) {
-    downloadBlob(blob, fileName);
-    return { mode: 'download' as const };
-  }
-
-  if (canNativeShare) {
-    await navigator.share({
-      files: [file],
-      title: 'Quiet Path 월간 캘린더',
-      text: `${year}년 ${month}월 무드 캘린더를 내보냈어요.`,
-    });
-    return { mode: 'share' as const };
-  }
 
   downloadBlob(blob, fileName);
   return { mode: 'download' as const };
@@ -1947,22 +1885,6 @@ export const exportRecordCard = async (
       ? await createDiaryPhotoRecordCardBlob(record)
       : await createPosterRecordCardBlob(record);
   const fileName = `quiet-path-record-${formatFileDate(record.timestamp)}.png`;
-  const file = new File([blob], fileName, { type: 'image/png' });
-
-  const canNativeShare =
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files: [file] });
-
-  if (canNativeShare) {
-    await navigator.share({
-      files: [file],
-      title: 'Quiet Path 기록 카드',
-      text: '오늘의 기록을 카드로 꺼냈어요.',
-    });
-    return { mode: 'share' as const };
-  }
 
   downloadBlob(blob, fileName);
   return { mode: 'download' as const };

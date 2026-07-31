@@ -12,6 +12,7 @@ import type { ApiErrorWithStatus } from '../api/apiClient';
 import { isMockAccessToken } from '../api/authApi';
 import { AppModal } from '../components/AppModal';
 import { exportRecordCard, exportMonthlyCalendar, exportMonthlyCollage } from '../utils/exportRecordCard';
+import { buildLatestRecordByDateMap } from '../utils/heatmap';
 
 interface RecordsViewProps {
   records: RecordType[];
@@ -326,7 +327,10 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
   const monthlyRecordMap = useMemo(() => {
     const map = new Map<number, RecordType>();
-    monthlyRecords.forEach((record) => map.set(new Date(record.timestamp).getDate(), record));
+    const latestRecords = buildLatestRecordByDateMap(monthlyRecords) as Map<string, RecordType>;
+    latestRecords.forEach((record) => {
+      map.set(new Date(record.timestamp).getDate(), record);
+    });
     return map;
   }, [monthlyRecords]);
 
@@ -418,13 +422,10 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const handleExportRecord = async (record: RecordType, mode?: RecordCardDisplayMode) => {
     setIsExportingRecordCard(true);
     try {
-      const result = await exportRecordCard(record, mode ? { mode } : undefined);
+      await exportRecordCard(record, mode ? { mode } : undefined);
       setShareNotice({
-        title: result.mode === 'share' ? '카드를 공유했어요' : '카드를 저장했어요',
-        description:
-          result.mode === 'share'
-            ? '기기 공유 시트를 통해 기록 카드를 전달했어요.'
-            : '기록 카드 이미지를 기기에 저장했어요.',
+        title: '카드를 저장했어요',
+        description: '기록 카드 이미지를 브라우저에서 다운로드했어요.',
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
@@ -457,10 +458,10 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     if (isExportingActivityBoard || monthlyRecords.length === 0) return;
     setIsExportingActivityBoard(true);
     try {
-      const result = await exportMonthlyCalendar(monthlyRecords, targetYear, targetMonth + 1);
+      await exportMonthlyCalendar(monthlyRecords, targetYear, targetMonth + 1);
       setShareNotice({
-        title: result.mode === 'share' ? '캘린더를 공유했어요' : '캘린더를 저장했어요',
-        description: `${targetMonth + 1}월 무드 캘린더를 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
+        title: '캘린더를 저장했어요',
+        description: `${targetMonth + 1}월 무드 캘린더를 브라우저에서 다운로드했어요.`,
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -479,11 +480,11 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     try {
       const result = await exportMonthlyCollage(monthlyRecords, targetYear, targetMonth + 1);
       setShareNotice({
-        title: result.mode === 'share' ? '전체 기록을 공유했어요' : '전체 기록 저장이 완료되었어요',
+        title: '전체 기록 저장이 완료되었어요',
         description:
           result.pages > 1
-            ? `${result.pages}장으로 나눠 ${result.mode === 'share' ? '공유' : '저장'}했어요.`
-            : `${targetMonth + 1}월 전체 기록을 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
+            ? `${result.pages}장으로 나눠 브라우저에서 다운로드했어요.`
+            : `${targetMonth + 1}월 전체 기록을 브라우저에서 다운로드했어요.`,
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -532,27 +533,24 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     try {
       if (selectedRecords.length === 1) {
         const targetRecord = selectedRecords[0];
-        const result = await exportRecordCard(
+        await exportRecordCard(
           targetRecord,
           targetRecord.imageUrl ? { mode: 'poster' } : undefined,
         );
         setShareNotice({
-          title: result.mode === 'share' ? '선택 기록을 공유했어요' : '선택 기록 저장이 완료되었어요',
-          description:
-            result.mode === 'share'
-              ? '선택한 기록 카드를 기기 공유 시트로 전달했어요.'
-              : '선택한 기록 카드를 기기에 저장했어요.',
+          title: '선택 기록 저장이 완료되었어요',
+          description: '선택한 기록 카드를 브라우저에서 다운로드했어요.',
         });
       } else {
         const result = await exportMonthlyCollage(monthlyRecords, targetYear, targetMonth + 1, {
           records: selectedRecords,
         });
         setShareNotice({
-          title: result.mode === 'share' ? '선택 기록을 공유했어요' : '선택 기록 저장이 완료되었어요',
+          title: '선택 기록 저장이 완료되었어요',
           description:
             result.pages > 1
-              ? `${result.pages}장으로 나눠 ${result.mode === 'share' ? '공유' : '저장'}했어요.`
-              : `선택한 ${selectedRecords.length}개의 장면을 ${result.mode === 'share' ? '공유' : '저장'}했어요.`,
+              ? `${result.pages}장으로 나눠 브라우저에서 다운로드했어요.`
+              : `선택한 ${selectedRecords.length}개의 장면을 브라우저에서 다운로드했어요.`,
         });
       }
 
