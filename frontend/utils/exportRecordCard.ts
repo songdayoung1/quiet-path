@@ -790,6 +790,18 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
 
   if (hasPhoto) {
     const image = await loadImage(record.imageUrl!);
+    const photoTextTones = getImageTextTones(image, {
+      positionX: record.imagePositionX,
+      positionY: record.imagePositionY,
+      scale: record.imageScale,
+      targetAspectRatio: cardWidth / cardHeight,
+      topSampleEnd: 0.34,
+      bodySampleStart: 0.54,
+      bodySampleEnd: 0.96,
+    });
+    const leftTextColors = getPhotoTextColors(photoTextTones.left);
+    const rightTextColors = getPhotoTextColors(photoTextTones.right);
+    const bodyTextColors = getPhotoTextColors(photoTextTones.body);
     clipImageCover(
       ctx,
       image,
@@ -803,32 +815,23 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       record.imageScale,
     );
 
-    const overlay = ctx.createLinearGradient(0, cardY, 0, cardY + cardHeight);
-    overlay.addColorStop(0, 'rgba(10,20,42,0.72)');
-    overlay.addColorStop(0.22, 'rgba(10,20,42,0.08)');
-    overlay.addColorStop(0.48, 'rgba(10,20,42,0.08)');
-    overlay.addColorStop(0.56, 'rgba(10,20,42,0.04)');
-    overlay.addColorStop(0.72, 'rgba(10,20,42,0.42)');
-    overlay.addColorStop(1, 'rgba(10,20,42,0.82)');
     ctx.save();
-    roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
-    ctx.clip();
-    ctx.fillStyle = overlay;
-    ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
-    ctx.restore();
-
+    setPhotoTextShadow(ctx, photoTextTones.left);
     drawExportWordmark(ctx, {
       mascotImage: wordmarkMascotImg,
       x: contentX - 6,
       y: cardY + 78,
       mascotSize: 36,
-      textColor: 'rgba(255,255,255,0.95)',
+      textColor: leftTextColors.secondary,
       fontSize: 22,
       letterSpacing: 3.5,
       gap: 8,
     });
+    ctx.restore();
 
     const dirLeftX = cardX + cardWidth - 340;
+    ctx.save();
+    setPhotoTextShadow(ctx, photoTextTones.right);
     ctx.textAlign = 'left';
     drawDirectionSummaryWithText(
       ctx,
@@ -836,35 +839,45 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       cardY + 83,
       268,
       directionText,
-      '#FFFFFF',
-      'rgba(255,255,255,0.6)',
+      rightTextColors.primary,
+      rightTextColors.secondary,
     );
+    ctx.restore();
 
+    ctx.save();
+    setPhotoTextShadow(ctx, photoTextTones.left);
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = leftTextColors.secondary;
     ctx.font = '800 18px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText(`${WEEKDAYS[date.getDay()]} · ${MONTHS[date.getMonth()]}`, contentX, cardY + 224);
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = leftTextColors.primary;
     ctx.font = '800 110px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText(String(date.getDate()).padStart(2, '0'), contentX - 4, cardY + 322);
+    ctx.restore();
 
+    ctx.save();
+    setPhotoTextShadow(ctx, photoTextTones.right);
     ctx.textAlign = 'right';
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = rightTextColors.primary;
     ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText(fmtTime(date), cardX + cardWidth - 72, cardY + 224);
+    ctx.restore();
 
     if (record.moodCode) {
       ctx.font = '700 24px "SF Pro Display", "Pretendard", sans-serif';
       const moodWidth = Math.max(ctx.measureText(record.moodCode).width + 60, 120);
       roundedRect(ctx, cardX + cardWidth - 72 - moodWidth, cardY + 270, moodWidth, 52, 26);
-      ctx.fillStyle = 'rgba(255,255,255,0.16)';
+      ctx.fillStyle = rightTextColors.chipFill;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+      ctx.strokeStyle = rightTextColors.chipBorder;
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.fillStyle = '#FFFFFF';
+      ctx.save();
+      setPhotoTextShadow(ctx, photoTextTones.right);
+      ctx.fillStyle = rightTextColors.primary;
       ctx.textAlign = 'center';
       ctx.fillText(record.moodCode, cardX + cardWidth - 72 - moodWidth / 2, cardY + 302);
+      ctx.restore();
     }
 
     if (mainMascotImg) {
@@ -875,17 +888,15 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     let cursorY = cardY + cardHeight - 540;
 
     ctx.save();
+    setPhotoTextShadow(ctx, photoTextTones.body);
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255,255,255,0.76)';
+    ctx.fillStyle = bodyTextColors.secondary;
     ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText('오늘의 기록', CANVAS_WIDTH / 2, cursorY);
     cursorY += 64;
 
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = bodyTextColors.primary;
     ctx.font = '700 52px "SF Pro Display", "Pretendard", sans-serif';
-    ctx.shadowColor = 'rgba(0,0,0,0.24)';
-    ctx.shadowBlur = 18;
-    ctx.shadowOffsetY = 6;
     cursorY = drawParagraphBlocks(ctx, actionBlocks, CANVAS_WIDTH / 2, cursorY, 68, 18);
     ctx.restore();
 
@@ -898,20 +909,23 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       const pillWidth = Math.min(contentWidth - 20, textWidth + 180);
 
       roundedRect(ctx, CANVAS_WIDTH / 2 - pillWidth / 2, cursorY, pillWidth, 82, 41);
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillStyle = bodyTextColors.chipFill;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+      ctx.strokeStyle = bodyTextColors.chipBorder;
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      ctx.fillStyle = '#FFFFFF';
+      ctx.save();
+      setPhotoTextShadow(ctx, photoTextTones.body);
+      ctx.fillStyle = bodyTextColors.primary;
       ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
       ctx.fillText('한 단어', CANVAS_WIDTH / 2 - textWidth / 2 - 28, cursorY + 50);
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = bodyTextColors.primary;
       ctx.fillRect(CANVAS_WIDTH / 2 - textWidth / 2 + 14, cursorY + 41, 26, 2);
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = bodyTextColors.primary;
       ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
       ctx.fillText(quoteText, CANVAS_WIDTH / 2 + 50, cursorY + 52);
+      ctx.restore();
     }
 
     if (loadedMascots.length > 0) {
@@ -922,7 +936,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       text: 'quietpath.app',
       x: cardX + 44,
       y: cardY + cardHeight - 44,
-      color: 'rgba(255,255,255,0.45)',
+      color: bodyTextColors.secondary,
       fontSize: 15,
       align: 'left',
     });

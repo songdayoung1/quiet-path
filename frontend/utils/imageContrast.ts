@@ -3,21 +3,26 @@ export type ImageTextTone = 'dark' | 'light';
 export interface ImageTextTones {
   left: ImageTextTone;
   right: ImageTextTone;
+  body: ImageTextTone;
 }
 
 interface ImageComposition {
   positionX?: number;
   positionY?: number;
   scale?: number;
+  targetAspectRatio?: number;
+  topSampleEnd?: number;
+  bodySampleStart?: number;
+  bodySampleEnd?: number;
 }
 
-const DEFAULT_TEXT_TONES: ImageTextTones = { left: 'light', right: 'light' };
+const DEFAULT_TEXT_TONES: ImageTextTones = { left: 'light', right: 'light', body: 'light' };
 const SAMPLE_WIDTH = 80;
-const SAMPLE_HEIGHT = 60;
 const tonePromiseCache = new Map<string, Promise<ImageTextTones>>();
 
 const resolveRegionTone = (
   pixels: Uint8ClampedArray,
+  rowWidth: number,
   startX: number,
   endX: number,
   startY: number,
@@ -29,7 +34,7 @@ const resolveRegionTone = (
 
   for (let y = startY; y < endY; y += 1) {
     for (let x = startX; x < endX; x += 1) {
-      const offset = (y * SAMPLE_WIDTH + x) * 4;
+      const offset = (y * rowWidth + x) * 4;
       const luminance = pixels[offset] * 0.2126
         + pixels[offset + 1] * 0.7152
         + pixels[offset + 2] * 0.0722;
@@ -52,9 +57,14 @@ export const getImageTextTones = (
   image: HTMLImageElement,
   composition: ImageComposition = {},
 ): ImageTextTones => {
+  const requestedAspectRatio = composition.targetAspectRatio ?? 4 / 3;
+  const targetAspectRatio = Number.isFinite(requestedAspectRatio) && requestedAspectRatio > 0
+    ? requestedAspectRatio
+    : 4 / 3;
+  const sampleHeight = Math.round(SAMPLE_WIDTH / targetAspectRatio);
   const canvas = document.createElement('canvas');
   canvas.width = SAMPLE_WIDTH;
-  canvas.height = SAMPLE_HEIGHT;
+  canvas.height = sampleHeight;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
   if (!ctx || !image.naturalWidth || !image.naturalHeight) {
@@ -62,15 +72,14 @@ export const getImageTextTones = (
   }
 
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT);
+  ctx.fillRect(0, 0, SAMPLE_WIDTH, sampleHeight);
 
   const sourceRatio = image.naturalWidth / image.naturalHeight;
-  const targetRatio = SAMPLE_WIDTH / SAMPLE_HEIGHT;
   let drawWidth = SAMPLE_WIDTH;
-  let drawHeight = SAMPLE_HEIGHT;
+  let drawHeight = sampleHeight;
 
-  if (sourceRatio > targetRatio) {
-    drawWidth = SAMPLE_HEIGHT * sourceRatio;
+  if (sourceRatio > targetAspectRatio) {
+    drawWidth = sampleHeight * sourceRatio;
   } else {
     drawHeight = SAMPLE_WIDTH / sourceRatio;
   }
@@ -79,19 +88,37 @@ export const getImageTextTones = (
   drawWidth *= scale;
   drawHeight *= scale;
   const offsetX = -(drawWidth - SAMPLE_WIDTH) * ((composition.positionX ?? 50) / 100);
-  const offsetY = -(drawHeight - SAMPLE_HEIGHT) * ((composition.positionY ?? 50) / 100);
+  const offsetY = -(drawHeight - sampleHeight) * ((composition.positionY ?? 50) / 100);
   ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
 
-  const pixels = ctx.getImageData(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT).data;
-  const sampleBottom = Math.round(SAMPLE_HEIGHT * 0.56);
+  const pixels = ctx.getImageData(0, 0, SAMPLE_WIDTH, sampleHeight).data;
+  const topSampleEnd = Math.round(sampleHeight * (composition.topSampleEnd ?? 0.56));
+  const bodySampleStart = Math.round(sampleHeight * (composition.bodySampleStart ?? 0.52));
+  const bodySampleEnd = Math.round(sampleHeight * (composition.bodySampleEnd ?? 0.96));
   return {
-    left: resolveRegionTone(pixels, 0, Math.round(SAMPLE_WIDTH * 0.48), 0, sampleBottom),
+    left: resolveRegionTone(
+      pixels,
+      SAMPLE_WIDTH,
+      0,
+      Math.round(SAMPLE_WIDTH * 0.48),
+      0,
+      topSampleEnd,
+    ),
     right: resolveRegionTone(
       pixels,
+      SAMPLE_WIDTH,
       Math.round(SAMPLE_WIDTH * 0.52),
       SAMPLE_WIDTH,
       0,
-      sampleBottom,
+      topSampleEnd,
+    ),
+    body: resolveRegionTone(
+      pixels,
+      SAMPLE_WIDTH,
+      Math.round(SAMPLE_WIDTH * 0.08),
+      Math.round(SAMPLE_WIDTH * 0.92),
+      bodySampleStart,
+      bodySampleEnd,
     ),
   };
 };
@@ -105,6 +132,10 @@ export const loadImageTextTones = (
     composition.positionX ?? 50,
     composition.positionY ?? 50,
     composition.scale ?? 1,
+    composition.targetAspectRatio?.toFixed(3) ?? '1.333',
+    composition.topSampleEnd ?? 0.56,
+    composition.bodySampleStart ?? 0.52,
+    composition.bodySampleEnd ?? 0.96,
   ].join('|');
   const cached = tonePromiseCache.get(cacheKey);
   if (cached) {
