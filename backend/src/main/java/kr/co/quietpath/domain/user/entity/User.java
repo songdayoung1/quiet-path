@@ -108,6 +108,20 @@ public class User {
             .build();
     }
 
+    public static User createLocal(
+        String providerUserId,
+        String nickname
+    ) {
+        Objects.requireNonNull(providerUserId, "providerUserId는 필수입니다.");
+        Objects.requireNonNull(nickname, "nickname은 필수입니다.");
+
+        return User.builder()
+            .provider(ProviderType.LOCAL)
+            .providerUserId(providerUserId)
+            .nickname(nickname)
+            .build();
+    }
+
     private void touch() {
         this.updatedAt = LocalDateTime.now();
     }

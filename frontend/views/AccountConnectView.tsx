@@ -4,11 +4,17 @@ import { ArrowLeft, ShieldCheck } from 'lucide-react';
 interface AccountConnectViewProps {
   onBack: () => void;
   onStartKakao: () => void;
+  onNavigateToLocalQa: () => void;
   // Callback equivalent to redirecting for E2E dev
   onNavigateToMockKakao: (code: string) => void;
 }
 
-export const AccountConnectView: React.FC<AccountConnectViewProps> = ({ onBack, onStartKakao, onNavigateToMockKakao }) => {
+export const AccountConnectView: React.FC<AccountConnectViewProps> = ({
+  onBack,
+  onStartKakao,
+  onNavigateToLocalQa,
+  onNavigateToMockKakao,
+}) => {
   const [startError, setStartError] = React.useState<string | null>(null);
 
   const handleRealKakaoLogin = async () => {
@@ -74,43 +80,54 @@ export const AccountConnectView: React.FC<AccountConnectViewProps> = ({ onBack, 
             </div>
           )}
 
-          <div className="pt-8">
-            <button
-              onClick={() => setDevOpen((prev) => !prev)}
-              className="text-[10px] font-bold tracking-[0.18em] text-mist-400 hover:text-mist-500"
-            >
-              · DEV MOCK {devOpen ? '▲' : '▼'}
-            </button>
+          {import.meta.env.DEV && (
+            <div className="pt-8">
+              <button
+                onClick={() => setDevOpen((prev) => !prev)}
+                className="text-[10px] font-bold tracking-[0.18em] text-mist-400 hover:text-mist-500"
+              >
+                · DEV LOGIN {devOpen ? '▲' : '▼'}
+              </button>
 
-            {devOpen && (
-              <div className="mt-2 p-3 rounded-xl bg-white/70 border border-white text-left animate-fade-in">
-                <p className="text-[10px] font-bold text-mist-500 tracking-[0.14em] mb-2 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-point-400 inline-block animate-pulse" />
-                  E2E MOCK (import.meta.env.DEV)
-                </p>
-                <div className="grid grid-cols-3 gap-1.5">
+              {devOpen && (
+                <div className="mt-2 p-3 rounded-xl bg-white/70 border border-white text-left animate-fade-in">
+                  <p className="text-[10px] font-bold text-mist-500 tracking-[0.14em] mb-2 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-point-400 inline-block animate-pulse" />
+                    LOCAL QA
+                  </p>
                   <button
-                    onClick={() => onNavigateToMockKakao('new_user')}
-                    className="py-1.5 rounded-lg text-[11px] font-bold bg-white text-mist-600 border border-mist-100 hover:bg-mist-50"
+                    onClick={onNavigateToLocalQa}
+                    className="w-full py-2 mb-2 rounded-lg text-[11px] font-bold bg-point-50 text-point-600 border border-point-100 hover:bg-point-100/80"
                   >
-                    신규
+                    로컬 QA 계정으로 로그인
                   </button>
-                  <button
-                    onClick={() => onNavigateToMockKakao('existing_user')}
-                    className="py-1.5 rounded-lg text-[11px] font-bold bg-white text-mist-600 border border-mist-100 hover:bg-mist-50"
-                  >
-                    기존
-                  </button>
-                  <button
-                    onClick={() => onNavigateToMockKakao('error_user')}
-                    className="py-1.5 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-500 border border-rose-100 hover:bg-rose-100/80"
-                  >
-                    에러
-                  </button>
+                  <p className="text-[10px] font-bold text-mist-400 tracking-[0.12em] mb-1.5">
+                    화면 흐름 MOCK
+                  </p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button
+                      onClick={() => onNavigateToMockKakao('new_user')}
+                      className="py-1.5 rounded-lg text-[11px] font-bold bg-white text-mist-600 border border-mist-100 hover:bg-mist-50"
+                    >
+                      신규
+                    </button>
+                    <button
+                      onClick={() => onNavigateToMockKakao('existing_user')}
+                      className="py-1.5 rounded-lg text-[11px] font-bold bg-white text-mist-600 border border-mist-100 hover:bg-mist-50"
+                    >
+                      기존
+                    </button>
+                    <button
+                      onClick={() => onNavigateToMockKakao('error_user')}
+                      className="py-1.5 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-500 border border-rose-100 hover:bg-rose-100/80"
+                    >
+                      에러
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

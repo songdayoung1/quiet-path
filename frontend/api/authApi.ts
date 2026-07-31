@@ -9,8 +9,10 @@ import { apiFetch, apiUrl, buildApiError, parseErrorMessage } from './apiClient'
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MOCK_CODES = new Set(['new_user', 'existing_user', 'error_user']);
+const LOCAL_QA_CODE_PREFIX = 'local_qa:';
 const REFRESH_RETRY_DELAYS = [120, 250];
 let refreshRequest: Promise<{ token: string }> | null = null;
+export const createLocalQaLoginCode = () => `${LOCAL_QA_CODE_PREFIX}${Date.now()}`;
 export const isMockAccessToken = (token: string) =>
   token.startsWith('mock_token_') || token.startsWith('mock_access_');
 const mockStatusByToken = (token: string): OnboardingStatus =>
@@ -44,6 +46,23 @@ export const authApi = {
   loginWithKakao: async (
     code: string
   ): Promise<{ token: string; onboardingStatus: OnboardingStatus }> => {
+    if (import.meta.env.DEV && code.startsWith(LOCAL_QA_CODE_PREFIX)) {
+      const response = await fetch(apiUrl('/api/v1/auth/local/qa-login'), {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error(await parseErrorMessage(response));
+      }
+
+      const data = await response.json();
+      return {
+        token: data.token,
+        onboardingStatus: data.onboardingStatus,
+      };
+    }
+
     if (import.meta.env.DEV && MOCK_CODES.has(code)) {
       await delay(1500);
       if (code === 'new_user') {

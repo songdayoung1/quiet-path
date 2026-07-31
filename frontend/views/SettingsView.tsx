@@ -63,7 +63,7 @@ const SETTINGS_KEY = 'qp.settings.v3';
 const NICKNAME_KEY = 'qp.profile.nickname';
 const THEME_CHANGE_EVENT = 'qp:theme-mode-changed';
 const REVIEW_REMINDER_MINUTES = [0, 15, 30, 45];
-const SHOW_WEB_PUSH_TEST_BUTTON = false;
+const SHOW_WEB_PUSH_TEST_BUTTON = import.meta.env.DEV;
 
 const DEFAULT_SETTINGS: LocalSettings = {
   notifications: {

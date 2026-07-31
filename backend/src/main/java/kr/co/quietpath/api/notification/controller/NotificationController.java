@@ -15,6 +15,7 @@ import kr.co.quietpath.api.notification.dto.response.WebPushConfigResponse;
 import kr.co.quietpath.api.notification.dto.response.WebPushSubscriptionResponse;
 import kr.co.quietpath.api.notification.dto.response.NotificationReadAllResponse;
 import kr.co.quietpath.api.notification.dto.response.NotificationReadResponse;
+import kr.co.quietpath.api.notification.dto.response.NotificationUnreadCountResponse;
 import kr.co.quietpath.api.notification.service.NotificationService;
 import kr.co.quietpath.api.notification.service.NotificationPreferenceService;
 import kr.co.quietpath.api.notification.service.WebPushSubscriptionService;
@@ -90,6 +91,13 @@ public class NotificationController {
     ) {
         Long userId = extractUserId(principal);
         return notificationService.getNotifications(userId, query);
+    }
+
+    @GetMapping("/unread-count")
+    public NotificationUnreadCountResponse getUnreadCount(
+        @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        return notificationService.getUnreadCount(extractUserId(principal));
     }
 
     @PatchMapping("/{notificationId}/read")

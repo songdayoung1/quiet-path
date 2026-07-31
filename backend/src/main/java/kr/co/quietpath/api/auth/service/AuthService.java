@@ -51,6 +51,9 @@ public class AuthService {
 
     private static final String AUTHORIZATION_CODE = "authorization_code";
     private static final String RESPONSE_TYPE_CODE = "code";
+    private static final String LOCAL_QA_PROVIDER_USER_ID = "quiet-path-local-qa";
+    private static final String LOCAL_QA_NICKNAME = "로컬테스터";
+    private static final int LOCAL_QA_NICKNAME_SUFFIX_LIMIT = 99;
     private static final List<String> NICKNAME_STEMS = List.of(
         "조용한물결빛",
         "고요한새벽숲",
@@ -121,10 +124,25 @@ public class AuthService {
             onboardingStatus = OnboardingStatus.EXISTING;
         }
 
-        String sessionId = UUID.randomUUID().toString();
-        String appAccessToken = jwtTokenProvider.createAccessToken(user.getId(), sessionId);
-        String appRefreshToken = issueRefreshToken(user.getId(), sessionId);
-        return new AuthLoginResult(appAccessToken, appRefreshToken, onboardingStatus);
+        return issueLoginResult(user, onboardingStatus);
+    }
+
+    public AuthLoginResult loginWithLocalQaAccount() {
+        User user = userRepository.findByProviderAndProviderUserId(
+                ProviderType.LOCAL,
+                LOCAL_QA_PROVIDER_USER_ID
+            )
+            .orElse(null);
+
+        if (user == null) {
+            user = User.createLocal(LOCAL_QA_PROVIDER_USER_ID, generateLocalQaNickname());
+            user.updateLastLogin();
+            userRepository.save(user);
+        } else {
+            user.updateLastLogin();
+        }
+
+        return issueLoginResult(user, OnboardingStatus.EXISTING);
     }
 
     @Transactional(readOnly = true)
@@ -298,6 +316,19 @@ public class AuthService {
         throw new ApiException(ErrorCode.NICKNAME_GENERATION_FAILED);
     }
 
+    private String generateLocalQaNickname() {
+        if (!userRepository.existsByNickname(LOCAL_QA_NICKNAME)) {
+            return LOCAL_QA_NICKNAME;
+        }
+        for (int suffix = 1; suffix <= LOCAL_QA_NICKNAME_SUFFIX_LIMIT; suffix++) {
+            String candidate = LOCAL_QA_NICKNAME + String.format("%02d", suffix);
+            if (!userRepository.existsByNickname(candidate)) {
+                return candidate;
+            }
+        }
+        throw new ApiException(ErrorCode.NICKNAME_GENERATION_FAILED);
+    }
+
     private String normalizeNickname(String nickname) {
         return nickname == null ? "" : nickname.trim();
     }
@@ -319,6 +350,13 @@ public class AuthService {
             RefreshTokenSession.issue(userId, sessionId, hashToken(refreshToken), getRefreshTokenTtlSeconds())
         );
         return refreshToken;
+    }
+
+    private AuthLoginResult issueLoginResult(User user, OnboardingStatus onboardingStatus) {
+        String sessionId = UUID.randomUUID().toString();
+        String accessToken = jwtTokenProvider.createAccessToken(user.getId(), sessionId);
+        String refreshToken = issueRefreshToken(user.getId(), sessionId);
+        return new AuthLoginResult(accessToken, refreshToken, onboardingStatus);
     }
 
     private Long getRefreshTokenTtlSeconds() {
