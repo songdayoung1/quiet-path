@@ -875,7 +875,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
                   className="text-[11px] mt-0.5"
                   style={{ color: 'var(--qp-warn-text)', opacity: 0.86 }}
                 >
-                  알림을 받을 때만 브라우저 권한을 요청할게요.
+                  알림을 받으려면 브라우저와 기기의 알림을 모두 허용해주세요.
                 </p>
               </div>
               <button
