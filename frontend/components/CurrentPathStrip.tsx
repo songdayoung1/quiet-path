@@ -23,7 +23,6 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
     : null;
 
   const cat = CATEGORIES.find(c => c.id === currentDirection?.categoryId);
-  const accentColor = cat?.accent || '#8B5CF6';
 
   if (!currentDirection) {
     return (
@@ -45,22 +44,12 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
       style={{ background: palette.cardBg, borderColor: palette.border }}
     >
       <div className="flex items-center gap-5 xl:gap-4 relative z-10">
-        {/* Category Section: Icon with subtle background circle */}
+        {/* Category Section: neutral icon and label */}
         <div className="flex flex-col items-center gap-2 xl:gap-1.5 shrink-0">
-          <span className="text-[10px] font-bold tracking-wider mb-1 xl:mb-0.5" style={{ color: accentColor }}>
+          <span className="text-[10px] font-bold tracking-wider mb-1 xl:mb-0.5" style={{ color: palette.mutedText }}>
             {cat?.label || 'Path'}
           </span>
-          <div className="relative">
-             <div 
-               className="absolute inset-0 rounded-full blur-md opacity-20"
-               style={{ backgroundColor: accentColor }}
-             />
-             <CategoryIcon 
-               categoryId={currentDirection?.categoryId} 
-               size="lg" 
-               className="!rounded-full shadow-sm relative z-10 border border-white" 
-             />
-          </div>
+          <CategoryIcon categoryId={currentDirection?.categoryId} size="lg" />
         </div>
 
         {/* Content Section: Title and Question */}
@@ -79,7 +68,7 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
         <div className="flex flex-col items-end shrink-0 gap-2.5 xl:gap-2">
           <div className="text-right">
             <div className="flex items-baseline justify-end gap-0.5">
-              <span className="text-2xl xl:text-xl font-black tracking-tighter" style={{ color: accentColor }}>
+              <span className="text-2xl xl:text-xl font-black tracking-tighter text-point-500">
                 {currentPathConsistency}
               </span>
               <span className="text-[10px] font-bold" style={{ color: palette.faintText }}>%</span>

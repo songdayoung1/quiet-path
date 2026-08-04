@@ -687,6 +687,8 @@ export const CategoryIcon: React.FC<{
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }> = ({ categoryId, size = 'md', className = '' }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
   const cat = CATEGORIES.find(c => c.id === categoryId);
 
   const sizeMap = {
@@ -695,14 +697,18 @@ export const CategoryIcon: React.FC<{
     lg: { outer: 'w-16 h-16', iconSize: 22, radius: 'rounded-3xl' },
   };
   const { outer, iconSize, radius } = sizeMap[size];
+  const iconColor = theme === 'dark' ? '#CBD5E1' : '#64748B';
+  const iconBackground = theme === 'dark'
+    ? 'linear-gradient(145deg, rgba(51,65,85,0.96), rgba(30,41,59,0.96))'
+    : 'linear-gradient(145deg, rgba(248,250,252,0.98), rgba(226,232,240,0.94))';
 
   if (!cat) {
     return (
       <div
-        className={`${outer} ${radius} flex items-center justify-center shadow-sm shrink-0 ${className}`}
-        style={{ background: 'linear-gradient(135deg, #E4E7EB, #CBD2D9)' }}
+        className={`${outer} ${radius} flex items-center justify-center border shadow-sm shrink-0 ${className}`}
+        style={{ background: iconBackground, borderColor: palette.border }}
       >
-        <Briefcase size={iconSize} color="#9AA5B1" strokeWidth={1.8} />
+        <Briefcase size={iconSize} color={iconColor} strokeWidth={1.8} />
       </div>
     );
   }
@@ -711,10 +717,10 @@ export const CategoryIcon: React.FC<{
 
   return (
     <div
-      className={`${outer} ${radius} flex items-center justify-center shadow-sm shrink-0 ${className}`}
-      style={{ background: `linear-gradient(135deg, ${cat.gradientFrom}, ${cat.gradientTo})` }}
+      className={`${outer} ${radius} flex items-center justify-center border shadow-sm shrink-0 ${className}`}
+      style={{ background: iconBackground, borderColor: palette.border }}
     >
-      <IconComponent size={iconSize} color={cat.accent} strokeWidth={2} />
+      <IconComponent size={iconSize} color={iconColor} strokeWidth={2} />
     </div>
   );
 };

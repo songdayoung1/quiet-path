@@ -162,16 +162,17 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                     setDescription('');
                     setShowCategorySelect(false);
                   }}
-                  className="!p-5 cursor-pointer hover:bg-white active:scale-[0.98] border border-white transition-all shadow-sm hover:shadow-md"
-                  style={{ background: `linear-gradient(135deg, ${cat.accentBg}CC, white)` } as React.CSSProperties}
+                  withSurfaceOverlay={false}
+                  className="group !p-5 cursor-pointer active:scale-[0.98] transition-all shadow-sm hover:shadow-md hover:!border-point-200 focus-within:ring-2 focus-within:ring-point-200/60"
+                  style={{ background: palette.cardBgStrong, borderColor: palette.border }}
                 >
                   <div className="flex items-center gap-4">
                     <CategoryIcon categoryId={cat.id} size="md" />
                     <div className="flex-1">
-                      <h3 className="font-bold text-base mb-0.5" style={{ color: cat.accent }}>{cat.label}</h3>
-                      <p className="text-mist-400 text-xs">{cat.desc}</p>
+                      <h3 className="font-bold text-base mb-0.5" style={{ color: palette.strongText }}>{cat.label}</h3>
+                      <p className="text-xs" style={{ color: palette.mutedText }}>{cat.desc}</p>
                     </div>
-                    <ArrowRight size={16} className="text-mist-300 shrink-0" />
+                    <ArrowRight size={16} className="text-mist-300 shrink-0 transition-colors group-hover:text-point-400" />
                   </div>
                 </Card>
               ))}
@@ -272,9 +273,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                   )}
                   <div className="flex-1 min-w-0 pt-0.5">
                     {currentDirection.categoryId && (
-                      <span className="text-[10px] font-bold tracking-widest uppercase mb-1 block"
-                        style={{ color: CATEGORIES.find(c => c.id === currentDirection.categoryId)?.accent ?? '#9AA5B1' }}>
-                        {currentDirection.categoryLabel}
+                      <span className="text-[10px] font-bold tracking-widest uppercase mb-1 block" style={{ color: palette.mutedText }}>
+                        카테고리 · {currentDirection.categoryLabel}
                       </span>
                     )}
                     <h2 className="text-[19px] font-bold leading-tight break-keep" style={{ color: palette.strongText }}>
