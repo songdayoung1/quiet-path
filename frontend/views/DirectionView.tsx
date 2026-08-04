@@ -30,9 +30,9 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   const palette = getThemePalette(theme);
   const categoryCardStyle: React.CSSProperties = {
     background: theme === 'dark'
-      ? 'linear-gradient(118deg, rgba(76,29,149,0.36) 0%, rgba(24,34,52,0.96) 48%, rgba(49,46,129,0.28) 100%)'
-      : 'linear-gradient(118deg, rgba(237,233,254,0.92) 0%, rgba(255,255,255,0.96) 46%, rgba(224,231,255,0.84) 100%)',
-    borderColor: theme === 'dark' ? 'rgba(167,139,250,0.34)' : 'rgba(167,139,250,0.48)',
+      ? 'linear-gradient(118deg, rgba(76,29,149,0.22) 0%, rgba(24,34,52,0.96) 48%, rgba(49,46,129,0.16) 100%)'
+      : 'linear-gradient(118deg, rgba(243,240,255,0.92) 0%, rgba(255,255,255,0.96) 46%, rgba(232,236,255,0.74) 100%)',
+    borderColor: theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'rgba(196,181,253,0.38)',
   };
   const [isEditing, setIsEditing] = useState(false);
   const [finishModalOpen, setFinishModalOpen] = useState(false);
@@ -181,11 +181,11 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                     <span
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-transform group-hover:translate-x-0.5"
                       style={{
-                        background: theme === 'dark' ? 'rgba(139,92,246,0.2)' : 'rgba(245,243,255,0.96)',
-                        borderColor: theme === 'dark' ? 'rgba(167,139,250,0.3)' : 'rgba(196,181,253,0.58)',
+                        background: theme === 'dark' ? 'rgba(139,92,246,0.12)' : 'rgba(248,247,255,0.96)',
+                        borderColor: theme === 'dark' ? 'rgba(167,139,250,0.22)' : 'rgba(196,181,253,0.42)',
                       }}
                     >
-                      <ArrowRight size={14} className="text-point-500" />
+                      <ArrowRight size={14} className="text-point-400" />
                     </span>
                   </div>
                 </Card>
