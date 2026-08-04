@@ -91,6 +91,9 @@ public interface ReactionRepository extends JpaRepository<Reaction, Long> {
         @Param("recordIds") List<Long> recordIds
     );
 
+    @Query("select r from Reaction r join fetch r.record where r.user.id = :userId")
+    List<Reaction> findAllWithRecordByUserId(@Param("userId") Long userId);
+
     default boolean existsByUserIdAndTargetTypeAndTargetId(Long userId, String targetType, Long targetId) {
         if (!"RECORD".equals(targetType)) {
             return false;

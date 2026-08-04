@@ -24,7 +24,7 @@ public class Comment {
     @Column(name = "record_id", nullable = false)
     private Long recordId;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id")
     private Long userId;
 
     @Column(nullable = false, length = 500)
@@ -61,6 +61,13 @@ public class Comment {
         if (!this.deleted) {
             this.deleted = true;
             this.deletedAt = LocalDateTime.now();
+            this.updatedAt = LocalDateTime.now();
+        }
+    }
+
+    public void anonymizeAuthor() {
+        if (this.userId != null) {
+            this.userId = null;
             this.updatedAt = LocalDateTime.now();
         }
     }
