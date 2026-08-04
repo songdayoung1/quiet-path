@@ -691,9 +691,9 @@ export const CategoryIcon: React.FC<{
   const cat = CATEGORIES.find(c => c.id === categoryId);
 
   const sizeMap = {
-    sm: { outer: 'w-9 h-9', iconSize: 12, radius: 'rounded-xl' },
-    md: { outer: 'w-12 h-12', iconSize: 16, radius: 'rounded-2xl' },
-    lg: { outer: 'w-16 h-16', iconSize: 22, radius: 'rounded-3xl' },
+    sm: { outer: 'w-9 h-9', iconSize: 15, radius: 'rounded-xl' },
+    md: { outer: 'w-12 h-12', iconSize: 20, radius: 'rounded-2xl' },
+    lg: { outer: 'w-16 h-16', iconSize: 28, radius: 'rounded-3xl' },
   };
   const { outer, iconSize, radius } = sizeMap[size];
   const iconColor = theme === 'dark' ? '#DDD6FE' : '#7C3AED';
@@ -730,7 +730,7 @@ export const CategoryIcon: React.FC<{
         boxShadow: '0 10px 22px -14px rgba(124,58,237,0.55)',
       }}
     >
-      <IconComponent size={iconSize} color={iconColor} strokeWidth={2} />
+      <IconComponent size={iconSize} color={iconColor} strokeWidth={1.8} />
     </div>
   );
 };
