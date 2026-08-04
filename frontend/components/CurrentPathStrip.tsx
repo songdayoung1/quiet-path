@@ -41,47 +41,47 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
   return (
     <Card
       withSurfaceOverlay={false}
-      className="!rounded-[2rem] !px-5 !py-4 backdrop-blur-md shadow-sm !transition-all !duration-300"
+      className="!rounded-[2rem] !px-5 !py-5 backdrop-blur-md shadow-sm !transition-all !duration-300"
       style={{ background: palette.cardBg, borderColor: palette.border }}
     >
-      <div className="relative z-10 flex items-center gap-3">
+      <div className="relative z-10 flex items-center gap-4">
         <CategoryIcon categoryId={currentDirection.categoryId} size="md" className="self-center" />
 
         <div className="min-w-0 flex-1">
-          <div className="mb-1 flex items-center gap-1.5 text-[9px] font-semibold tracking-wide" style={{ color: palette.mutedText }}>
+          <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold tracking-wide" style={{ color: palette.mutedText }}>
             <span className="font-bold text-point-500">
               {cat?.label || '카테고리'}
             </span>
             {reviewDateText && (
               <>
-                <span className="h-2.5 w-px" style={{ background: palette.divider }} />
-                <Compass size={9} className="shrink-0 text-point-300" />
+                <span className="h-3 w-px" style={{ background: palette.divider }} />
+                <Compass size={10} className="shrink-0 text-point-300" />
                 <span className="whitespace-nowrap">{reviewDateText} 회고</span>
               </>
             )}
           </div>
 
-          <h3 className="line-clamp-2 break-keep text-[16px] font-bold leading-[1.4]" style={{ color: palette.strongText }}>
+          <h3 className="line-clamp-2 break-keep text-[18px] font-bold leading-[1.4]" style={{ color: palette.strongText }}>
             {currentDirection.description || '아직 설정된 여정이 없어요'}
           </h3>
           {currentDirection.question && (
-            <p className="mt-0.5 line-clamp-1 break-keep text-[11px] font-medium leading-relaxed" style={{ color: palette.mutedText }}>
+            <p className="mt-1 line-clamp-1 break-keep text-[13px] font-medium leading-relaxed" style={{ color: palette.mutedText }}>
               {currentDirection.question}
             </p>
           )}
         </div>
 
         <div
-          className="flex w-[58px] shrink-0 flex-col items-center justify-center border-l pl-3"
+          className="flex w-[62px] shrink-0 flex-col items-center justify-center border-l pl-4"
           style={{ borderColor: palette.divider }}
         >
           <div className="flex items-baseline justify-center gap-0.5">
-            <span className="text-[22px] font-black leading-none tracking-tighter text-point-500">
+            <span className="text-[25px] font-black leading-none tracking-tighter text-point-500">
               {currentPathConsistency}
             </span>
-            <span className="text-[9px] font-bold" style={{ color: palette.faintText }}>%</span>
+            <span className="text-[10px] font-bold" style={{ color: palette.faintText }}>%</span>
           </div>
-          <p className="mt-1 whitespace-nowrap text-[7px] font-bold uppercase tracking-[0.1em]" style={{ color: palette.faintText }}>
+          <p className="mt-1.5 whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: palette.faintText }}>
             {KPI_LABELS.pathRate}
           </p>
         </div>
