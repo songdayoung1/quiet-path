@@ -41,7 +41,7 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
   return (
     <Card
       withSurfaceOverlay={false}
-      className="!rounded-[2rem] !px-5 !py-5 backdrop-blur-md shadow-sm !transition-all !duration-300"
+      className="!rounded-[2rem] !px-5 !py-4 backdrop-blur-md shadow-sm !transition-all !duration-300"
       style={{ background: palette.cardBg, borderColor: palette.border }}
     >
       <div className="relative z-10 flex items-center gap-4">
