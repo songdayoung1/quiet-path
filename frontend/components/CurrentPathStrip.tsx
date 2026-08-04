@@ -41,55 +41,47 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
   return (
     <Card
       withSurfaceOverlay={false}
-      className="!rounded-[2rem] !p-4 backdrop-blur-md shadow-sm !transition-all !duration-300"
+      className="!rounded-[2rem] !px-5 !py-4 backdrop-blur-md shadow-sm !transition-all !duration-300"
       style={{ background: palette.cardBg, borderColor: palette.border }}
     >
-      <div className="relative z-10 flex items-center gap-3.5">
+      <div className="relative z-10 flex items-center gap-3">
         <CategoryIcon categoryId={currentDirection.categoryId} size="md" className="self-center" />
 
         <div className="min-w-0 flex-1">
-          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-            <span
-              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-bold tracking-wide"
-              style={{ background: palette.cardBgSoft, borderColor: palette.divider, color: palette.mutedText }}
-            >
+          <div className="mb-1 flex items-center gap-1.5 text-[9px] font-semibold tracking-wide" style={{ color: palette.mutedText }}>
+            <span className="font-bold text-point-500">
               {cat?.label || '카테고리'}
             </span>
             {reviewDateText && (
-              <span
-                className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-semibold"
-                style={{ background: palette.pillBg, borderColor: palette.pillBorder, color: palette.mutedText }}
-              >
-                <Compass size={9} className="text-point-400" />
-                ~ {reviewDateText}
-              </span>
+              <>
+                <span className="h-2.5 w-px" style={{ background: palette.divider }} />
+                <Compass size={9} className="shrink-0 text-point-300" />
+                <span className="whitespace-nowrap">{reviewDateText} 회고</span>
+              </>
             )}
           </div>
 
-          <h3 className="line-clamp-2 break-keep text-[16px] font-bold leading-[1.35]" style={{ color: palette.strongText }}>
+          <h3 className="line-clamp-2 break-keep text-[15px] font-bold leading-[1.4]" style={{ color: palette.strongText }}>
             {currentDirection.description || '아직 설정된 여정이 없어요'}
           </h3>
           {currentDirection.question && (
-            <p className="mt-1 line-clamp-1 break-keep text-[11px] font-medium leading-relaxed" style={{ color: palette.mutedText }}>
+            <p className="mt-0.5 line-clamp-1 break-keep text-[10px] font-medium leading-relaxed" style={{ color: palette.mutedText }}>
               {currentDirection.question}
             </p>
           )}
         </div>
 
         <div
-          className="flex min-w-[64px] shrink-0 flex-col items-center justify-center self-stretch rounded-[1.15rem] border px-2 py-2.5"
-          style={{
-            background: theme === 'dark' ? 'rgba(139,92,246,0.12)' : 'rgba(245,243,255,0.72)',
-            borderColor: theme === 'dark' ? 'rgba(167,139,250,0.2)' : 'rgba(196,181,253,0.42)',
-          }}
+          className="flex w-[58px] shrink-0 flex-col items-center justify-center border-l pl-3"
+          style={{ borderColor: palette.divider }}
         >
           <div className="flex items-baseline justify-center gap-0.5">
-            <span className="text-[21px] font-black leading-none tracking-tighter text-point-500">
+            <span className="text-[22px] font-black leading-none tracking-tighter text-point-500">
               {currentPathConsistency}
             </span>
             <span className="text-[9px] font-bold" style={{ color: palette.faintText }}>%</span>
           </div>
-          <p className="mt-1 whitespace-nowrap text-[7px] font-bold uppercase tracking-[0.12em]" style={{ color: palette.faintText }}>
+          <p className="mt-1 whitespace-nowrap text-[7px] font-bold uppercase tracking-[0.1em]" style={{ color: palette.faintText }}>
             {KPI_LABELS.pathRate}
           </p>
         </div>
