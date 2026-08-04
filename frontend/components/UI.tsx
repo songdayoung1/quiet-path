@@ -696,13 +696,13 @@ export const CategoryIcon: React.FC<{
     lg: { outer: 'w-16 h-16', iconSize: 28, radius: 'rounded-3xl' },
   };
   const { outer, iconSize, radius } = sizeMap[size];
-  const iconColor = theme === 'dark' ? '#DDD6FE' : '#7C3AED';
+  const iconColor = theme === 'dark' ? '#F5F3FF' : '#FFFFFF';
   const iconBackground = theme === 'dark'
-    ? 'linear-gradient(145deg, rgba(91,33,182,0.56), rgba(49,46,129,0.72))'
-    : 'linear-gradient(145deg, rgba(245,243,255,0.98), rgba(224,231,255,0.96))';
+    ? 'linear-gradient(145deg, #7C3AED, #4F46E5)'
+    : 'linear-gradient(145deg, #8B5CF6, #6366F1)';
   const iconBorder = theme === 'dark'
-    ? 'rgba(167,139,250,0.35)'
-    : 'rgba(196,181,253,0.68)';
+    ? 'rgba(255,255,255,0.18)'
+    : 'rgba(255,255,255,0.72)';
 
   if (!cat) {
     return (
@@ -711,7 +711,7 @@ export const CategoryIcon: React.FC<{
         style={{
           background: iconBackground,
           borderColor: iconBorder,
-          boxShadow: '0 10px 22px -14px rgba(124,58,237,0.55)',
+          boxShadow: '0 12px 24px -12px rgba(99,102,241,0.68)',
         }}
       >
         <Briefcase size={iconSize} color={iconColor} strokeWidth={1.8} />
@@ -727,7 +727,7 @@ export const CategoryIcon: React.FC<{
       style={{
         background: iconBackground,
         borderColor: iconBorder,
-        boxShadow: '0 10px 22px -14px rgba(124,58,237,0.55)',
+        boxShadow: '0 12px 24px -12px rgba(99,102,241,0.68)',
       }}
     >
       <IconComponent size={iconSize} color={iconColor} strokeWidth={1.8} />

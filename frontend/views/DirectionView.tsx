@@ -30,9 +30,9 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
   const palette = getThemePalette(theme);
   const categoryCardStyle: React.CSSProperties = {
     background: theme === 'dark'
-      ? 'linear-gradient(118deg, rgba(76,29,149,0.24) 0%, rgba(24,34,52,0.96) 48%, rgba(49,46,129,0.18) 100%)'
-      : 'linear-gradient(118deg, rgba(245,243,255,0.98) 0%, rgba(255,255,255,0.94) 48%, rgba(238,242,255,0.82) 100%)',
-    borderColor: theme === 'dark' ? 'rgba(167,139,250,0.26)' : 'rgba(196,181,253,0.44)',
+      ? 'linear-gradient(118deg, rgba(76,29,149,0.36) 0%, rgba(24,34,52,0.96) 48%, rgba(49,46,129,0.28) 100%)'
+      : 'linear-gradient(118deg, rgba(237,233,254,0.92) 0%, rgba(255,255,255,0.96) 46%, rgba(224,231,255,0.84) 100%)',
+    borderColor: theme === 'dark' ? 'rgba(167,139,250,0.34)' : 'rgba(167,139,250,0.48)',
   };
   const [isEditing, setIsEditing] = useState(false);
   const [finishModalOpen, setFinishModalOpen] = useState(false);
@@ -180,9 +180,12 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                     </div>
                     <span
                       className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-transform group-hover:translate-x-0.5"
-                      style={{ background: palette.pillBg, borderColor: 'rgba(139,92,246,0.18)' }}
+                      style={{
+                        background: theme === 'dark' ? 'rgba(139,92,246,0.2)' : 'rgba(245,243,255,0.96)',
+                        borderColor: theme === 'dark' ? 'rgba(167,139,250,0.3)' : 'rgba(196,181,253,0.58)',
+                      }}
                     >
-                      <ArrowRight size={14} className="text-point-400" />
+                      <ArrowRight size={14} className="text-point-500" />
                     </span>
                   </div>
                 </Card>
