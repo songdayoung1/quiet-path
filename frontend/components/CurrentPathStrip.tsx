@@ -61,11 +61,11 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
             )}
           </div>
 
-          <h3 className="line-clamp-2 break-keep text-[15px] font-bold leading-[1.4]" style={{ color: palette.strongText }}>
+          <h3 className="line-clamp-2 break-keep text-[16px] font-bold leading-[1.4]" style={{ color: palette.strongText }}>
             {currentDirection.description || '아직 설정된 여정이 없어요'}
           </h3>
           {currentDirection.question && (
-            <p className="mt-0.5 line-clamp-1 break-keep text-[10px] font-medium leading-relaxed" style={{ color: palette.mutedText }}>
+            <p className="mt-0.5 line-clamp-1 break-keep text-[11px] font-medium leading-relaxed" style={{ color: palette.mutedText }}>
               {currentDirection.question}
             </p>
           )}
