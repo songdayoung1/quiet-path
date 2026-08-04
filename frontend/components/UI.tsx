@@ -437,7 +437,7 @@ export const ForestObject: React.FC<{ index: number; type: string; isLocked: boo
 
 const MOOD_HEATMAP_COLOR: Record<string, string> = {
   '포근': 'bg-point-300',
-  '멍함': 'bg-mist-200',
+  '멍함': 'bg-slate-400',
   '반짝': 'bg-amber-300',
   '잔잔': 'bg-blue-200',
   '버팀': 'bg-green-300',
@@ -560,6 +560,7 @@ export const StreakHeatmap: React.FC<{
           { code: '잔잔', color: 'bg-blue-200' },
           { code: '버팀', color: 'bg-green-300' },
           { code: '두근', color: 'bg-rose-300' },
+          { code: '멍함', color: 'bg-slate-400' },
         ].map(m => (
           <div key={m.code} className="flex items-center gap-1">
             <div className={`w-2.5 h-2.5 rounded-sm ${m.color}`} />
@@ -686,22 +687,34 @@ export const CategoryIcon: React.FC<{
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }> = ({ categoryId, size = 'md', className = '' }) => {
+  const theme = useResolvedTheme();
   const cat = CATEGORIES.find(c => c.id === categoryId);
 
   const sizeMap = {
-    sm: { outer: 'w-9 h-9', iconSize: 12, radius: 'rounded-xl' },
-    md: { outer: 'w-12 h-12', iconSize: 16, radius: 'rounded-2xl' },
-    lg: { outer: 'w-16 h-16', iconSize: 22, radius: 'rounded-3xl' },
+    sm: { outer: 'w-9 h-9', iconSize: 15, radius: 'rounded-xl' },
+    md: { outer: 'w-12 h-12', iconSize: 20, radius: 'rounded-2xl' },
+    lg: { outer: 'w-16 h-16', iconSize: 28, radius: 'rounded-3xl' },
   };
   const { outer, iconSize, radius } = sizeMap[size];
+  const iconColor = theme === 'dark' ? '#EDE9FE' : '#6D5ACF';
+  const iconBackground = theme === 'dark'
+    ? 'linear-gradient(145deg, rgba(109,40,217,0.38), rgba(67,56,202,0.44))'
+    : 'linear-gradient(145deg, rgba(233,213,255,0.92), rgba(199,210,254,0.92))';
+  const iconBorder = theme === 'dark'
+    ? 'rgba(196,181,253,0.24)'
+    : 'rgba(255,255,255,0.78)';
 
   if (!cat) {
     return (
       <div
-        className={`${outer} ${radius} flex items-center justify-center shadow-sm shrink-0 ${className}`}
-        style={{ background: 'linear-gradient(135deg, #E4E7EB, #CBD2D9)' }}
+        className={`${outer} ${radius} flex items-center justify-center border shrink-0 ${className}`}
+        style={{
+          background: iconBackground,
+          borderColor: iconBorder,
+          boxShadow: '0 10px 22px -14px rgba(109,90,207,0.42)',
+        }}
       >
-        <Briefcase size={iconSize} color="#9AA5B1" strokeWidth={1.8} />
+        <Briefcase size={iconSize} color={iconColor} strokeWidth={1.8} />
       </div>
     );
   }
@@ -710,10 +723,14 @@ export const CategoryIcon: React.FC<{
 
   return (
     <div
-      className={`${outer} ${radius} flex items-center justify-center shadow-sm shrink-0 ${className}`}
-      style={{ background: `linear-gradient(135deg, ${cat.gradientFrom}, ${cat.gradientTo})` }}
+      className={`${outer} ${radius} flex items-center justify-center border shrink-0 ${className}`}
+      style={{
+        background: iconBackground,
+        borderColor: iconBorder,
+        boxShadow: '0 10px 22px -14px rgba(109,90,207,0.42)',
+      }}
     >
-      <IconComponent size={iconSize} color={cat.accent} strokeWidth={2} />
+      <IconComponent size={iconSize} color={iconColor} strokeWidth={1.8} />
     </div>
   );
 };

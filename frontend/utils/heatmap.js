@@ -10,20 +10,46 @@ export const toStartOfLocalDay = (inputDate) => {
   return date;
 };
 
-export const buildRecordDateMap = (records) => {
-  const recordDateMap = new Map();
+const isNewerRecord = (candidate, current) => {
+  const candidateTimestamp = Number(candidate.timestamp);
+  const currentTimestamp = Number(current.timestamp);
+  if (candidateTimestamp !== currentTimestamp) {
+    return candidateTimestamp > currentTimestamp;
+  }
+
+  const candidateId = Number(candidate.id);
+  const currentId = Number(current.id);
+  return Number.isFinite(candidateId)
+    && Number.isFinite(currentId)
+    && candidateId > currentId;
+};
+
+export const buildLatestRecordByDateMap = (records) => {
+  const latestRecordByDate = new Map();
 
   (records || [])
     .filter((record) => !record.isHidden)
     .forEach((record) => {
-      const date = new Date(record.timestamp);
+      const timestamp = Number(record.timestamp);
+      if (!Number.isFinite(timestamp)) return;
+
+      const date = new Date(timestamp);
       const key = toLocalDateKey(date);
-      if (record.moodCode) {
-        recordDateMap.set(key, record.moodCode);
-      } else {
-        recordDateMap.set(key, RECORDED_SENTINEL);
+      const current = latestRecordByDate.get(key);
+      if (!current || isNewerRecord(record, current)) {
+        latestRecordByDate.set(key, record);
       }
     });
+
+  return latestRecordByDate;
+};
+
+export const buildRecordDateMap = (records) => {
+  const recordDateMap = new Map();
+
+  buildLatestRecordByDateMap(records).forEach((record, key) => {
+    recordDateMap.set(key, record.moodCode || RECORDED_SENTINEL);
+  });
 
   return recordDateMap;
 };

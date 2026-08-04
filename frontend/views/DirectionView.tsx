@@ -9,6 +9,7 @@ import { AppModal } from '../components/AppModal';
 import { getThemePalette, useResolvedTheme } from '../theme';
 import { RecordImage } from '../components/RecordImage';
 import { getCurrentPathRecords } from '../utils/recordScope';
+import { calculatePathProgress } from '../utils/pathProgress';
 
 const formatDateInputValue = (date: Date) => {
   const year = date.getFullYear();
@@ -28,6 +29,12 @@ interface DirectionViewProps {
 export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, records, onStartDirection, onFinishDirection, onHistoryClick }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
+  const categoryCardStyle: React.CSSProperties = {
+    background: theme === 'dark'
+      ? 'linear-gradient(118deg, rgba(76,29,149,0.22) 0%, rgba(24,34,52,0.96) 48%, rgba(49,46,129,0.16) 100%)'
+      : 'linear-gradient(118deg, rgba(243,240,255,0.92) 0%, rgba(255,255,255,0.96) 46%, rgba(232,236,255,0.74) 100%)',
+    borderColor: theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'rgba(196,181,253,0.38)',
+  };
   const [isEditing, setIsEditing] = useState(false);
   const [finishModalOpen, setFinishModalOpen] = useState(false);
   const [showCategorySelect, setShowCategorySelect] = useState(false);
@@ -128,21 +135,10 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
     return Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
   }, [currentPathRecords]);
 
-  const pathConsistency = useMemo(() => {
-    if (!currentDirection) return 0;
-    const startDate = new Date(currentDirection.createdAt);
-    const today = new Date();
-    const pathDays = Math.max(
-      1,
-      Math.floor(
-        (new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() -
-          new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime()) /
-          (1000 * 60 * 60 * 24)
-      ) + 1
-    );
-
-    return Math.round((currentPathRecords.length / pathDays) * 100);
-  }, [currentDirection, currentPathRecords.length]);
+  const pathProgress = useMemo(
+    () => calculatePathProgress(currentPathRecords, currentDirection),
+    [currentDirection, currentPathRecords]
+  );
 
   if (isEditing) {
     return (
@@ -162,16 +158,25 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                     setDescription('');
                     setShowCategorySelect(false);
                   }}
-                  className="!p-5 cursor-pointer hover:bg-white active:scale-[0.98] border border-white transition-all shadow-sm hover:shadow-md"
-                  style={{ background: `linear-gradient(135deg, ${cat.accentBg}CC, white)` } as React.CSSProperties}
+                  withSurfaceOverlay={false}
+                  className="group !p-5 cursor-pointer active:scale-[0.98] transition-all shadow-sm hover:shadow-md hover:!border-point-200 focus-within:ring-2 focus-within:ring-point-200/60"
+                  style={categoryCardStyle}
                 >
                   <div className="flex items-center gap-4">
                     <CategoryIcon categoryId={cat.id} size="md" />
                     <div className="flex-1">
-                      <h3 className="font-bold text-base mb-0.5" style={{ color: cat.accent }}>{cat.label}</h3>
-                      <p className="text-mist-400 text-xs">{cat.desc}</p>
+                      <h3 className="font-bold text-base mb-0.5" style={{ color: palette.strongText }}>{cat.label}</h3>
+                      <p className="text-xs" style={{ color: palette.mutedText }}>{cat.desc}</p>
                     </div>
-                    <ArrowRight size={16} className="text-mist-300 shrink-0" />
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-transform group-hover:translate-x-0.5"
+                      style={{
+                        background: theme === 'dark' ? 'rgba(139,92,246,0.18)' : 'rgba(237,233,254,0.88)',
+                        borderColor: theme === 'dark' ? 'rgba(167,139,250,0.3)' : 'rgba(167,139,250,0.46)',
+                      }}
+                    >
+                      <ArrowRight size={14} className="text-point-500" />
+                    </span>
                   </div>
                 </Card>
               ))}
@@ -272,9 +277,8 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                   )}
                   <div className="flex-1 min-w-0 pt-0.5">
                     {currentDirection.categoryId && (
-                      <span className="text-[10px] font-bold tracking-widest uppercase mb-1 block"
-                        style={{ color: CATEGORIES.find(c => c.id === currentDirection.categoryId)?.accent ?? '#9AA5B1' }}>
-                        {currentDirection.categoryLabel}
+                      <span className="text-[10px] font-bold tracking-widest uppercase mb-1 block" style={{ color: palette.mutedText }}>
+                        카테고리 · {currentDirection.categoryLabel}
                       </span>
                     )}
                     <h2 className="text-[19px] font-bold leading-tight break-keep" style={{ color: palette.strongText }}>
@@ -293,12 +297,12 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                   <div className="flex items-center justify-between mb-4 border-b pb-4" style={{ borderColor: palette.divider }}>
                     <div className="flex flex-col items-center flex-1">
                       <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Path Rate</p>
-                      <p className="text-[17px] font-bold text-point-500 mt-1 leading-none">{pathConsistency}%</p>
+                      <p className="text-[17px] font-bold text-point-500 mt-1 leading-none">{pathProgress.rate}%</p>
                     </div>
                     <div className="w-px h-6" style={{ background: palette.divider }}></div>
                     <div className="flex flex-col items-center flex-1">
                       <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Days</p>
-                      <p className="text-[17px] font-bold mt-1 leading-none" style={{ color: palette.strongText }}>{currentPathRecords.length}</p>
+                      <p className="text-[17px] font-bold mt-1 leading-none" style={{ color: palette.strongText }}>{pathProgress.recordedDays}</p>
                     </div>
                     <div className="w-px h-6" style={{ background: palette.divider }}></div>
                     <div className="flex flex-col items-center flex-1">

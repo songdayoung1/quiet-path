@@ -5,10 +5,6 @@ export const CATEGORIES = [
     desc: '지원서, 면접, 준비 과정',
     defaultTitle: '취업 준비 중',
     icon: 'Briefcase',
-    accent: '#8B5CF6',
-    accentBg: '#F5F3FF',
-    gradientFrom: '#EDE9FE',
-    gradientTo: '#DDD6FE',
   },
   {
     id: 'study',
@@ -16,10 +12,6 @@ export const CATEGORIES = [
     desc: '오늘의 배움, 독서, 연구',
     defaultTitle: '오늘의 공부',
     icon: 'BookOpen',
-    accent: '#667EEA',
-    accentBg: '#F0F4FF',
-    gradientFrom: '#DDE6FF',
-    gradientTo: '#C2D1FF',
   },
   {
     id: 'workout',
@@ -27,10 +19,6 @@ export const CATEGORIES = [
     desc: '운동, 컨디션, 몸 상태',
     defaultTitle: '건강 관리',
     icon: 'Dumbbell',
-    accent: '#10b981',
-    accentBg: '#f0fdf4',
-    gradientFrom: '#d1fae5',
-    gradientTo: '#a7f3d0',
   },
   {
     id: 'hobby',
@@ -38,10 +26,6 @@ export const CATEGORIES = [
     desc: '좋아하는 것, 만드는 즐거움',
     defaultTitle: '취미 생활',
     icon: 'Palette',
-    accent: '#f59e0b',
-    accentBg: '#fffbeb',
-    gradientFrom: '#fde68a',
-    gradientTo: '#fcd34d',
   },
   {
     id: 'cert',
@@ -49,10 +33,6 @@ export const CATEGORIES = [
     desc: '시험 일정, 목표 점수, 진행률',
     defaultTitle: '자격증 취득',
     icon: 'Award',
-    accent: '#f43f5e',
-    accentBg: '#fff1f2',
-    gradientFrom: '#fecdd3',
-    gradientTo: '#fda4af',
   },
 ];
 

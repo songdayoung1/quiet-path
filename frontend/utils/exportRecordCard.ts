@@ -1,4 +1,6 @@
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
+import { buildLatestRecordByDateMap } from './heatmap';
+import { getImageTextTones, type ImageTextTone } from './imageContrast';
 import { getRecordParagraphs } from './recordText';
 
 const CANVAS_WIDTH = 1080;
@@ -7,6 +9,38 @@ const MONTHS_FULL = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JU
 const WEEKDAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const WEEKDAY_LABELS_KO = ['일', '월', '화', '수', '목', '금', '토'];
 const fmtTime = (d: Date) => d.toTimeString().slice(0, 5);
+
+const getPhotoTextColors = (tone: ImageTextTone) => tone === 'dark'
+  ? {
+      primary: '#0F172A',
+      secondary: 'rgba(51,65,85,0.82)',
+      chipFill: 'rgba(255,255,255,0.52)',
+      chipBorder: 'rgba(15,23,42,0.12)',
+    }
+  : {
+      primary: '#FFFFFF',
+      secondary: 'rgba(255,255,255,0.9)',
+      chipFill: 'rgba(15,23,42,0.12)',
+      chipBorder: 'rgba(255,255,255,0.42)',
+    };
+
+const setPhotoTextShadow = (ctx: CanvasRenderingContext2D, tone: ImageTextTone) => {
+  ctx.shadowColor = tone === 'dark'
+    ? 'rgba(255,255,255,0.72)'
+    : 'rgba(15,23,42,0.48)';
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 1;
+};
+
+const setPosterBodyTextShadow = (ctx: CanvasRenderingContext2D, tone: ImageTextTone) => {
+  ctx.shadowColor = tone === 'dark'
+    ? 'rgba(255,255,255,0.92)'
+    : 'rgba(15,23,42,0.68)';
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 2;
+};
 
 const MOOD_CHIP_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   '포근': { bg: 'rgba(245,243,255,0.92)', border: 'rgba(196,181,253,0.75)', text: '#7C3AED' },
@@ -44,7 +78,7 @@ const MOOD_ACTIVITY_CELL_COLORS: Record<string, string> = {
   '잔잔': '#BFDBFE',
   '버팀': '#86EFAC',
   '두근': '#FDA4AF',
-  '멍함': '#E2E8F0',
+  '멍함': '#94A3B8',
 };
 
 const getMoodExportColor = (mood?: string) =>
@@ -765,6 +799,18 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
 
   if (hasPhoto) {
     const image = await loadImage(record.imageUrl!);
+    const photoTextTones = getImageTextTones(image, {
+      positionX: record.imagePositionX,
+      positionY: record.imagePositionY,
+      scale: record.imageScale,
+      targetAspectRatio: cardWidth / cardHeight,
+      topSampleEnd: 0.34,
+      bodySampleStart: 0.54,
+      bodySampleEnd: 0.96,
+    });
+    const leftTextColors = getPhotoTextColors(photoTextTones.left);
+    const rightTextColors = getPhotoTextColors(photoTextTones.right);
+    const bodyTextColors = getPhotoTextColors(photoTextTones.body);
     clipImageCover(
       ctx,
       image,
@@ -778,32 +824,23 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       record.imageScale,
     );
 
-    const overlay = ctx.createLinearGradient(0, cardY, 0, cardY + cardHeight);
-    overlay.addColorStop(0, 'rgba(10,20,42,0.72)');
-    overlay.addColorStop(0.22, 'rgba(10,20,42,0.08)');
-    overlay.addColorStop(0.48, 'rgba(10,20,42,0.08)');
-    overlay.addColorStop(0.56, 'rgba(10,20,42,0.04)');
-    overlay.addColorStop(0.72, 'rgba(10,20,42,0.42)');
-    overlay.addColorStop(1, 'rgba(10,20,42,0.82)');
     ctx.save();
-    roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
-    ctx.clip();
-    ctx.fillStyle = overlay;
-    ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
-    ctx.restore();
-
+    setPhotoTextShadow(ctx, photoTextTones.left);
     drawExportWordmark(ctx, {
       mascotImage: wordmarkMascotImg,
       x: contentX - 6,
       y: cardY + 78,
       mascotSize: 36,
-      textColor: 'rgba(255,255,255,0.95)',
+      textColor: leftTextColors.secondary,
       fontSize: 22,
       letterSpacing: 3.5,
       gap: 8,
     });
+    ctx.restore();
 
     const dirLeftX = cardX + cardWidth - 340;
+    ctx.save();
+    setPhotoTextShadow(ctx, photoTextTones.right);
     ctx.textAlign = 'left';
     drawDirectionSummaryWithText(
       ctx,
@@ -811,56 +848,60 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       cardY + 83,
       268,
       directionText,
-      '#FFFFFF',
-      'rgba(255,255,255,0.6)',
+      rightTextColors.primary,
+      rightTextColors.secondary,
     );
+    ctx.restore();
 
+    ctx.save();
+    setPhotoTextShadow(ctx, photoTextTones.left);
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.fillStyle = leftTextColors.secondary;
     ctx.font = '800 18px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText(`${WEEKDAYS[date.getDay()]} · ${MONTHS[date.getMonth()]}`, contentX, cardY + 224);
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = leftTextColors.primary;
     ctx.font = '800 110px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText(String(date.getDate()).padStart(2, '0'), contentX - 4, cardY + 322);
+    ctx.restore();
 
+    ctx.save();
+    setPhotoTextShadow(ctx, photoTextTones.right);
     ctx.textAlign = 'right';
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = rightTextColors.primary;
     ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText(fmtTime(date), cardX + cardWidth - 72, cardY + 224);
+    ctx.restore();
 
     if (record.moodCode) {
       ctx.font = '700 24px "SF Pro Display", "Pretendard", sans-serif';
       const moodWidth = Math.max(ctx.measureText(record.moodCode).width + 60, 120);
       roundedRect(ctx, cardX + cardWidth - 72 - moodWidth, cardY + 270, moodWidth, 52, 26);
-      ctx.fillStyle = 'rgba(255,255,255,0.16)';
+      ctx.fillStyle = rightTextColors.chipFill;
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+      ctx.strokeStyle = rightTextColors.chipBorder;
       ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.fillStyle = '#FFFFFF';
+      ctx.save();
+      setPhotoTextShadow(ctx, photoTextTones.right);
+      ctx.fillStyle = rightTextColors.primary;
       ctx.textAlign = 'center';
       ctx.fillText(record.moodCode, cardX + cardWidth - 72 - moodWidth / 2, cardY + 302);
-    }
-
-    if (mainMascotImg) {
-      drawMascotImage(ctx, mainMascotImg, cardX + cardWidth - 100, cardY + cardHeight - 470, 92, 0.15);
+      ctx.restore();
     }
 
     const actionBlocks = wrapParagraphBlocks(ctx, record.action, contentWidth - 80, 4);
     let cursorY = cardY + cardHeight - 540;
 
     ctx.save();
+    setPosterBodyTextShadow(ctx, photoTextTones.body);
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255,255,255,0.76)';
+    ctx.fillStyle = bodyTextColors.secondary;
     ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText('오늘의 기록', CANVAS_WIDTH / 2, cursorY);
     cursorY += 64;
 
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = bodyTextColors.primary;
     ctx.font = '700 52px "SF Pro Display", "Pretendard", sans-serif';
-    ctx.shadowColor = 'rgba(0,0,0,0.24)';
-    ctx.shadowBlur = 18;
-    ctx.shadowOffsetY = 6;
     cursorY = drawParagraphBlocks(ctx, actionBlocks, CANVAS_WIDTH / 2, cursorY, 68, 18);
     ctx.restore();
 
@@ -873,18 +914,18 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       const pillWidth = Math.min(contentWidth - 20, textWidth + 180);
 
       roundedRect(ctx, CANVAS_WIDTH / 2 - pillWidth / 2, cursorY, pillWidth, 82, 41);
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillStyle = 'rgba(245,243,255,0.92)';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.42)';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(196,181,253,0.6)';
+      ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#94A3B8';
       ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
       ctx.fillText('한 단어', CANVAS_WIDTH / 2 - textWidth / 2 - 28, cursorY + 50);
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#CBD2D9';
       ctx.fillRect(CANVAS_WIDTH / 2 - textWidth / 2 + 14, cursorY + 41, 26, 2);
-      ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#7C3AED';
       ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
       ctx.fillText(quoteText, CANVAS_WIDTH / 2 + 50, cursorY + 52);
     }
@@ -897,7 +938,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       text: 'quietpath.app',
       x: cardX + 44,
       y: cardY + cardHeight - 44,
-      color: 'rgba(255,255,255,0.45)',
+      color: bodyTextColors.secondary,
       fontSize: 15,
       align: 'left',
     });
@@ -1039,6 +1080,13 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
 
 const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   const image = await loadImage(record.imageUrl!);
+  const photoTextTones = getImageTextTones(image, {
+    positionX: record.imagePositionX,
+    positionY: record.imagePositionY,
+    scale: record.imageScale,
+  });
+  const leftTextColors = getPhotoTextColors(photoTextTones.left);
+  const rightTextColors = getPhotoTextColors(photoTextTones.right);
   const simCtx = document.createElement('canvas').getContext('2d');
   const CANVAS_HEIGHT = 1440;
   const cardX = 72;
@@ -1128,14 +1176,6 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   );
   ctx.fillStyle = 'rgba(255,255,255,0.96)';
   ctx.fillRect(cardX, cardY + imageHeight, cardWidth, cardHeight - imageHeight);
-  const imageOverlay = ctx.createLinearGradient(0, cardY, 0, cardY + imageHeight);
-  imageOverlay.addColorStop(0, 'rgba(10,20,42,0.72)');
-  imageOverlay.addColorStop(0.22, 'rgba(10,20,42,0.08)');
-  imageOverlay.addColorStop(0.48, 'rgba(10,20,42,0.08)');
-  imageOverlay.addColorStop(0.7, 'rgba(10,20,42,0.04)');
-  imageOverlay.addColorStop(1, 'rgba(10,20,42,0.46)');
-  ctx.fillStyle = imageOverlay;
-  ctx.fillRect(cardX, cardY, cardWidth, imageHeight);
   ctx.restore();
 
   roundedRect(ctx, cardX, cardY, cardWidth, cardHeight, 44);
@@ -1143,18 +1183,23 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   ctx.lineWidth = 3;
   ctx.stroke();
 
+  ctx.save();
+  setPhotoTextShadow(ctx, photoTextTones.left);
   drawExportWordmark(ctx, {
     mascotImage: wordmarkMascotImg,
     x: contentLeftX - 6,
     y: cardY + 78,
     mascotSize: 36,
-    textColor: 'rgba(255,255,255,0.95)',
+    textColor: leftTextColors.secondary,
     fontSize: 22,
     letterSpacing: 3.5,
     gap: 8,
   });
+  ctx.restore();
 
   const dirLeftX = cardX + cardWidth - 340;
+  ctx.save();
+  setPhotoTextShadow(ctx, photoTextTones.right);
   ctx.textAlign = 'left';
   drawDirectionSummaryWithText(
     ctx,
@@ -1162,35 +1207,45 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
     cardY + 83,
     268,
     directionText,
-    '#FFFFFF',
-    'rgba(255,255,255,0.6)',
+    rightTextColors.primary,
+    rightTextColors.secondary,
   );
+  ctx.restore();
 
+  ctx.save();
+  setPhotoTextShadow(ctx, photoTextTones.left);
   ctx.textAlign = 'left';
-  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillStyle = leftTextColors.secondary;
   ctx.font = '800 18px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText(`${WEEKDAYS[date.getDay()]} · ${MONTHS[date.getMonth()]}`, contentLeftX, cardY + 224);
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = leftTextColors.primary;
   ctx.font = '800 110px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText(String(date.getDate()).padStart(2, '0'), contentLeftX - 4, cardY + 322);
+  ctx.restore();
 
+  ctx.save();
+  setPhotoTextShadow(ctx, photoTextTones.right);
   ctx.textAlign = 'right';
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = rightTextColors.primary;
   ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText(fmtTime(date), cardX + cardWidth - 72, cardY + 224);
+  ctx.restore();
 
   if (record.moodCode) {
     ctx.font = '700 24px "SF Pro Display", "Pretendard", sans-serif';
     const moodWidth = Math.max(ctx.measureText(record.moodCode).width + 60, 120);
     roundedRect(ctx, cardX + cardWidth - 72 - moodWidth, cardY + 270, moodWidth, 52, 26);
-    ctx.fillStyle = 'rgba(255,255,255,0.16)';
+    ctx.fillStyle = rightTextColors.chipFill;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+    ctx.strokeStyle = rightTextColors.chipBorder;
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    ctx.fillStyle = '#FFFFFF';
+    ctx.save();
+    setPhotoTextShadow(ctx, photoTextTones.right);
+    ctx.fillStyle = rightTextColors.primary;
     ctx.textAlign = 'center';
     ctx.fillText(record.moodCode, cardX + cardWidth - 72 - moodWidth / 2, cardY + 302);
+    ctx.restore();
   }
 
   if (mainMascotImg) {
@@ -1280,11 +1335,6 @@ const downloadBlob = (blob: Blob, fileName: string) => {
   anchor.click();
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
-
-const isDesktopEnvironment = () => {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia('(pointer:fine)').matches;
 };
 
 // ─── Monthly Collage ────────────────────────────────────────────────────────
@@ -1554,34 +1604,6 @@ export const exportMonthlyCollage = async (
   }
 
   const fileDate = `${year}-${String(month).padStart(2, '0')}`;
-  const files = blobs.map((blob, i) => {
-    const suffix = totalPages > 1 ? `-${i + 1}of${totalPages}` : '';
-    return new File([blob], `quiet-path-collage-${fileDate}${suffix}.png`, { type: 'image/png' });
-  });
-
-  const canNativeShare =
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files });
-
-  if (isDesktopEnvironment()) {
-    for (let i = 0; i < blobs.length; i++) {
-      const suffix = totalPages > 1 ? `-${i + 1}of${totalPages}` : '';
-      downloadBlob(blobs[i], `quiet-path-collage-${fileDate}${suffix}.png`);
-    }
-    return { mode: 'download' as const, pages: totalPages };
-  }
-
-  if (canNativeShare) {
-    await navigator.share({
-      files,
-      title: 'Quiet Path 기록 콜라주',
-      text: `${year}년 ${month}월의 기록을 콜라주로 내보냈어요.`,
-    });
-    return { mode: 'share' as const, pages: totalPages };
-  }
-
   for (let i = 0; i < blobs.length; i++) {
     const suffix = totalPages > 1 ? `-${i + 1}of${totalPages}` : '';
     downloadBlob(blobs[i], `quiet-path-collage-${fileDate}${suffix}.png`);
@@ -1589,70 +1611,47 @@ export const exportMonthlyCollage = async (
   return { mode: 'download' as const, pages: totalPages };
 };
 
-// ─── Monthly Activity Board ────────────────────────────────────────────────
+// ─── Monthly Calendar Export ───────────────────────────────────────────────
 
-const ACTIVITY_BOARD_CANVAS_HEIGHT = 1350;
+const CALENDAR_EXPORT_CANVAS_HEIGHT = 1350;
 
-const drawActivityBoardCell = (
-  ctx: CanvasRenderingContext2D,
-  day: number,
-  record: RecordType | undefined,
-  isToday: boolean,
-  isFuture: boolean,
-  useCurrentMonthState: boolean,
-  x: number,
-  y: number,
-  size: number
-) => {
-  const radius = 10;
-  const fillColor = record ? getMoodActivityCellColor(record.moodCode) : '#EEF3F7';
-  const shouldDrawFuturePlaceholder = useCurrentMonthState && isFuture && !record;
-  const shouldDrawTodayMarker = useCurrentMonthState && isToday;
-  const shouldDrawEmptyCell = record || !shouldDrawFuturePlaceholder;
+type CalendarExportCell =
+  | { type: 'empty' }
+  | { type: 'day'; day: number; record?: RecordType };
 
-  if (shouldDrawEmptyCell) {
-    ctx.save();
-    roundedRect(ctx, x, y, size, size, radius);
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-    ctx.restore();
+const buildMonthlyCalendarCells = (
+  records: RecordType[],
+  year: number,
+  month: number
+): CalendarExportCell[] => {
+  const recordByDay = new Map<number, RecordType>();
+
+  const latestRecords = buildLatestRecordByDateMap(records) as Map<string, RecordType>;
+  latestRecords.forEach((record) => {
+    const date = new Date(record.timestamp);
+    recordByDay.set(date.getDate(), record);
+  });
+
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDayOffset = new Date(year, month - 1, 1).getDay();
+  const cells: CalendarExportCell[] = [];
+
+  for (let i = 0; i < firstDayOffset; i += 1) {
+    cells.push({ type: 'empty' });
   }
 
-  if (!record && !shouldDrawFuturePlaceholder) {
-    roundedRect(ctx, x, y, size, size, radius);
-    ctx.strokeStyle = shouldDrawTodayMarker ? '#A78BFA' : '#E3EAF1';
-    ctx.lineWidth = shouldDrawTodayMarker ? 2.2 : 1.5;
-    ctx.stroke();
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push({ type: 'day', day, record: recordByDay.get(day) });
   }
 
-  if (record && shouldDrawTodayMarker) {
-    roundedRect(ctx, x, y, size, size, radius);
-    ctx.strokeStyle = '#A78BFA';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+  while (cells.length % 7 !== 0) {
+    cells.push({ type: 'empty' });
   }
 
-  ctx.fillStyle = record
-    ? 'rgba(71,85,105,0.72)'
-    : shouldDrawFuturePlaceholder
-      ? 'rgba(148,163,184,0.28)'
-      : 'rgba(148,163,184,0.74)';
-  ctx.font = `${record ? 600 : 500} ${Math.max(size * 0.30, 14)}px "SF Pro Display", "Pretendard", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(day), x + size / 2, y + size / 2 + 1);
-
-  if (!record && shouldDrawTodayMarker) {
-    ctx.fillStyle = '#B69BFF';
-    ctx.beginPath();
-    ctx.arc(x + size / 2, y + size - Math.max(size * 0.12, 6), Math.max(size * 0.055, 2.6), 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.textBaseline = 'alphabetic';
+  return cells;
 };
 
-const createMonthlyActivityBoardBlob = async (
+const createMonthlyCalendarBlob = async (
   records: RecordType[],
   year: number,
   month: number,
@@ -1705,17 +1704,17 @@ const createMonthlyActivityBoardBlob = async (
   const boardX = innerX;
   const boardY = bodyStartY;
   const boardWidth = innerWidth;
-  const boardHeight = s(250);
+  const boardHeight = s(276);
 
   ctx.save();
   roundedRect(ctx, boardX, boardY, boardWidth, boardHeight, s(20));
-  ctx.fillStyle = 'rgba(255,255,255,0.56)';
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
   ctx.fill();
   ctx.restore();
 
   const cells = buildMonthlyCalendarCells(records, year, month);
   const rowCount = cells.length / 7;
-  const headerHeight = s(44);
+  const headerHeight = s(46);
   const gridTop = boardY + headerHeight;
   const cellWidth = boardWidth / 7;
   const cellHeight = (boardHeight - headerHeight) / rowCount;
@@ -1746,7 +1745,7 @@ const createMonthlyActivityBoardBlob = async (
     ctx.fillText(label, boardX + cellWidth * index + cellWidth / 2, boardY + s(28));
   });
 
-  ctx.strokeStyle = 'rgba(226,232,240,0.9)';
+  ctx.strokeStyle = 'rgba(226,232,240,0.95)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(boardX, gridTop);
@@ -1777,24 +1776,24 @@ const createMonthlyActivityBoardBlob = async (
     if (isToday) {
       ctx.save();
       ctx.strokeStyle = moodCode ? getMoodActivityCellColor(moodCode) : '#7C3AED';
-      ctx.lineWidth = 1.8;
+      ctx.lineWidth = 2.2;
       ctx.strokeRect(cellX + 1, cellY + 1, cellWidth - 2, cellHeight - 2);
       ctx.restore();
     }
 
-    ctx.fillStyle = cell.record ? '#475569' : '#94A3B8';
+    ctx.fillStyle = cell.record ? '#64748B' : '#94A3B8';
     if (isToday) {
       ctx.fillStyle = '#334155';
     }
-    ctx.font = `700 ${s(9)}px "JetBrains Mono", ui-monospace, monospace`;
-    ctx.fillText(String(cell.day), cellX + s(9), cellY + s(14));
+    ctx.font = `700 ${s(9.8)}px "JetBrains Mono", ui-monospace, monospace`;
+    ctx.fillText(String(cell.day), cellX + s(9), cellY + s(15));
 
     if (!cell.record || !moodCode) return;
 
     const bubbleColor = getMoodActivityCellColor(moodCode);
     const centerX = cellX + cellWidth / 2;
-    const centerY = cellY + cellHeight / 2 + s(2);
-    const bubbleRadius = s(17.5);
+    const centerY = cellY + cellHeight / 2 + s(4);
+    const bubbleRadius = s(isToday ? 21 : 20);
     const bubble = ctx.createRadialGradient(
       centerX - bubbleRadius * 0.35,
       centerY - bubbleRadius * 0.45,
@@ -1804,16 +1803,22 @@ const createMonthlyActivityBoardBlob = async (
       bubbleRadius
     );
     bubble.addColorStop(0, 'rgba(255,255,255,0.94)');
-    bubble.addColorStop(0.62, hexToRgba(bubbleColor, 0.20));
-    bubble.addColorStop(1, hexToRgba(bubbleColor, 0.08));
+    bubble.addColorStop(0.58, hexToRgba(bubbleColor, 0.28));
+    bubble.addColorStop(1, hexToRgba(bubbleColor, 0.12));
     ctx.fillStyle = bubble;
     ctx.beginPath();
     ctx.arc(centerX, centerY, bubbleRadius, 0, Math.PI * 2);
     ctx.fill();
 
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.52)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+
     const mascotImage = moodImageMap.get(moodCode);
     if (mascotImage) {
-      const mascotSize = s(isToday ? 25 : 24);
+      const mascotSize = s(isToday ? 31 : 30);
       ctx.drawImage(mascotImage, centerX - mascotSize / 2, centerY - mascotSize / 2, mascotSize, mascotSize);
     }
   });
@@ -1827,46 +1832,57 @@ const createMonthlyActivityBoardBlob = async (
     .map((mood) => ({ mood, count: moodCounts[mood] || 0 }))
     .filter(({ count }) => count > 0);
 
-  const summaryTop = boardY + boardHeight + s(28);
+  const summaryTop = boardY + boardHeight + s(30);
   ctx.fillStyle = '#94A3B8';
   ctx.font = `700 ${s(10.5)}px "SF Pro Display", "Pretendard", sans-serif`;
   ctx.textAlign = 'left';
   ctx.fillText('이번 달 무드', innerX, summaryTop);
 
-  let chipX = innerX;
-  let chipY = summaryTop + s(14);
-  const chipGap = s(10);
-  const chipHeight = s(34);
+  if (moodEntries.length > 0) {
+    const itemGap = s(16);
+    const itemWidth = s(44);
+    const rowWidth = moodEntries.length * itemWidth + (moodEntries.length - 1) * itemGap;
+    const startX = innerX + (innerWidth - rowWidth) / 2;
+    const iconCenterY = summaryTop + s(34);
 
-  moodEntries.forEach(({ mood, count }) => {
-    const mascotImage = moodImageMap.get(mood);
-    const moodColors = getMoodExportColor(mood);
-    ctx.font = `700 ${s(11)}px "SF Pro Display", "Pretendard", sans-serif`;
-    const label = `${mood} ×${count}`;
-    const chipWidth = Math.max(ctx.measureText(label).width + s(54), s(92));
+    moodEntries.forEach(({ mood, count }, index) => {
+      const mascotImage = moodImageMap.get(mood);
+      const moodColor = getMoodActivityCellColor(mood);
+      const centerX = startX + itemWidth * index + itemGap * index + itemWidth / 2;
+      const bubbleRadius = s(18);
+      const bubble = ctx.createRadialGradient(
+        centerX - bubbleRadius * 0.35,
+        iconCenterY - bubbleRadius * 0.45,
+        bubbleRadius * 0.18,
+        centerX,
+        iconCenterY,
+        bubbleRadius
+      );
+      bubble.addColorStop(0, 'rgba(255,255,255,0.96)');
+      bubble.addColorStop(0.58, hexToRgba(moodColor, 0.26));
+      bubble.addColorStop(1, hexToRgba(moodColor, 0.10));
+      ctx.fillStyle = bubble;
+      ctx.beginPath();
+      ctx.arc(centerX, iconCenterY, bubbleRadius, 0, Math.PI * 2);
+      ctx.fill();
 
-    if (chipX + chipWidth > innerX + innerWidth) {
-      chipX = innerX;
-      chipY += chipHeight + chipGap;
-    }
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
 
-    roundedRect(ctx, chipX, chipY, chipWidth, chipHeight, chipHeight / 2);
-    ctx.fillStyle = moodColors.bg;
-    ctx.fill();
-    ctx.strokeStyle = moodColors.border;
-    ctx.lineWidth = 2;
-    ctx.stroke();
+      if (mascotImage) {
+        const mascotSize = s(28);
+        ctx.drawImage(mascotImage, centerX - mascotSize / 2, iconCenterY - mascotSize / 2, mascotSize, mascotSize);
+      }
 
-    if (mascotImage) {
-      const mascotSize = s(20);
-      ctx.drawImage(mascotImage, chipX + s(12), chipY + chipHeight / 2 - mascotSize / 2, mascotSize, mascotSize);
-    }
-
-    ctx.fillStyle = moodColors.text;
-    ctx.textAlign = 'left';
-    ctx.fillText(label, chipX + s(36), chipY + s(22));
-    chipX += chipWidth + chipGap;
-  });
+      ctx.fillStyle = '#64748B';
+      ctx.font = `700 ${s(13)}px "SF Pro Display", "Pretendard", sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(String(count), centerX, iconCenterY + bubbleRadius + s(16));
+    });
+  }
 
   drawExportFooterText(ctx, {
     text: 'quietpath.app',
@@ -1906,32 +1922,6 @@ export const exportMonthlyCalendar = async (
   const blob = await createMonthlyCalendarBlob(monthRecords, year, month, wordmarkMascotImg);
   const fileDate = `${year}-${String(month).padStart(2, '0')}`;
   const fileName = `quiet-path-monthly-calendar-${fileDate}.png`;
-  const file = new File([blob], fileName, { type: 'image/png' });
-
-  const canNativeShare =
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files: [file] });
-
-  if (isDesktopEnvironment()) {
-    downloadBlob(blob, fileName);
-    return { mode: 'download' as const };
-  }
-
-  if (isDesktopEnvironment()) {
-    downloadBlob(blob, fileName);
-    return { mode: 'download' as const };
-  }
-
-  if (canNativeShare) {
-    await navigator.share({
-      files: [file],
-      title: 'Quiet Path 월간 캘린더',
-      text: `${year}년 ${month}월 무드 캘린더를 내보냈어요.`,
-    });
-    return { mode: 'share' as const };
-  }
 
   downloadBlob(blob, fileName);
   return { mode: 'download' as const };
@@ -1949,22 +1939,6 @@ export const exportRecordCard = async (
       ? await createDiaryPhotoRecordCardBlob(record)
       : await createPosterRecordCardBlob(record);
   const fileName = `quiet-path-record-${formatFileDate(record.timestamp)}.png`;
-  const file = new File([blob], fileName, { type: 'image/png' });
-
-  const canNativeShare =
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    typeof navigator.canShare === 'function' &&
-    navigator.canShare({ files: [file] });
-
-  if (canNativeShare) {
-    await navigator.share({
-      files: [file],
-      title: 'Quiet Path 기록 카드',
-      text: '오늘의 기록을 카드로 꺼냈어요.',
-    });
-    return { mode: 'share' as const };
-  }
 
   downloadBlob(blob, fileName);
   return { mode: 'download' as const };

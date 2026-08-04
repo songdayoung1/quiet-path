@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { SoftButton, Card, CategoryIcon } from '../components/UI';
-import { ArrowRight, Compass } from 'lucide-react';
+import { ArrowRight, Check, Compass } from 'lucide-react';
 import { DirectionSetupForm } from '../components/DirectionSetupForm';
 import { Direction } from '../types';
 import { createDirectionId } from '../storage';
 import { CATEGORIES } from '../constants';
+import { getThemePalette, useResolvedTheme } from '../theme';
 
 const formatDateInputValue = (date: Date) => {
   const year = date.getFullYear();
@@ -33,6 +34,14 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
   onStartGuest,
   initialStep = 0,
 }) => {
+  const theme = useResolvedTheme();
+  const palette = getThemePalette(theme);
+  const categoryCardStyle: React.CSSProperties = {
+    background: theme === 'dark'
+      ? 'linear-gradient(118deg, rgba(76,29,149,0.22) 0%, rgba(24,34,52,0.96) 48%, rgba(49,46,129,0.16) 100%)'
+      : 'linear-gradient(118deg, rgba(243,240,255,0.92) 0%, rgba(255,255,255,0.96) 46%, rgba(232,236,255,0.74) 100%)',
+    borderColor: theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'rgba(196,181,253,0.38)',
+  };
   const [step, setStep] = useState(initialStep);
   const [selectedCategory, setSelectedCategory] = useState<typeof CATEGORIES[0] | null>(null);
 
@@ -137,16 +146,25 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
               <Card
                 key={cat.id}
                 onClick={() => { setSelectedCategory(cat); setStep(2); }}
-                className="!p-4 cursor-pointer active:scale-[0.99] border border-white transition-all duration-300 hover:shadow-md"
-                style={{ background: `linear-gradient(135deg, ${cat.accentBg}CC, white)` } as React.CSSProperties}
+                withSurfaceOverlay={false}
+                className="group !p-4 cursor-pointer active:scale-[0.99] transition-all duration-300 hover:shadow-md hover:!border-point-200"
+                style={categoryCardStyle}
               >
                 <div className="flex items-center gap-4">
                   <CategoryIcon categoryId={cat.id} size="md" />
                   <div className="flex-1">
-                    <h3 className="font-bold text-base mb-0.5" style={{ color: cat.accent }}>{cat.label}</h3>
-                    <p className="text-mist-400 text-xs">{cat.desc}</p>
+                    <h3 className="font-bold text-base mb-0.5" style={{ color: palette.strongText }}>{cat.label}</h3>
+                    <p className="text-xs" style={{ color: palette.mutedText }}>{cat.desc}</p>
                   </div>
-                  <ArrowRight size={16} className="text-mist-300 shrink-0" />
+                  <span
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-transform group-hover:translate-x-0.5"
+                    style={{
+                      background: theme === 'dark' ? 'rgba(139,92,246,0.18)' : 'rgba(237,233,254,0.88)',
+                      borderColor: theme === 'dark' ? 'rgba(167,139,250,0.3)' : 'rgba(167,139,250,0.46)',
+                    }}
+                  >
+                    <ArrowRight size={14} className="text-point-500" />
+                  </span>
                 </div>
               </Card>
             ))}
@@ -163,9 +181,13 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
         <div className="flex-1 flex flex-col justify-center items-center max-w-sm gap-8">
           {/* 선택된 카테고리 뱃지 */}
           {selectedCategory && (
-            <div className="flex items-center gap-3 bg-white/70 px-5 py-3 rounded-2xl shadow-sm border border-white">
+            <div
+              className="flex items-center gap-3 px-5 py-3 rounded-2xl shadow-sm border"
+              style={{ ...categoryCardStyle, borderColor: 'rgba(139,92,246,0.38)' }}
+            >
               <CategoryIcon categoryId={selectedCategory.id} size="sm" />
-              <span className="font-bold text-sm" style={{ color: selectedCategory?.accent }}>{selectedCategory.label}</span>
+              <span className="font-bold text-sm" style={{ color: palette.strongText }}>{selectedCategory.label}</span>
+              <Check size={13} className="text-point-500" strokeWidth={2.4} />
             </div>
           )}
           <h2 className="text-[26px] font-semibold text-mist-600 leading-[1.35] tracking-[-0.01em]">

@@ -9,7 +9,6 @@ import { getThemePalette, useResolvedTheme } from '../theme';
 interface CurrentPathStripProps {
   currentDirection: Direction | null;
   currentPathConsistency: number;
-  currentPathRecordCount: number;
 }
 
 export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
@@ -23,7 +22,6 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
     : null;
 
   const cat = CATEGORIES.find(c => c.id === currentDirection?.categoryId);
-  const accentColor = cat?.accent || '#8B5CF6';
 
   if (!currentDirection) {
     return (
@@ -41,60 +39,50 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
 
   return (
     <Card
-      className="!rounded-[2rem] !p-5 xl:!p-4 backdrop-blur-md shadow-sm !transition-all !duration-300"
+      withSurfaceOverlay={false}
+      className="!rounded-[2rem] !px-5 !py-4 backdrop-blur-md shadow-sm !transition-all !duration-300"
       style={{ background: palette.cardBg, borderColor: palette.border }}
     >
-      <div className="flex items-center gap-5 xl:gap-4 relative z-10">
-        {/* Category Section: Icon with subtle background circle */}
-        <div className="flex flex-col items-center gap-2 xl:gap-1.5 shrink-0">
-          <span className="text-[10px] font-bold tracking-wider mb-1 xl:mb-0.5" style={{ color: accentColor }}>
-            {cat?.label || 'Path'}
-          </span>
-          <div className="relative">
-             <div 
-               className="absolute inset-0 rounded-full blur-md opacity-20"
-               style={{ backgroundColor: accentColor }}
-             />
-             <CategoryIcon 
-               categoryId={currentDirection?.categoryId} 
-               size="lg" 
-               className="!rounded-full shadow-sm relative z-10 border border-white" 
-             />
-          </div>
-        </div>
+      <div className="relative z-10 flex items-center gap-4">
+        <CategoryIcon categoryId={currentDirection.categoryId} size="md" className="self-center" />
 
-        {/* Content Section: Title and Question */}
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          <h3 className="text-[17px] xl:text-[15px] font-bold leading-snug break-keep mb-1.5 xl:mb-1" style={{ color: palette.strongText }}>
-            {currentDirection?.description || '아직 설정된 여정이 없어요'}
+        <div className="min-w-0 flex-1">
+          <div className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold tracking-wide" style={{ color: palette.mutedText }}>
+            <span className="font-bold text-point-500">
+              {cat?.label || '카테고리'}
+            </span>
+            {reviewDateText && (
+              <>
+                <span className="h-3 w-px" style={{ background: palette.divider }} />
+                <Compass size={10} className="shrink-0 text-point-300" />
+                <span className="whitespace-nowrap">{reviewDateText} 회고</span>
+              </>
+            )}
+          </div>
+
+          <h3 className="line-clamp-2 break-keep text-[14px] font-bold leading-[1.4]" style={{ color: palette.strongText }}>
+            {currentDirection.description || '아직 설정된 여정이 없어요'}
           </h3>
-          {currentDirection?.question && (
-            <p className="text-[12px] xl:text-[11px] font-medium leading-relaxed break-keep line-clamp-1 opacity-90" style={{ color: palette.mutedText }}>
+          {currentDirection.question && (
+            <p className="mt-1 line-clamp-1 break-keep text-[12px] font-medium leading-relaxed" style={{ color: palette.mutedText }}>
               {currentDirection.question}
             </p>
           )}
         </div>
 
-        {/* Info Section: Consistency & Review Date */}
-        <div className="flex flex-col items-end shrink-0 gap-2.5 xl:gap-2">
-          <div className="text-right">
-            <div className="flex items-baseline justify-end gap-0.5">
-              <span className="text-2xl xl:text-xl font-black tracking-tighter" style={{ color: accentColor }}>
-                {currentPathConsistency}
-              </span>
-              <span className="text-[10px] font-bold" style={{ color: palette.faintText }}>%</span>
-            </div>
-            <p className="text-[8px] font-bold uppercase tracking-widest mt-0.5" style={{ color: palette.faintText }}>{KPI_LABELS.pathRate}</p>
+        <div
+          className="flex w-[62px] shrink-0 flex-col items-center justify-center border-l pl-4"
+          style={{ borderColor: palette.divider }}
+        >
+          <div className="flex items-baseline justify-center gap-0.5">
+            <span className="text-[17px] font-black leading-none tracking-tighter text-point-500">
+              {currentPathConsistency}
+            </span>
+            <span className="text-[10px] font-bold" style={{ color: palette.faintText }}>%</span>
           </div>
-          
-          {reviewDateText && (
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full border shadow-sm" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
-              <Compass size={10} className="text-point-400" />
-              <span className="text-[9px] font-bold" style={{ color: palette.mutedText }}>
-                ~ {reviewDateText}
-              </span>
-            </div>
-          )}
+          <p className="mt-1.5 whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.08em]" style={{ color: palette.faintText }}>
+            {KPI_LABELS.pathRate}
+          </p>
         </div>
       </div>
     </Card>

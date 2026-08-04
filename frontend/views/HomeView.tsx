@@ -11,6 +11,7 @@ import { ProgressBand } from '../components/ProgressBand';
 import { MemoryPreviewStrip } from '../components/MemoryPreviewStrip';
 import { ExpandedHeatmapSheet } from '../components/ExpandedHeatmapSheet';
 import { getCurrentPathRecords, getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from '../utils/recordScope';
+import { calculatePathProgress } from '../utils/pathProgress';
 import {
   HeroSkeleton,
   TodaysCardSkeleton,
@@ -58,23 +59,9 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
   const currentPathRecords = currentDirection
     ? getCurrentPathRecords(sortedRecords, currentDirection)
     : [];
-  const currentPathRecordCount = currentPathRecords.length;
-  const currentPathStartDate = currentDirection ? new Date(currentDirection.createdAt) : null;
-  
-  const today = new Date();
+  const currentPathProgress = calculatePathProgress(currentPathRecords, currentDirection);
   
   const monthlyConsistency = monthlyRecordedDays > 0 ? Math.round((monthlyRecordedDays / daysInCurrentMonth) * 100) : 0;
-  
-  const currentPathConsistency = currentPathRecords.length > 0 && currentPathStartDate
-    ? Math.round(
-        (currentPathRecords.length /
-          Math.max(
-            1,
-            Math.floor((new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() - new Date(currentPathStartDate.getFullYear(), currentPathStartDate.getMonth(), currentPathStartDate.getDate()).getTime()) / (1000 * 60 * 60 * 24)) + 1
-          )) *
-          100
-      )
-    : 0;
     
   const monthlyMoodCounts = monthlyRecords.reduce((acc, record) => {
     if (record.moodCode) acc[record.moodCode] = (acc[record.moodCode] || 0) + 1;
@@ -160,8 +147,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
         {hasActiveDirection && (
           <CurrentPathStrip 
             currentDirection={currentDirection} 
-            currentPathConsistency={currentPathConsistency} 
-            currentPathRecordCount={currentPathRecordCount} 
+            currentPathConsistency={currentPathProgress.rate}
           />
         )}
         

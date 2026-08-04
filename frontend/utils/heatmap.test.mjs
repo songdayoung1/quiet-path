@@ -34,6 +34,23 @@ test('buildRecordDateMap ignores hidden records and preserves visible date hits'
   assert.equal(map.has(toLocalDateKey(localDate(2026, 5, 19))), true);
 });
 
+test('buildRecordDateMap uses the latest record mood regardless of input order', () => {
+  const dateKey = toLocalDateKey(localDate(2026, 5, 19));
+  const latest = {
+    id: 12,
+    timestamp: new Date(2026, 4, 19, 18, 30).getTime(),
+    moodCode: '두근',
+  };
+  const older = {
+    id: 11,
+    timestamp: new Date(2026, 4, 19, 9, 15).getTime(),
+    moodCode: '잔잔',
+  };
+
+  assert.equal(buildRecordDateMap([latest, older]).get(dateKey), '두근');
+  assert.equal(buildRecordDateMap([older, latest]).get(dateKey), '두근');
+});
+
 test('computeCurrentStreak counts consecutive days backward from today', () => {
   const baseDate = localDate(2026, 5, 19);
   const records = [

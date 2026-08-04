@@ -1,6 +1,7 @@
 import React from 'react';
 import { Download, PencilLine, Trash2, X } from 'lucide-react';
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
+import { loadImageTextTones, type ImageTextTones } from '../utils/imageContrast';
 import { getRecordParagraphs } from '../utils/recordText';
 import { WaterDropCharacter, type CharacterMood } from './WaterDropCharacter';
 import { RecordImage } from './RecordImage';
@@ -67,6 +68,13 @@ export const RecordDetailDiary: React.FC<Props> = ({
   onShare,
   onDelete,
 }) => {
+  const posterCardRef = React.useRef<HTMLElement>(null);
+  const [photoTextTones, setPhotoTextTones] = React.useState<ImageTextTones>({
+    left: 'light',
+    right: 'light',
+    body: 'light',
+  });
+  const [posterAspectRatio, setPosterAspectRatio] = React.useState(3 / 4);
   const date = new Date(record.timestamp);
   const mood = record.moodCode;
   const moodTone = mood ? MOOD_TONE[mood] : undefined;
@@ -80,7 +88,82 @@ export const RecordDetailDiary: React.FC<Props> = ({
   const mascotRailMoods: CharacterMood[] = [characterMood, 'COZY', 'SPARKLE', 'CALM', 'HOLDING'];
   const detailDisplayMode: RecordCardDisplayMode = hasPhoto ? displayMode : 'diary';
   const isPosterMode = hasPhoto && detailDisplayMode === 'poster';
-  const posterActionText = actionParagraphs.join(' ');
+  const leftUsesDarkText = photoTextTones.left === 'dark';
+  const rightUsesDarkText = photoTextTones.right === 'dark';
+  const posterUsesDarkText = photoTextTones.body === 'dark';
+  const posterTextShadow = posterUsesDarkText
+    ? '0 0 2px rgba(255,255,255,0.98), 0 1px 6px rgba(255,255,255,0.9), 0 3px 14px rgba(255,255,255,0.62)'
+    : '0 0 2px rgba(15,23,42,0.82), 0 1px 6px rgba(15,23,42,0.68), 0 3px 14px rgba(15,23,42,0.48)';
+
+  React.useEffect(() => {
+    const card = posterCardRef.current;
+    if (!isPosterMode || !card) {
+      return;
+    }
+
+    const updateAspectRatio = () => {
+      if (!card.clientWidth || !card.clientHeight) {
+        return;
+      }
+
+      const nextRatio = Number((card.clientWidth / card.clientHeight).toFixed(3));
+      setPosterAspectRatio((currentRatio) => (
+        Math.abs(currentRatio - nextRatio) >= 0.01 ? nextRatio : currentRatio
+      ));
+    };
+
+    updateAspectRatio();
+    const observer = new ResizeObserver(updateAspectRatio);
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [isPosterMode, record.id]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    if (!record.imageUrl) {
+      setPhotoTextTones({ left: 'light', right: 'light', body: 'light' });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPhotoTextTones({ left: 'light', right: 'light', body: 'light' });
+    loadImageTextTones(record.imageUrl, {
+      positionX: record.imagePositionX,
+      positionY: record.imagePositionY,
+      scale: record.imageScale,
+      ...(isPosterMode
+        ? {
+            targetAspectRatio: posterAspectRatio,
+            topSampleEnd: 0.34,
+            bodySampleStart: 0.48,
+            bodySampleEnd: 0.96,
+          }
+        : {}),
+    })
+      .then((tones) => {
+        if (!cancelled) {
+          setPhotoTextTones(tones);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPhotoTextTones({ left: 'light', right: 'light', body: 'light' });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isPosterMode,
+    posterAspectRatio,
+    record.imagePositionX,
+    record.imagePositionY,
+    record.imageScale,
+    record.imageUrl,
+  ]);
 
   const cardSurfaceStyle: React.CSSProperties = {
     background: 'linear-gradient(160deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.74) 100%)',
@@ -98,7 +181,6 @@ export const RecordDetailDiary: React.FC<Props> = ({
   };
 
   const defaultSectionLabelClassName = 'text-[10px] font-bold tracking-[0.12em] text-mist-400';
-  const posterSectionLabelClassName = 'text-[10px] font-bold tracking-[0.12em] text-white/70';
 
   return (
     <div
@@ -203,26 +285,56 @@ export const RecordDetailDiary: React.FC<Props> = ({
           <div className="relative z-10">
             {isPosterMode ? (
               <article
+                ref={posterCardRef}
                 className="relative overflow-hidden rounded-[26px] border border-white/85"
                 style={posterCardStyle}
               >
                 <RecordImage record={record} alt="기록 사진" className="absolute inset-0 h-full w-full" />
-                <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.08)_34%,rgba(10,20,42,0.12)_58%,rgba(10,20,42,0.44)_78%,rgba(10,20,42,0.82)_100%)]" />
                 <div className="relative aspect-[4/3]">
                   <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
-                    <div className="text-white">
-                      <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-white/92">
+                    <div
+                      className={leftUsesDarkText ? 'text-slate-900' : 'text-white'}
+                      style={{
+                        textShadow: leftUsesDarkText
+                          ? '0 1px 3px rgba(255,255,255,0.72)'
+                          : '0 1px 3px rgba(15,23,42,0.48)',
+                      }}
+                    >
+                      <p className={`mb-1 font-mono text-[10px] font-bold tracking-[0.2em] ${
+                        leftUsesDarkText ? 'text-slate-700/80' : 'text-white/92'
+                      }`}>
                         {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
                       </p>
-                      <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-white">
+                      <p className={`text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] ${
+                        leftUsesDarkText ? 'text-slate-900' : 'text-white'
+                      }`}>
                         {String(date.getDate()).padStart(2, '0')}
                       </p>
                     </div>
                     <div className="flex flex-col items-center gap-2.5">
-                      <span className="font-mono text-[10px] tracking-wider text-center text-white">{fmtTime(date)}</span>
+                      <span
+                        className={`text-center font-mono text-[10px] tracking-wider ${
+                          rightUsesDarkText ? 'text-slate-700' : 'text-white'
+                        }`}
+                        style={{
+                          textShadow: rightUsesDarkText
+                            ? '0 1px 3px rgba(255,255,255,0.72)'
+                            : '0 1px 3px rgba(15,23,42,0.48)',
+                        }}
+                      >
+                        {fmtTime(date)}
+                      </span>
                       {mood && (
-                        <span className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-white/42 bg-white/14 px-3 py-1.5 backdrop-blur-sm">
-                          <span className="text-xs font-bold leading-none text-white">{mood}</span>
+                        <span className={`inline-flex items-center justify-center rounded-xl border-[1.5px] px-3 py-1.5 backdrop-blur-sm ${
+                          rightUsesDarkText
+                            ? 'border-slate-900/10 bg-white/[0.52]'
+                            : 'border-white/[0.42] bg-slate-950/[0.12]'
+                        }`}>
+                          <span className={`text-xs font-bold leading-none ${
+                            rightUsesDarkText ? 'text-slate-800' : 'text-white'
+                          }`}>
+                            {mood}
+                          </span>
                         </span>
                       )}
                     </div>
@@ -230,16 +342,22 @@ export const RecordDetailDiary: React.FC<Props> = ({
                 </div>
 
                 <div className="relative px-6 pb-6 pt-9">
-                  <div aria-hidden className="pointer-events-none absolute right-8 top-7 opacity-[0.08]">
-                    <WaterDropCharacter size={74} mood={characterMood} animate={false} />
-                  </div>
-
-                  <p className={`mb-5 text-center ${posterSectionLabelClassName}`}>오늘의 기록</p>
+                  <p
+                    className={`mb-5 text-center text-[10px] font-bold tracking-[0.12em] ${
+                      posterUsesDarkText ? 'text-slate-700/70' : 'text-white/70'
+                    }`}
+                    style={{ textShadow: posterTextShadow }}
+                  >
+                    오늘의 기록
+                  </p>
                   <div className="space-y-[18px] text-center">
                     {actionParagraphs.map((paragraph, index) => (
                       <p
                         key={`${record.id}-poster-action-${index}`}
-                        className="whitespace-pre-line text-[20px] font-bold leading-[1.72] tracking-[-0.01em] text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.24)]"
+                        className={`whitespace-pre-line text-[20px] font-bold leading-[1.72] tracking-[-0.01em] ${
+                          posterUsesDarkText ? 'text-slate-900' : 'text-white'
+                        }`}
+                        style={{ textShadow: posterTextShadow }}
                       >
                         {paragraph}
                       </p>
@@ -248,10 +366,10 @@ export const RecordDetailDiary: React.FC<Props> = ({
 
                   {hasOneWord && (
                     <div className="mt-8 flex justify-center">
-                      <div className="flex items-center gap-[10px] rounded-full border border-white/38 bg-white/10 px-5 py-3 backdrop-blur-sm">
-                        <span className="text-[10px] font-bold tracking-[0.12em] text-white">한 단어</span>
-                        <span className="h-px w-[14px] bg-white" />
-                        <span className="text-[18px] font-semibold italic tracking-[-0.01em] text-white">
+                      <div className="flex items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                        <span className={defaultSectionLabelClassName}>한 단어</span>
+                        <span className="h-px w-[14px] bg-mist-200" />
+                        <span className="text-[18px] font-semibold italic tracking-[-0.01em] text-point-600">
                           "{record.oneWordText}"
                         </span>
                       </div>
@@ -259,13 +377,20 @@ export const RecordDetailDiary: React.FC<Props> = ({
                   )}
 
                   {hasTomorrow && (
-                    <div className="mt-8 border-t border-white/14 pt-5 text-center">
-                      <p className="mb-3 text-[10px] font-bold tracking-[0.12em] text-white/68">내일의 메모</p>
+                    <div className={`mt-8 border-t pt-5 text-center ${
+                      posterUsesDarkText ? 'border-slate-900/10' : 'border-white/14'
+                    }`}>
+                      <p className={`mb-3 text-[10px] font-bold tracking-[0.12em] ${
+                        posterUsesDarkText ? 'text-slate-700/70' : 'text-white/68'
+                      }`}>내일의 메모</p>
                       <div className="space-y-2">
                         {tomorrowParagraphs.map((paragraph, index) => (
                           <p
                             key={`${record.id}-poster-tomorrow-${index}`}
-                            className="whitespace-pre-line text-[13px] font-medium leading-[1.7] tracking-[-0.01em] text-white/78"
+                            className={`whitespace-pre-line text-[13px] font-medium leading-[1.7] tracking-[-0.01em] ${
+                              posterUsesDarkText ? 'text-slate-700/80' : 'text-white/78'
+                            }`}
+                            style={{ textShadow: posterTextShadow }}
                           >
                             {paragraph}
                           </p>
@@ -275,8 +400,12 @@ export const RecordDetailDiary: React.FC<Props> = ({
                   )}
 
                   <div className="mt-7 flex items-center justify-between">
-                    <span className="font-mono text-[9px] tracking-[0.2em] text-white/38">{nickname ? `— ${nickname}` : ''}</span>
-                    <span className="font-mono text-[9px] tracking-[0.2em] text-white/46">
+                    <span className={`font-mono text-[9px] tracking-[0.2em] ${
+                      posterUsesDarkText ? 'text-slate-700/55' : 'text-white/38'
+                    }`}>{nickname ? `— ${nickname}` : ''}</span>
+                    <span className={`font-mono text-[9px] tracking-[0.2em] ${
+                      posterUsesDarkText ? 'text-slate-700/60' : 'text-white/46'
+                    }`}>
                       pg.{String(pageNumber ?? 1).padStart(3, '0')}
                     </span>
                   </div>
@@ -286,21 +415,50 @@ export const RecordDetailDiary: React.FC<Props> = ({
               <article className="overflow-hidden rounded-[26px] border border-white/85" style={diaryPhotoSurfaceStyle}>
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <RecordImage record={record} alt="기록 사진" className="h-full w-full" />
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,20,42,0.18)_0%,rgba(10,20,42,0.03)_60%,rgba(10,20,42,0.46)_100%)]" />
                   <div className="absolute inset-x-0 top-0 flex items-end justify-between px-6 pb-[18px] pt-6">
-                    <div className="text-white">
-                      <p className="mb-1 font-mono text-[10px] font-bold tracking-[0.2em] text-white/92">
+                    <div
+                      className={leftUsesDarkText ? 'text-slate-900' : 'text-white'}
+                      style={{
+                        textShadow: leftUsesDarkText
+                          ? '0 1px 3px rgba(255,255,255,0.72)'
+                          : '0 1px 3px rgba(15,23,42,0.48)',
+                      }}
+                    >
+                      <p className={`mb-1 font-mono text-[10px] font-bold tracking-[0.2em] ${
+                        leftUsesDarkText ? 'text-slate-700/80' : 'text-white/92'
+                      }`}>
                         {WEEKDAYS[date.getDay()]} · {MONTHS[date.getMonth()]}
                       </p>
-                      <p className="text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] text-white">
+                      <p className={`text-[46px] font-extrabold leading-[0.9] tracking-[-0.03em] ${
+                        leftUsesDarkText ? 'text-slate-900' : 'text-white'
+                      }`}>
                         {String(date.getDate()).padStart(2, '0')}
                       </p>
                     </div>
                     <div className="flex flex-col items-center gap-2.5">
-                      <span className="font-mono text-[10px] tracking-wider text-center text-white">{fmtTime(date)}</span>
+                      <span
+                        className={`text-center font-mono text-[10px] tracking-wider ${
+                          rightUsesDarkText ? 'text-slate-700' : 'text-white'
+                        }`}
+                        style={{
+                          textShadow: rightUsesDarkText
+                            ? '0 1px 3px rgba(255,255,255,0.72)'
+                            : '0 1px 3px rgba(15,23,42,0.48)',
+                        }}
+                      >
+                        {fmtTime(date)}
+                      </span>
                       {mood && (
-                        <span className="inline-flex items-center justify-center rounded-xl border-[1.5px] border-white/42 bg-white/14 px-3 py-1.5 backdrop-blur-sm">
-                          <span className="text-xs font-bold leading-none text-white">{mood}</span>
+                        <span className={`inline-flex items-center justify-center rounded-xl border-[1.5px] px-3 py-1.5 backdrop-blur-sm ${
+                          rightUsesDarkText
+                            ? 'border-slate-900/10 bg-white/[0.52]'
+                            : 'border-white/[0.42] bg-slate-950/[0.12]'
+                        }`}>
+                          <span className={`text-xs font-bold leading-none ${
+                            rightUsesDarkText ? 'text-slate-800' : 'text-white'
+                          }`}>
+                            {mood}
+                          </span>
                         </span>
                       )}
                     </div>

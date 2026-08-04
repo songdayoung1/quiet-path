@@ -18,7 +18,7 @@ const RECORDED_SENTINEL = '__recorded__';
 
 const MOOD_COLOR_MAP: Record<string, string> = {
   포근: 'bg-point-300',
-  멍함: 'bg-mist-200',
+  멍함: 'bg-slate-400',
   반짝: 'bg-amber-300',
   잔잔: 'bg-blue-200',
   버팀: 'bg-green-300',
@@ -34,7 +34,7 @@ const MOOD_LEGEND = [
   { code: '잔잔', color: 'bg-blue-200' },
   { code: '버팀', color: 'bg-green-300' },
   { code: '두근', color: 'bg-rose-300' },
-  { code: '멍함', color: 'bg-mist-200' },
+  { code: '멍함', color: 'bg-slate-400' },
 ];
 
 type DayCell = {

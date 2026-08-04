@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar } from 'lucide-react';
+import { Calendar, Check } from 'lucide-react';
 import { CATEGORIES } from '../constants';
 import { Card, CategoryIcon, SoftButton, SoftInput } from './UI';
 import { getThemePalette, useResolvedTheme } from '../theme';
@@ -58,12 +58,12 @@ export const DirectionSetupForm: React.FC<DirectionSetupFormProps> = ({
         <div className="flex items-center gap-3 pb-5 border-b" style={{ borderColor: palette.divider }}>
           <CategoryIcon categoryId={selectedCategory.id} size="sm" />
           <div className="flex-1 min-w-0">
-            <span
-              className="text-[15px] font-bold leading-tight block mb-1"
-              style={{ color: selectedCategory.accent }}
-            >
-              {selectedCategory.label}
-            </span>
+            <div className="mb-1 flex items-center gap-1.5">
+              <span className="text-[15px] font-bold leading-tight" style={{ color: palette.strongText }}>
+                {selectedCategory.label}
+              </span>
+              <Check size={12} className="text-point-500" strokeWidth={2.4} />
+            </div>
             <span className="text-[11px] block" style={{ color: palette.faintText }}>
               이 카테고리 안에서 새로운 방향을 시작해요.
             </span>
