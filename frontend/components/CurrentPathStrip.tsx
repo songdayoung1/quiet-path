@@ -76,7 +76,7 @@ export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({
           style={{ borderColor: palette.divider }}
         >
           <div className="flex items-baseline justify-center gap-0.5">
-            <span className="text-[25px] font-black leading-none tracking-tighter text-point-500">
+            <span className="text-[17px] font-black leading-none tracking-tighter text-point-500">
               {currentPathConsistency}
             </span>
             <span className="text-[10px] font-bold" style={{ color: palette.faintText }}>%</span>
