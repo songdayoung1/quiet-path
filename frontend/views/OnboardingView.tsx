@@ -159,11 +159,11 @@ export const OnboardingView: React.FC<OnboardingViewProps> = ({
                   <span
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-transform group-hover:translate-x-0.5"
                     style={{
-                      background: theme === 'dark' ? 'rgba(139,92,246,0.12)' : 'rgba(248,247,255,0.96)',
-                      borderColor: theme === 'dark' ? 'rgba(167,139,250,0.22)' : 'rgba(196,181,253,0.42)',
+                      background: theme === 'dark' ? 'rgba(139,92,246,0.18)' : 'rgba(237,233,254,0.88)',
+                      borderColor: theme === 'dark' ? 'rgba(167,139,250,0.3)' : 'rgba(167,139,250,0.46)',
                     }}
                   >
-                    <ArrowRight size={14} className="text-point-400" />
+                    <ArrowRight size={14} className="text-point-500" />
                   </span>
                 </div>
               </Card>
