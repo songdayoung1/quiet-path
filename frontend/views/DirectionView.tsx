@@ -28,6 +28,12 @@ interface DirectionViewProps {
 export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, records, onStartDirection, onFinishDirection, onHistoryClick }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
+  const categoryCardStyle: React.CSSProperties = {
+    background: theme === 'dark'
+      ? 'linear-gradient(118deg, rgba(76,29,149,0.24) 0%, rgba(24,34,52,0.96) 48%, rgba(49,46,129,0.18) 100%)'
+      : 'linear-gradient(118deg, rgba(245,243,255,0.98) 0%, rgba(255,255,255,0.94) 48%, rgba(238,242,255,0.82) 100%)',
+    borderColor: theme === 'dark' ? 'rgba(167,139,250,0.26)' : 'rgba(196,181,253,0.44)',
+  };
   const [isEditing, setIsEditing] = useState(false);
   const [finishModalOpen, setFinishModalOpen] = useState(false);
   const [showCategorySelect, setShowCategorySelect] = useState(false);
@@ -164,7 +170,7 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                   }}
                   withSurfaceOverlay={false}
                   className="group !p-5 cursor-pointer active:scale-[0.98] transition-all shadow-sm hover:shadow-md hover:!border-point-200 focus-within:ring-2 focus-within:ring-point-200/60"
-                  style={{ background: palette.cardBgStrong, borderColor: palette.border }}
+                  style={categoryCardStyle}
                 >
                   <div className="flex items-center gap-4">
                     <CategoryIcon categoryId={cat.id} size="md" />
@@ -172,7 +178,12 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                       <h3 className="font-bold text-base mb-0.5" style={{ color: palette.strongText }}>{cat.label}</h3>
                       <p className="text-xs" style={{ color: palette.mutedText }}>{cat.desc}</p>
                     </div>
-                    <ArrowRight size={16} className="text-mist-300 shrink-0 transition-colors group-hover:text-point-400" />
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-transform group-hover:translate-x-0.5"
+                      style={{ background: palette.pillBg, borderColor: 'rgba(139,92,246,0.18)' }}
+                    >
+                      <ArrowRight size={14} className="text-point-400" />
+                    </span>
                   </div>
                 </Card>
               ))}

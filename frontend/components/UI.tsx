@@ -688,7 +688,6 @@ export const CategoryIcon: React.FC<{
   className?: string;
 }> = ({ categoryId, size = 'md', className = '' }) => {
   const theme = useResolvedTheme();
-  const palette = getThemePalette(theme);
   const cat = CATEGORIES.find(c => c.id === categoryId);
 
   const sizeMap = {
@@ -697,16 +696,23 @@ export const CategoryIcon: React.FC<{
     lg: { outer: 'w-16 h-16', iconSize: 22, radius: 'rounded-3xl' },
   };
   const { outer, iconSize, radius } = sizeMap[size];
-  const iconColor = theme === 'dark' ? '#CBD5E1' : '#64748B';
+  const iconColor = theme === 'dark' ? '#DDD6FE' : '#7C3AED';
   const iconBackground = theme === 'dark'
-    ? 'linear-gradient(145deg, rgba(51,65,85,0.96), rgba(30,41,59,0.96))'
-    : 'linear-gradient(145deg, rgba(248,250,252,0.98), rgba(226,232,240,0.94))';
+    ? 'linear-gradient(145deg, rgba(91,33,182,0.56), rgba(49,46,129,0.72))'
+    : 'linear-gradient(145deg, rgba(245,243,255,0.98), rgba(224,231,255,0.96))';
+  const iconBorder = theme === 'dark'
+    ? 'rgba(167,139,250,0.35)'
+    : 'rgba(196,181,253,0.68)';
 
   if (!cat) {
     return (
       <div
-        className={`${outer} ${radius} flex items-center justify-center border shadow-sm shrink-0 ${className}`}
-        style={{ background: iconBackground, borderColor: palette.border }}
+        className={`${outer} ${radius} flex items-center justify-center border shrink-0 ${className}`}
+        style={{
+          background: iconBackground,
+          borderColor: iconBorder,
+          boxShadow: '0 10px 22px -14px rgba(124,58,237,0.55)',
+        }}
       >
         <Briefcase size={iconSize} color={iconColor} strokeWidth={1.8} />
       </div>
@@ -717,8 +723,12 @@ export const CategoryIcon: React.FC<{
 
   return (
     <div
-      className={`${outer} ${radius} flex items-center justify-center border shadow-sm shrink-0 ${className}`}
-      style={{ background: iconBackground, borderColor: palette.border }}
+      className={`${outer} ${radius} flex items-center justify-center border shrink-0 ${className}`}
+      style={{
+        background: iconBackground,
+        borderColor: iconBorder,
+        boxShadow: '0 10px 22px -14px rgba(124,58,237,0.55)',
+      }}
     >
       <IconComponent size={iconSize} color={iconColor} strokeWidth={2} />
     </div>
