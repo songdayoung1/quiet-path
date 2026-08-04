@@ -9,7 +9,6 @@ import { getThemePalette, useResolvedTheme } from '../theme';
 interface CurrentPathStripProps {
   currentDirection: Direction | null;
   currentPathConsistency: number;
-  currentPathRecordCount: number;
 }
 
 export const CurrentPathStrip: React.FC<CurrentPathStripProps> = ({

@@ -9,6 +9,7 @@ import { AppModal } from '../components/AppModal';
 import { getThemePalette, useResolvedTheme } from '../theme';
 import { RecordImage } from '../components/RecordImage';
 import { getCurrentPathRecords } from '../utils/recordScope';
+import { calculatePathProgress } from '../utils/pathProgress';
 
 const formatDateInputValue = (date: Date) => {
   const year = date.getFullYear();
@@ -134,21 +135,10 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
     return Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
   }, [currentPathRecords]);
 
-  const pathConsistency = useMemo(() => {
-    if (!currentDirection) return 0;
-    const startDate = new Date(currentDirection.createdAt);
-    const today = new Date();
-    const pathDays = Math.max(
-      1,
-      Math.floor(
-        (new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime() -
-          new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime()) /
-          (1000 * 60 * 60 * 24)
-      ) + 1
-    );
-
-    return Math.round((currentPathRecords.length / pathDays) * 100);
-  }, [currentDirection, currentPathRecords.length]);
+  const pathProgress = useMemo(
+    () => calculatePathProgress(currentPathRecords, currentDirection),
+    [currentDirection, currentPathRecords]
+  );
 
   if (isEditing) {
     return (
@@ -307,12 +297,12 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
                   <div className="flex items-center justify-between mb-4 border-b pb-4" style={{ borderColor: palette.divider }}>
                     <div className="flex flex-col items-center flex-1">
                       <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Path Rate</p>
-                      <p className="text-[17px] font-bold text-point-500 mt-1 leading-none">{pathConsistency}%</p>
+                      <p className="text-[17px] font-bold text-point-500 mt-1 leading-none">{pathProgress.rate}%</p>
                     </div>
                     <div className="w-px h-6" style={{ background: palette.divider }}></div>
                     <div className="flex flex-col items-center flex-1">
                       <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: palette.faintText }}>Days</p>
-                      <p className="text-[17px] font-bold mt-1 leading-none" style={{ color: palette.strongText }}>{currentPathRecords.length}</p>
+                      <p className="text-[17px] font-bold mt-1 leading-none" style={{ color: palette.strongText }}>{pathProgress.recordedDays}</p>
                     </div>
                     <div className="w-px h-6" style={{ background: palette.divider }}></div>
                     <div className="flex flex-col items-center flex-1">
