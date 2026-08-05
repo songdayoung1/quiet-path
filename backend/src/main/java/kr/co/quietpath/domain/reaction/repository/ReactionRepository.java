@@ -3,6 +3,7 @@ package kr.co.quietpath.domain.reaction.repository;
 import kr.co.quietpath.domain.reaction.entity.Reaction;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -93,6 +94,10 @@ public interface ReactionRepository extends JpaRepository<Reaction, Long> {
 
     @Query("select r from Reaction r join fetch r.record where r.user.id = :userId")
     List<Reaction> findAllWithRecordByUserId(@Param("userId") Long userId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Reaction r where r.record.id in :recordIds")
+    int deleteAllByRecordIds(@Param("recordIds") List<Long> recordIds);
 
     default boolean existsByUserIdAndTargetTypeAndTargetId(Long userId, String targetType, Long targetId) {
         if (!"RECORD".equals(targetType)) {

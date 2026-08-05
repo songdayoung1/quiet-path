@@ -15,7 +15,12 @@ import { AccountConnectView } from './views/AccountConnectView';
 import { NicknameSetupView } from './views/NicknameSetupView';
 import { configureApiClient } from './api/apiClient';
 import type { ApiErrorWithStatus } from './api/apiClient';
-import { authApi, createLocalQaLoginCode, isMockAccessToken } from './api/authApi';
+import {
+  authApi,
+  createLocalQaLoginCode,
+  createWithdrawalQaLoginCode,
+  isMockAccessToken,
+} from './api/authApi';
 import { pathApi, PastPathListItem, PathActiveResponse, PathCreateResponse } from './api/pathApi';
 import { recordApi, RecordResponse } from './api/recordApi';
 import { notificationApi, type NotificationItem } from './api/notificationApi';
@@ -301,6 +306,8 @@ const App: React.FC = () => {
   const [noticeModal, setNoticeModal] = useState<{
     title: string;
     description: string;
+    afterCloseView?: ViewState;
+    variant?: 'primary' | 'danger';
   } | null>(null);
   const [expiredDirectionResolution, setExpiredDirectionResolution] = useState<ExpiredDirectionResolutionState | null>(null);
   const [expiredDirectionReviewAt, setExpiredDirectionReviewAt] = useState(() => buildFutureDateInputValue(7));
@@ -1152,6 +1159,48 @@ const App: React.FC = () => {
     setCurrentView('NOW');
   };
 
+  const clearLocalAuthentication = (nextView: ViewState) => {
+    window.sessionStorage.removeItem(OAUTH_PENDING_CODE_KEY);
+    window.sessionStorage.removeItem(OAUTH_PENDING_ERROR_KEY);
+    window.localStorage.removeItem('qp.profile.nickname');
+    setAuthCodeParam(null);
+    refreshAuthRequestRef.current = null;
+    unreadCountRequestRef.current = null;
+    setUnreadNotificationCount(0);
+    setNotificationListRefreshKey(0);
+    setState(prev => ({
+      ...clearServerDrivenState(prev),
+      auth: { isLoggedIn: false, token: null, userId: null },
+    }));
+    persistAuthState(
+      { isLoggedIn: false, token: null, userId: null },
+      { hasSeenOnboarding: state.hasSeenOnboarding, clearServerState: true }
+    );
+    setCurrentView(nextView);
+  };
+
+  const handleWithdrawalComplete = () => {
+    clearLocalAuthentication('NOW');
+    setNoticeModal({
+      title: '회원탈퇴가 완료됐어요',
+      description: '계정과 저장된 데이터가 삭제되었습니다. 다시 시작하면 신규 사용자로 가입할 수 있어요.',
+      afterCloseView: 'ACCOUNT_CONNECT',
+      variant: 'primary',
+    });
+  };
+
+  const handleWithdrawalReauthenticate = () => {
+    clearLocalAuthentication('ACCOUNT_CONNECT');
+  };
+
+  const closeNoticeModal = () => {
+    const afterCloseView = noticeModal?.afterCloseView;
+    setNoticeModal(null);
+    if (afterCloseView) {
+      setCurrentView(afterCloseView);
+    }
+  };
+
   const currentPathTodayRecord = getCurrentPathTodayRecord(state.records, state.currentDirection);
 
   const openNotifications = () => {
@@ -1233,6 +1282,10 @@ const App: React.FC = () => {
                 onStartKakao={() => authApi.startKakaoLogin()}
                 onNavigateToLocalQa={() => {
                     setAuthCodeParam(createLocalQaLoginCode());
+                    setCurrentView('OAUTH_CALLBACK');
+                }}
+                onNavigateToWithdrawalQa={() => {
+                    setAuthCodeParam(createWithdrawalQaLoginCode());
                     setCurrentView('OAUTH_CALLBACK');
                 }}
                 onNavigateToMockKakao={(code) => {
@@ -1508,6 +1561,8 @@ const App: React.FC = () => {
               }}
               onLogin={() => setCurrentView('ACCOUNT_CONNECT')}
               onLogout={handleLogout}
+              onWithdrawalComplete={handleWithdrawalComplete}
+              onReauthenticate={handleWithdrawalReauthenticate}
            />
         )}
         {currentView === 'NOTIFICATIONS' && state.auth.token && (
@@ -1650,9 +1705,9 @@ const App: React.FC = () => {
         description={noticeModal?.description ?? ''}
         confirmLabel="확인"
         hideCancel
-        confirmVariant="danger"
-        onClose={() => setNoticeModal(null)}
-        onConfirm={() => setNoticeModal(null)}
+        confirmVariant={noticeModal?.variant ?? 'danger'}
+        onClose={closeNoticeModal}
+        onConfirm={closeNoticeModal}
       />
 
       {/* Floating Bottom Navigation */}

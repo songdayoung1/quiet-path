@@ -5,6 +5,7 @@ interface AccountConnectViewProps {
   onBack: () => void;
   onStartKakao: () => void;
   onNavigateToLocalQa: () => void;
+  onNavigateToWithdrawalQa: () => void;
   // Callback equivalent to redirecting for E2E dev
   onNavigateToMockKakao: (code: string) => void;
 }
@@ -13,6 +14,7 @@ export const AccountConnectView: React.FC<AccountConnectViewProps> = ({
   onBack,
   onStartKakao,
   onNavigateToLocalQa,
+  onNavigateToWithdrawalQa,
   onNavigateToMockKakao,
 }) => {
   const [startError, setStartError] = React.useState<string | null>(null);
@@ -101,6 +103,15 @@ export const AccountConnectView: React.FC<AccountConnectViewProps> = ({
                   >
                     로컬 QA 계정으로 로그인
                   </button>
+                  <button
+                    onClick={onNavigateToWithdrawalQa}
+                    className="w-full py-2 mb-1.5 rounded-lg text-[11px] font-bold bg-rose-50 text-rose-500 border border-rose-100 hover:bg-rose-100/80"
+                  >
+                    탈퇴 테스트 계정으로 로그인
+                  </button>
+                  <p className="text-[9.5px] leading-relaxed text-mist-400 mb-2.5 px-1">
+                    탈퇴 후 다시 로그인하면 신규 사용자 흐름으로 재생성돼요.
+                  </p>
                   <p className="text-[10px] font-bold text-mist-400 tracking-[0.12em] mb-1.5">
                     화면 흐름 MOCK
                   </p>

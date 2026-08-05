@@ -16,8 +16,14 @@ import {
 } from 'lucide-react';
 import { AppState } from '../types';
 import { authApi, isMockAccessToken } from '../api/authApi';
+import type { ApiErrorWithStatus } from '../api/apiClient';
 import { notificationApi, NotificationPreferenceResponse } from '../api/notificationApi';
-import { disableWebPush, enableWebPush, hasWebPushSubscription } from '../services/webPush';
+import {
+  clearLocalWebPushSubscription,
+  disableWebPush,
+  enableWebPush,
+  hasWebPushSubscription,
+} from '../services/webPush';
 import { generateNickname } from './NicknameSetupView';
 import { AppModal } from '../components/AppModal';
 
@@ -26,6 +32,8 @@ interface SettingsViewProps {
   onClose: () => void;
   onLogin: () => void;
   onLogout: () => void | Promise<void>;
+  onWithdrawalComplete: () => void;
+  onReauthenticate: () => void;
 }
 
 type ThemeMode = 'system' | 'light' | 'dark';
@@ -39,7 +47,8 @@ type BusyKey =
   | 'nickname'
   | 'permission'
   | 'testPush'
-  | 'logout';
+  | 'logout'
+  | 'withdraw';
 
 interface LocalSettings {
   notifications: {
@@ -200,7 +209,14 @@ const Toggle: React.FC<{
   </button>
 );
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLogin, onLogout }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({
+  state,
+  onClose,
+  onLogin,
+  onLogout,
+  onWithdrawalComplete,
+  onReauthenticate,
+}) => {
   const isLoggedIn = !!state.auth?.isLoggedIn;
   const token = state.auth?.token ?? null;
 
@@ -217,6 +233,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
   const profileRequestRef = useRef<ReturnType<typeof authApi.getMe> | null>(null);
 
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
+  const [withdrawalConfirmed, setWithdrawalConfirmed] = useState(false);
+  const [withdrawalError, setWithdrawalError] = useState('');
+  const [withdrawalNeedsLogin, setWithdrawalNeedsLogin] = useState(false);
 
   const resolvedTheme = useMemo(() => resolveTheme(settings.theme), [settings.theme]);
 
@@ -617,6 +637,52 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
       pushToast('ok', '로그아웃되었어요');
     } finally {
       setBusy((prev) => ({ ...prev, logout: false }));
+    }
+  };
+
+  const openWithdrawalModal = () => {
+    if (!isLoggedIn) {
+      onLogin();
+      return;
+    }
+    setWithdrawalConfirmed(false);
+    setWithdrawalError('');
+    setWithdrawalNeedsLogin(false);
+    setWithdrawalModalOpen(true);
+  };
+
+  const closeWithdrawalModal = () => {
+    if (busy.withdraw) return;
+    setWithdrawalModalOpen(false);
+    setWithdrawalConfirmed(false);
+    setWithdrawalError('');
+    setWithdrawalNeedsLogin(false);
+  };
+
+  const confirmWithdrawal = async () => {
+    if (!token || !withdrawalConfirmed || busy.withdraw) return;
+    setBusy((prev) => ({ ...prev, withdraw: true }));
+    setWithdrawalError('');
+    setWithdrawalNeedsLogin(false);
+    try {
+      await authApi.withdraw(token);
+      await clearLocalWebPushSubscription().catch(() => undefined);
+      setWithdrawalModalOpen(false);
+      onWithdrawalComplete();
+    } catch (error) {
+      const apiError = error as ApiErrorWithStatus;
+      if (apiError.status === 401) {
+        setWithdrawalNeedsLogin(true);
+        setWithdrawalError('로그인 세션이 만료되었어요. 다시 로그인한 뒤 탈퇴를 진행해주세요.');
+      } else {
+        setWithdrawalError(
+          error instanceof Error && error.message
+            ? error.message
+            : '회원탈퇴를 완료하지 못했어요. 잠시 후 다시 시도해주세요.'
+        );
+      }
+    } finally {
+      setBusy((prev) => ({ ...prev, withdraw: false }));
     }
   };
 
@@ -1060,12 +1126,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
               v0.4.2 · build 217
             </span>
           </div>
-          {['이용약관', '문의하기', '회원탈퇴'].map((menu, index) => (
+          {['이용약관', '문의하기'].map((menu) => (
             <button
               key={menu}
               onClick={() => pushToast('info', '준비 중인 기능입니다')}
               className="w-full px-4 py-3.5 flex items-center justify-between text-left"
-              style={{ borderBottom: index === 2 ? 'none' : '1px solid var(--qp-divider)' }}
+              style={{ borderBottom: '1px solid var(--qp-divider)' }}
             >
               <span className="text-[14px] font-semibold" style={{ color: 'var(--qp-text-muted)' }}>
                 {menu}
@@ -1075,6 +1141,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
               </span>
             </button>
           ))}
+          <button
+            type="button"
+            onClick={openWithdrawalModal}
+            disabled={!!busy.withdraw}
+            className="w-full px-4 py-3.5 flex items-center justify-between text-left"
+            style={{ color: isLoggedIn ? 'var(--qp-danger-text)' : 'var(--qp-text-muted)' }}
+          >
+            <span className="text-[14px] font-semibold">회원탈퇴</span>
+            <span className="text-[10px] font-bold tracking-[0.12em]">
+              {isLoggedIn ? '계정 삭제' : '로그인 필요'}
+            </span>
+          </button>
         </div>
       </section>
 
@@ -1099,6 +1177,68 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ state, onClose, onLo
         cancelDisabled={!!busy.logout}
         onClose={() => setLogoutModalOpen(false)}
         onConfirm={() => void confirmLogout()}
+      />
+
+      <AppModal
+        open={withdrawalModalOpen}
+        icon={<AlertTriangle size={24} />}
+        title="정말 탈퇴할까요?"
+        description={
+          <div className="text-left">
+            <p className="mb-3 text-center">
+              탈퇴하면 아래 데이터는 복구할 수 없어요.
+            </p>
+            <ul
+              className="rounded-[16px] px-4 py-3 mb-3 space-y-1.5 text-[12px]"
+              style={{
+                background: resolvedTheme === 'dark' ? 'rgba(244,63,94,0.14)' : '#FFE4E6',
+                color: '#E11D48',
+                border: `1px solid ${resolvedTheme === 'dark' ? '#FB7185' : '#FDA4AF'}`,
+              }}
+            >
+              <li>• 기록·이미지·방향 및 회고 데이터 삭제</li>
+              <li>• 공감·알림 설정·푸시 구독 삭제</li>
+              <li>• 작성한 댓글은 ‘탈퇴한 사용자’로 유지</li>
+              <li>• 카카오 앱 연결 해제 및 모든 기기 로그아웃</li>
+            </ul>
+            <label
+              className="flex items-start gap-2.5 rounded-[14px] px-3 py-2.5 cursor-pointer"
+              style={{
+                background: resolvedTheme === 'dark' ? 'rgba(15,23,42,0.7)' : 'rgba(255,255,255,0.82)',
+                border: `1px solid ${resolvedTheme === 'dark' ? 'rgba(148,163,184,0.24)' : 'rgba(226,232,240,0.96)'}`,
+                color: resolvedTheme === 'dark' ? '#E2E8F0' : '#334155',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={withdrawalConfirmed}
+                onChange={(event) => setWithdrawalConfirmed(event.target.checked)}
+                disabled={!!busy.withdraw}
+                className="mt-0.5 h-4 w-4 accent-rose-500"
+              />
+              <span className="text-[12px] font-semibold leading-[1.5]">
+                삭제되는 내용을 확인했으며 회원탈퇴에 동의합니다.
+              </span>
+            </label>
+            {withdrawalError && (
+              <p className="mt-3 text-center text-[12px] font-semibold" style={{ color: '#E11D48' }}>
+                {withdrawalError}
+              </p>
+            )}
+          </div>
+        }
+        confirmLabel={busy.withdraw ? '탈퇴 처리 중…' : '회원탈퇴'}
+        confirmVariant="danger"
+        confirmDisabled={!withdrawalConfirmed || !!busy.withdraw}
+        cancelDisabled={!!busy.withdraw}
+        secondaryActionLabel={withdrawalNeedsLogin ? '다시 로그인' : undefined}
+        onSecondaryAction={withdrawalNeedsLogin ? () => {
+          closeWithdrawalModal();
+          onReauthenticate();
+        } : undefined}
+        secondaryActionDisabled={!!busy.withdraw}
+        onClose={closeWithdrawalModal}
+        onConfirm={() => void confirmWithdrawal()}
       />
 
       <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none">

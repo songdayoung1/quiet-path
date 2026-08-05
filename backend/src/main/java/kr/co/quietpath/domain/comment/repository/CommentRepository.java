@@ -42,4 +42,8 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
         @Param("userId") Long userId,
         @Param("updatedAt") LocalDateTime updatedAt
     );
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Comment c where c.recordId in :recordIds")
+    int deleteAllByRecordIds(@Param("recordIds") List<Long> recordIds);
 }

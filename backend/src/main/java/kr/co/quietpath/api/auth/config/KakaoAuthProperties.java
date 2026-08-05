@@ -10,9 +10,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class KakaoAuthProperties {
     private String clientId;
     private String clientSecret;
+    private String adminKey;
     private String redirectUri;
     private String authorizeUri = "https://kauth.kakao.com/oauth/authorize";
     private String tokenUri = "https://kauth.kakao.com/oauth/token";
     private String userInfoUri = "https://kapi.kakao.com/v2/user/me";
+    private String unlinkUri = "https://kapi.kakao.com/v1/user/unlink";
 }
-
