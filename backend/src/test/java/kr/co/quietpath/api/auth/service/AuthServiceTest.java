@@ -114,6 +114,48 @@ class AuthServiceTest {
     }
 
     @Test
+    void withdrawalQaLogin_createsSeparateAccountAndReturnsNewStatus() {
+        when(userRepository.findByProviderAndProviderUserId(
+            ProviderType.LOCAL,
+            "quiet-path-withdrawal-qa"
+        )).thenReturn(Optional.empty());
+        when(userRepository.existsByNickname("탈퇴테스터")).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User user = invocation.getArgument(0);
+            setId(user, 43L);
+            return user;
+        });
+        when(jwtTokenProvider.createAccessToken(eq(43L), anyString())).thenReturn("withdrawal-access-token");
+        when(jwtProperties.getRefreshTokenTtlSeconds()).thenReturn(1_209_600L);
+
+        AuthLoginResult result = authService.loginWithWithdrawalQaAccount();
+
+        assertEquals("withdrawal-access-token", result.accessToken());
+        assertEquals(OnboardingStatus.NEW, result.onboardingStatus());
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertEquals("quiet-path-withdrawal-qa", userCaptor.getValue().getProviderUserId());
+        assertEquals("탈퇴테스터", userCaptor.getValue().getNickname());
+    }
+
+    @Test
+    void withdrawalQaLogin_reusesExistingAccountAsExistingUser() {
+        User user = User.createLocal("quiet-path-withdrawal-qa", "탈퇴테스터");
+        setId(user, 43L);
+        when(userRepository.findByProviderAndProviderUserId(
+            ProviderType.LOCAL,
+            "quiet-path-withdrawal-qa"
+        )).thenReturn(Optional.of(user));
+        when(jwtTokenProvider.createAccessToken(eq(43L), anyString())).thenReturn("withdrawal-access-token");
+        when(jwtProperties.getRefreshTokenTtlSeconds()).thenReturn(1_209_600L);
+
+        AuthLoginResult result = authService.loginWithWithdrawalQaAccount();
+
+        assertEquals(OnboardingStatus.EXISTING, result.onboardingStatus());
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
     void refresh_withoutToken_returns400() {
         ApiException ex = assertThrows(ApiException.class, () -> authService.refresh(""));
         assertEquals(ErrorCode.REFRESH_TOKEN_REQUIRED, ex.getErrorCode());
@@ -142,6 +184,7 @@ class AuthServiceTest {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
         when(refreshTokenSessionRepository.findByTokenHash(anyString())).thenReturn(Optional.of(session));
+        when(userRepository.existsById(1L)).thenReturn(true);
         when(jwtProperties.getRefreshTokenTtlSeconds()).thenReturn(1_209_600L);
         when(jwtTokenProvider.createAccessToken(1L, "session-1")).thenReturn("new-access-token");
 
@@ -180,11 +223,35 @@ class AuthServiceTest {
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
         when(refreshTokenSessionRepository.findByTokenHash(anyString())).thenReturn(Optional.of(session));
+        when(userRepository.existsById(1L)).thenReturn(true);
         when(jwtProperties.getRefreshTokenTtlSeconds()).thenReturn(0L);
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> authService.refresh("plain-refresh-token"));
 
         assertEquals("app.jwt.refresh-token-ttl-seconds는 0보다 커야 합니다.", ex.getMessage());
+    }
+
+    @Test
+    void refresh_whenUserWasDeleted_removesSessionAndReturns401() {
+        RefreshTokenSession session = RefreshTokenSession.issue(
+            1L,
+            "session-1",
+            "hashed-old-token",
+            300L
+        );
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(true);
+        when(refreshTokenSessionRepository.findByTokenHash(anyString())).thenReturn(Optional.of(session));
+        when(userRepository.existsById(1L)).thenReturn(false);
+
+        ApiException exception = assertThrows(
+            ApiException.class,
+            () -> authService.refresh("plain-refresh-token")
+        );
+
+        assertEquals(ErrorCode.REFRESH_TOKEN_INVALID, exception.getErrorCode());
+        verify(refreshTokenSessionRepository).delete(session);
+        verify(refreshTokenSessionRepository, never()).save(session);
     }
 
     @Test

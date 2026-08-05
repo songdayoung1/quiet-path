@@ -23,7 +23,15 @@ public class LocalQaAuthController {
 
     @PostMapping("/qa-login")
     public ResponseEntity<AuthCallbackResponse> login() {
-        AuthLoginResult result = authService.loginWithLocalQaAccount();
+        return buildResponse(authService.loginWithLocalQaAccount());
+    }
+
+    @PostMapping("/withdrawal-qa-login")
+    public ResponseEntity<AuthCallbackResponse> withdrawalLogin() {
+        return buildResponse(authService.loginWithWithdrawalQaAccount());
+    }
+
+    private ResponseEntity<AuthCallbackResponse> buildResponse(AuthLoginResult result) {
         AuthCallbackResponse response = AuthCallbackResponse.builder()
             .token(result.accessToken())
             .onboardingStatus(result.onboardingStatus())

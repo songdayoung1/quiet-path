@@ -10,9 +10,11 @@ import { apiFetch, apiUrl, buildApiError, parseErrorMessage } from './apiClient'
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MOCK_CODES = new Set(['new_user', 'existing_user', 'error_user']);
 const LOCAL_QA_CODE_PREFIX = 'local_qa:';
+const WITHDRAWAL_QA_CODE_PREFIX = 'withdrawal_qa:';
 const REFRESH_RETRY_DELAYS = [120, 250];
 let refreshRequest: Promise<{ token: string }> | null = null;
 export const createLocalQaLoginCode = () => `${LOCAL_QA_CODE_PREFIX}${Date.now()}`;
+export const createWithdrawalQaLoginCode = () => `${WITHDRAWAL_QA_CODE_PREFIX}${Date.now()}`;
 export const isMockAccessToken = (token: string) =>
   token.startsWith('mock_token_') || token.startsWith('mock_access_');
 const mockStatusByToken = (token: string): OnboardingStatus =>
@@ -46,8 +48,14 @@ export const authApi = {
   loginWithKakao: async (
     code: string
   ): Promise<{ token: string; onboardingStatus: OnboardingStatus }> => {
-    if (import.meta.env.DEV && code.startsWith(LOCAL_QA_CODE_PREFIX)) {
-      const response = await fetch(apiUrl('/api/v1/auth/local/qa-login'), {
+    if (
+      import.meta.env.DEV &&
+      (code.startsWith(LOCAL_QA_CODE_PREFIX) || code.startsWith(WITHDRAWAL_QA_CODE_PREFIX))
+    ) {
+      const endpoint = code.startsWith(WITHDRAWAL_QA_CODE_PREFIX)
+        ? '/api/v1/auth/local/withdrawal-qa-login'
+        : '/api/v1/auth/local/qa-login';
+      const response = await fetch(apiUrl(endpoint), {
         method: 'POST',
         credentials: 'include',
       });
@@ -149,6 +157,26 @@ export const authApi = {
     });
     if (!response.ok) {
       throw new Error(await parseErrorMessage(response));
+    }
+  },
+
+  withdraw: async (token: string): Promise<void> => {
+    if (import.meta.env.DEV && isMockAccessToken(token)) {
+      await delay(500);
+      return;
+    }
+
+    const response = await apiFetch(
+      '/api/v1/auth/me',
+      {
+        method: 'DELETE',
+        credentials: 'include',
+      },
+      { accessToken: token }
+    );
+
+    if (!response.ok) {
+      throw await buildApiError(response);
     }
   },
 

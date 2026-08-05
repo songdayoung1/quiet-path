@@ -37,6 +37,11 @@ public class CommentSchemaMigrationRunner implements ApplicationRunner {
             jdbcTemplate.execute("ALTER TABLE comments DROP COLUMN target_id");
             log.info("Dropped legacy column comments.target_id");
         }
+
+        if (!isColumnNullable(schemaName, "comments", "user_id")) {
+            jdbcTemplate.execute("ALTER TABLE comments MODIFY COLUMN user_id BIGINT NULL");
+            log.info("Changed comments.user_id to nullable for withdrawn-user anonymization");
+        }
     }
 
     private boolean hasIndex(String schemaName, String tableName, String indexName) {
@@ -71,5 +76,22 @@ public class CommentSchemaMigrationRunner implements ApplicationRunner {
             columnName
         );
         return count != null && count > 0;
+    }
+
+    private boolean isColumnNullable(String schemaName, String tableName, String columnName) {
+        String nullable = jdbcTemplate.queryForObject(
+            """
+                select is_nullable
+                from information_schema.columns
+                where table_schema = ?
+                  and table_name = ?
+                  and column_name = ?
+                """,
+            String.class,
+            schemaName,
+            tableName,
+            columnName
+        );
+        return "YES".equalsIgnoreCase(nullable);
     }
 }

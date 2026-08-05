@@ -150,7 +150,7 @@ public class CommentService {
     }
 
     private void validateOwner(Long userId, Comment comment) {
-        if (!comment.getUserId().equals(userId)) {
+        if (comment.getUserId() == null || !comment.getUserId().equals(userId)) {
             throw new ApiException(ErrorCode.NOT_OWNER);
         }
     }

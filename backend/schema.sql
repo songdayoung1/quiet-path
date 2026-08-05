@@ -141,7 +141,7 @@ CREATE TABLE reactions (
 CREATE TABLE comments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     record_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
+    user_id BIGINT,
     content VARCHAR(500) NOT NULL,
     deleted TINYINT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,

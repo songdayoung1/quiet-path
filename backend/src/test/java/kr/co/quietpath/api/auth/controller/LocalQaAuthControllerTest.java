@@ -68,4 +68,22 @@ class LocalQaAuthControllerTest {
 
         verify(authService).loginWithLocalQaAccount();
     }
+
+    @Test
+    void withdrawalLogin_issuesSeparateAccountTokenAndRefreshCookie() throws Exception {
+        when(authService.loginWithWithdrawalQaAccount()).thenReturn(
+            new AuthLoginResult("withdrawal-access-token", "withdrawal-refresh-token", OnboardingStatus.NEW)
+        );
+
+        mockMvc.perform(post("/api/v1/auth/local/withdrawal-qa-login"))
+            .andExpect(status().isOk())
+            .andExpect(header().string(
+                HttpHeaders.SET_COOKIE,
+                org.hamcrest.Matchers.containsString("refresh_token=withdrawal-refresh-token")
+            ))
+            .andExpect(jsonPath("$.token").value("withdrawal-access-token"))
+            .andExpect(jsonPath("$.onboardingStatus").value("NEW"));
+
+        verify(authService).loginWithWithdrawalQaAccount();
+    }
 }

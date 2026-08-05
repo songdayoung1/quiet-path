@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 public enum ErrorCode {
     AUTH_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_REQUIRED", "로그인이 필요합니다."),
     KAKAO_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "KAKAO_AUTH_FAILED", "카카오 인증에 실패했습니다."),
+    KAKAO_UNLINK_FAILED(HttpStatus.BAD_GATEWAY, "KAKAO_UNLINK_FAILED", "카카오 연결 해제에 실패했습니다."),
     REFRESH_TOKEN_REQUIRED(HttpStatus.BAD_REQUEST, "REFRESH_TOKEN_REQUIRED", "리프레시 토큰이 필요합니다."),
     REFRESH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_INVALID", "리프레시 토큰이 유효하지 않습니다."),
     AUTH_CONFIG_MISSING(HttpStatus.INTERNAL_SERVER_ERROR, "AUTH_CONFIG_MISSING", "인증 설정값이 누락되었습니다."),

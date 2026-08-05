@@ -4,6 +4,7 @@ import kr.co.quietpath.domain.record.entity.Record;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -61,6 +62,13 @@ public interface RecordRepository extends JpaRepository<Record, Long> {
     boolean existsByPath_IdAndRecordDateAndIsHiddenFalse(Long pathId, LocalDate recordDate);
 
     Optional<Record> findByIdAndIsHiddenFalse(Long id);
+
+    @Query("select r from Record r left join fetch r.image where r.user.id = :userId")
+    List<Record> findAllWithImageByUserId(@Param("userId") Long userId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Record r where r.user.id = :userId")
+    int deleteAllByUserId(@Param("userId") Long userId);
 
     @Query("""
         select r from Record r

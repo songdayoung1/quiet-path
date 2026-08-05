@@ -20,6 +20,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -64,6 +66,28 @@ class CommentPageCacheServiceTest {
         assertEquals("nick1", response.getItems().get(0).getNickname());
         assertEquals(1L, response.getTotalElements());
         verify(commentRepository).findByRecordIdAndDeletedFalseOrderByCreatedAtAsc(10L, PageRequest.of(0, 20));
+    }
+
+    @Test
+    void getComments_mapsAnonymizedAuthorAsWithdrawnUser() {
+        Comment comment = Comment.builder()
+            .recordId(10L)
+            .userId(1L)
+            .content("남겨 둘 댓글")
+            .build();
+        comment.anonymizeAuthor();
+        setField(comment, "id", 102L);
+
+        when(commentRepository.findByRecordIdAndDeletedFalseOrderByCreatedAtAsc(
+            10L,
+            PageRequest.of(0, 20))
+        ).thenReturn(new PageImpl<>(List.of(comment), PageRequest.of(0, 20), 1));
+
+        var response = commentPageCacheService.getComments(10L, 0, 20);
+
+        assertNull(response.getItems().get(0).getUserId());
+        assertEquals("탈퇴한 사용자", response.getItems().get(0).getNickname());
+        verifyNoInteractions(userRepository);
     }
 
     @Test

@@ -12,6 +12,8 @@ public interface NotificationPreferenceRepository extends JpaRepository<Notifica
 
     Optional<NotificationPreference> findByUserId(Long userId);
 
+    long deleteAllByUserId(Long userId);
+
     @Query("select distinct p.timeZone from NotificationPreference p where p.reviewReminderEnabled = true")
     List<String> findDistinctTimeZonesByReviewReminderEnabledTrue();
 

@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -50,11 +51,13 @@ class RefreshTokenSessionRepositoryIntegrationTest {
 
         var byTokenHash = refreshTokenSessionRepository.findByTokenHash("hashed-token");
         var bySession = refreshTokenSessionRepository.findByUserIdAndSessionId(1L, "session-1");
+        var byUser = refreshTokenSessionRepository.findAllByUserId(1L);
 
         assertTrue(byTokenHash.isPresent());
         assertTrue(bySession.isPresent());
         assertEquals(session.getId(), byTokenHash.get().getId());
         assertEquals(session.getId(), bySession.get().getId());
+        assertEquals(List.of(session.getId()), byUser.stream().map(RefreshTokenSession::getId).toList());
     }
 
     @Test

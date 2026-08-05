@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import kr.co.quietpath.api.auth.UserPrincipal;
+import kr.co.quietpath.domain.auth.repository.RefreshTokenSessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -22,6 +23,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String BEARER_PREFIX = "Bearer ";
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenSessionRepository refreshTokenSessionRepository;
 
     @Override
     protected void doFilterInternal(
@@ -34,13 +36,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token) && jwtTokenProvider.validate(token)) {
             Long userId = jwtTokenProvider.parseUserId(token);
             String sessionId = jwtTokenProvider.parseSessionId(token);
-            UserPrincipal principal = new UserPrincipal(userId, sessionId);
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                principal,
-                null,
-                Collections.emptyList()
-            );
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            if (isActiveSession(userId, sessionId)) {
+                UserPrincipal principal = new UserPrincipal(userId, sessionId);
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                    principal,
+                    null,
+                    Collections.emptyList()
+                );
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
         }
 
         filterChain.doFilter(request, response);
@@ -52,5 +56,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return null;
         }
         return authorization.substring(BEARER_PREFIX.length()).trim();
+    }
+
+    private boolean isActiveSession(Long userId, String sessionId) {
+        return userId != null
+            && StringUtils.hasText(sessionId)
+            && refreshTokenSessionRepository.findByUserIdAndSessionId(userId, sessionId).isPresent();
     }
 }

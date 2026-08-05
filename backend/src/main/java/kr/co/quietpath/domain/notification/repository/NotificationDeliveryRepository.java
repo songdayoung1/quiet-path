@@ -13,4 +13,6 @@ public interface NotificationDeliveryRepository extends JpaRepository<Notificati
         Long targetId,
         LocalDate scheduledDate
     );
+
+    long deleteAllByUserId(Long userId);
 }

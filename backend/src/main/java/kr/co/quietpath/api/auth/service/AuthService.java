@@ -53,6 +53,8 @@ public class AuthService {
     private static final String RESPONSE_TYPE_CODE = "code";
     private static final String LOCAL_QA_PROVIDER_USER_ID = "quiet-path-local-qa";
     private static final String LOCAL_QA_NICKNAME = "로컬테스터";
+    private static final String WITHDRAWAL_QA_PROVIDER_USER_ID = "quiet-path-withdrawal-qa";
+    private static final String WITHDRAWAL_QA_NICKNAME = "탈퇴테스터";
     private static final int LOCAL_QA_NICKNAME_SUFFIX_LIMIT = 99;
     private static final List<String> NICKNAME_STEMS = List.of(
         "조용한물결빛",
@@ -128,21 +130,45 @@ public class AuthService {
     }
 
     public AuthLoginResult loginWithLocalQaAccount() {
+        return loginWithLocalQaAccount(
+            LOCAL_QA_PROVIDER_USER_ID,
+            LOCAL_QA_NICKNAME,
+            false
+        );
+    }
+
+    public AuthLoginResult loginWithWithdrawalQaAccount() {
+        return loginWithLocalQaAccount(
+            WITHDRAWAL_QA_PROVIDER_USER_ID,
+            WITHDRAWAL_QA_NICKNAME,
+            true
+        );
+    }
+
+    private AuthLoginResult loginWithLocalQaAccount(
+        String providerUserId,
+        String nickname,
+        boolean exposeNewUserFlow
+    ) {
         User user = userRepository.findByProviderAndProviderUserId(
                 ProviderType.LOCAL,
-                LOCAL_QA_PROVIDER_USER_ID
+                providerUserId
             )
             .orElse(null);
+        boolean created = user == null;
 
-        if (user == null) {
-            user = User.createLocal(LOCAL_QA_PROVIDER_USER_ID, generateLocalQaNickname());
+        if (created) {
+            user = User.createLocal(providerUserId, generateLocalQaNickname(nickname));
             user.updateLastLogin();
             userRepository.save(user);
         } else {
             user.updateLastLogin();
         }
 
-        return issueLoginResult(user, OnboardingStatus.EXISTING);
+        OnboardingStatus onboardingStatus = created && exposeNewUserFlow
+            ? OnboardingStatus.NEW
+            : OnboardingStatus.EXISTING;
+        return issueLoginResult(user, onboardingStatus);
     }
 
     @Transactional(readOnly = true)
@@ -177,6 +203,12 @@ public class AuthService {
                     log.warn("Refresh rejected: Redis session is missing or expired");
                     return new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
                 });
+
+            if (!userRepository.existsById(session.getUserId())) {
+                refreshTokenSessionRepository.delete(session);
+                log.warn("Refresh rejected: user no longer exists. userId={}", session.getUserId());
+                throw new ApiException(ErrorCode.REFRESH_TOKEN_INVALID);
+            }
 
             String rotatedRefreshToken = generateOpaqueRefreshToken();
             session.rotate(hashToken(rotatedRefreshToken), getRefreshTokenTtlSeconds());
@@ -316,12 +348,12 @@ public class AuthService {
         throw new ApiException(ErrorCode.NICKNAME_GENERATION_FAILED);
     }
 
-    private String generateLocalQaNickname() {
-        if (!userRepository.existsByNickname(LOCAL_QA_NICKNAME)) {
-            return LOCAL_QA_NICKNAME;
+    private String generateLocalQaNickname(String baseNickname) {
+        if (!userRepository.existsByNickname(baseNickname)) {
+            return baseNickname;
         }
         for (int suffix = 1; suffix <= LOCAL_QA_NICKNAME_SUFFIX_LIMIT; suffix++) {
-            String candidate = LOCAL_QA_NICKNAME + String.format("%02d", suffix);
+            String candidate = baseNickname + String.format("%02d", suffix);
             if (!userRepository.existsByNickname(candidate)) {
                 return candidate;
             }

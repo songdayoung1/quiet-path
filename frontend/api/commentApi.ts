@@ -2,7 +2,7 @@ import { apiFetch, buildApiError } from './apiClient';
 
 export interface CommentItemResponse {
   commentId: number;
-  userId: number;
+  userId: number | null;
   nickname: string | null;
   profileImageUrl: string | null;
   content: string;

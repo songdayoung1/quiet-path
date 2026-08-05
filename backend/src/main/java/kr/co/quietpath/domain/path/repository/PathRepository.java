@@ -3,6 +3,7 @@ package kr.co.quietpath.domain.path.repository;
 import kr.co.quietpath.domain.path.entity.Path;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -25,6 +26,14 @@ public interface PathRepository extends JpaRepository<Path, Long> {
     List<Path> findByUserIdInAndStatus(List<Long> userIds, String status);
 
     List<Path> findByIdIn(List<Long> ids);
+
+    @Modifying(flushAutomatically = true)
+    @Query("update Path p set p.coverRecord = null where p.userId = :userId")
+    int clearCoverRecordsByUserId(@Param("userId") Long userId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("delete from Path p where p.userId = :userId")
+    int deleteAllByUserId(@Param("userId") Long userId);
 
     @Query("""
         select p from Path p

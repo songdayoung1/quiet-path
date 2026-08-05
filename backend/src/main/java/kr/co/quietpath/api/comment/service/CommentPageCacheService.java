@@ -20,6 +20,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,7 @@ public class CommentPageCacheService {
 
     private static final String COMMENT_VERSION_KEY_PREFIX = "comments:version:";
     private static final Duration COMMENT_VERSION_TTL = Duration.ofHours(24);
+    private static final String WITHDRAWN_USER_NICKNAME = "탈퇴한 사용자";
 
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
@@ -49,18 +51,23 @@ public class CommentPageCacheService {
         List<Comment> comments = commentPage.getContent();
         Set<Long> userIds = comments.stream()
             .map(Comment::getUserId)
+            .filter(Objects::nonNull)
             .collect(Collectors.toSet());
 
-        Map<Long, User> userMap = userRepository.findByIdIn(List.copyOf(userIds)).stream()
-            .collect(Collectors.toMap(User::getId, user -> user));
+        Map<Long, User> userMap = userIds.isEmpty()
+            ? Map.of()
+            : userRepository.findByIdIn(List.copyOf(userIds)).stream()
+                .collect(Collectors.toMap(User::getId, user -> user));
 
         List<CommentListItem> items = comments.stream()
             .map(comment -> {
-                User user = userMap.get(comment.getUserId());
+                User user = comment.getUserId() != null
+                    ? userMap.get(comment.getUserId())
+                    : null;
                 return CommentListItem.builder()
                     .commentId(comment.getId())
-                    .userId(comment.getUserId())
-                    .nickname(user != null ? user.getNickname() : null)
+                    .userId(user != null ? user.getId() : null)
+                    .nickname(user != null ? user.getNickname() : WITHDRAWN_USER_NICKNAME)
                     .profileImageUrl(null)
                     .content(comment.getContent())
                     .deleted(comment.isDeleted())

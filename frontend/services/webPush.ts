@@ -96,3 +96,10 @@ export const disableWebPush = async (token: string) => {
     await subscription.unsubscribe();
   }
 };
+
+export const clearLocalWebPushSubscription = async () => {
+  if (!isWebPushSupported()) return;
+  const registration = await navigator.serviceWorker.getRegistration('/');
+  const subscription = await registration?.pushManager.getSubscription();
+  await subscription?.unsubscribe();
+};

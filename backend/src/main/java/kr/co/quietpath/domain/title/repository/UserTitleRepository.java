@@ -10,5 +10,6 @@ public interface UserTitleRepository extends JpaRepository<UserTitle, Long> {
     List<UserTitle> findByUserIdOrderByAcquiredAtDesc(Long userId);
 
     boolean existsByUserIdAndTitleId(Long userId, Long titleId);
-    
+
+    long deleteAllByUser_Id(Long userId);
 }
