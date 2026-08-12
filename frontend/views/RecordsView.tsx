@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
-import { AlertTriangle, BookOpenText, Calendar, ChevronLeft, ChevronRight, Download, Image as ImageIcon } from 'lucide-react';
+import { AlertTriangle, ArrowDownUp, BookOpenText, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Image as ImageIcon } from 'lucide-react';
 import { RecordDetailDiary } from '../components/RecordDetailDiary';
 import { AlbumTab } from '../components/records/AlbumTab';
 import { RecordsListTab } from '../components/records/RecordsListTab';
@@ -100,6 +100,33 @@ const rebuildMonthlyReport = (
   };
 };
 
+const sortRecordsForDisplay = (
+  records: RecordType[],
+  sortOrder: 'newest' | 'oldest',
+): RecordType[] =>
+  [...records].sort((a, b) => {
+    const aPinned = Boolean(a.isPinned);
+    const bPinned = Boolean(b.isPinned);
+    const pinDiff = Number(bPinned) - Number(aPinned);
+    if (pinDiff !== 0) {
+      return pinDiff;
+    }
+    if (aPinned && bPinned) {
+      return 0;
+    }
+
+    const timeDiff = sortOrder === 'newest'
+      ? b.timestamp - a.timestamp
+      : a.timestamp - b.timestamp;
+    if (timeDiff !== 0) {
+      return timeDiff;
+    }
+
+    return sortOrder === 'newest'
+      ? b.id.localeCompare(a.id, undefined, { numeric: true })
+      : a.id.localeCompare(b.id, undefined, { numeric: true });
+  });
+
 const updateMonthlyItem = (
   item: RecordResponse,
   updatedRecord: RecordType
@@ -147,6 +174,9 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const [selectedRecordIds, setSelectedRecordIds] = useState<string[]>([]);
   const [isExportingSelectedRecords, setIsExportingSelectedRecords] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [recordSortOrder, setRecordSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
   const [pendingRecordExport, setPendingRecordExport] = useState<{
     record: RecordType;
     mode?: RecordCardDisplayMode;
@@ -227,6 +257,25 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   }, [activeTab, isSelectionMode]);
 
   useEffect(() => {
+    setIsSortMenuOpen(false);
+  }, [activeTab, targetMonth, targetYear]);
+
+  useEffect(() => {
+    if (!isSortMenuOpen) {
+      return;
+    }
+
+    const closeSortMenu = (event: PointerEvent) => {
+      if (!sortMenuRef.current?.contains(event.target as Node)) {
+        setIsSortMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', closeSortMenu);
+    return () => document.removeEventListener('pointerdown', closeSortMenu);
+  }, [isSortMenuOpen]);
+
+  useEffect(() => {
     if (isServerBacked) {
       return;
     }
@@ -287,15 +336,19 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     () => (monthlyReport?.items ?? []).map(buildRecordFromMonthlyItem),
     [monthlyReport],
   );
+  const sortedRecordsForList = useMemo(
+    () => sortRecordsForDisplay(monthlyRecords, recordSortOrder),
+    [monthlyRecords, recordSortOrder],
+  );
 
   const photoRecords = useMemo(
-    () =>
-      monthlyRecords
-        .filter((record) => record.imageUrl)
-        .sort((a, b) => a.timestamp - b.timestamp),
-    [monthlyRecords],
+    () => sortRecordsForDisplay(
+      monthlyRecords.filter((record) => record.imageUrl),
+      recordSortOrder,
+    ),
+    [monthlyRecords, recordSortOrder],
   );
-  const displayedPhotoRecords = photoRecords.length > 12 ? photoRecords.slice(-12) : photoRecords;
+  const displayedPhotoRecords = photoRecords.slice(0, 12);
   const selectedRecords = useMemo(
     () => monthlyRecords.filter((record) => selectedRecordIds.includes(record.id)),
     [monthlyRecords, selectedRecordIds],
@@ -590,7 +643,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
   if (selectedRecordForDetail) {
     const record = selectedRecordForDetail;
-    const pageNumber = monthlyRecords.findIndex((item) => item.id === record.id) + 1;
+    const pageNumber = sortedRecordsForList.findIndex((item) => item.id === record.id) + 1;
     const exportViewLabel = record.imageUrl
       ? detailDisplayMode === 'poster'
         ? '포스터형 카드'
@@ -788,6 +841,91 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           </div>
         ) : (
           <div className="mt-3 flex items-center justify-end gap-1.5">
+            {(
+              (activeTab === 'album' && photoRecords.length > 0) ||
+              (activeTab === 'records' && monthlyRecords.length > 0)
+            ) && (
+              <div ref={sortMenuRef} className="relative z-40">
+                <button
+                  type="button"
+                  aria-label={activeTab === 'album' ? '앨범 정렬' : '기록 정렬'}
+                  aria-haspopup="listbox"
+                  aria-expanded={isSortMenuOpen}
+                  onClick={() => setIsSortMenuOpen((open) => !open)}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[11px] font-bold shadow-sm outline-none transition-all active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-point-300/70"
+                  style={{
+                    background: isSortMenuOpen ? palette.activeTabBg : palette.cardBgSoft,
+                    borderColor: isSortMenuOpen ? 'rgba(139,92,246,0.24)' : palette.border,
+                    color: isSortMenuOpen ? palette.activeTabText : palette.mutedText,
+                    boxShadow: isSortMenuOpen ? palette.shadow : undefined,
+                  }}
+                >
+                  <ArrowDownUp size={12} aria-hidden="true" />
+                  <span>{recordSortOrder === 'newest' ? '최신순' : '오래된순'}</span>
+                  <ChevronDown
+                    size={12}
+                    className={`transition-transform duration-200 ${isSortMenuOpen ? 'rotate-180' : ''}`}
+                    aria-hidden="true"
+                  />
+                </button>
+
+                {isSortMenuOpen && (
+                  <div
+                    role="listbox"
+                    aria-label={activeTab === 'album' ? '앨범 정렬 방식' : '기록 정렬 방식'}
+                    className="absolute right-0 top-[calc(100%+8px)] w-[148px] overflow-hidden rounded-[18px] border p-1.5 shadow-xl backdrop-blur-xl"
+                    style={{
+                      background: palette.cardBgStrong,
+                      borderColor: palette.border,
+                      boxShadow: theme === 'dark'
+                        ? '0 18px 44px rgba(0,0,0,0.34)'
+                        : '0 18px 44px rgba(82,96,109,0.18)',
+                    }}
+                  >
+                    {(
+                      [
+                        { id: 'newest', label: '최신순', description: '최근 기록부터' },
+                        { id: 'oldest', label: '오래된순', description: '처음 기록부터' },
+                      ] as const
+                    ).map((option) => {
+                      const selected = recordSortOrder === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          onClick={() => {
+                            setRecordSortOrder(option.id);
+                            setIsSortMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-[13px] px-2.5 py-2 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-point-300/60"
+                          style={{ background: selected ? palette.activeTabBg : 'transparent' }}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[11px] font-bold" style={{ color: selected ? palette.activeTabText : palette.strongText }}>
+                              {option.label}
+                            </span>
+                            <span className="mt-0.5 block text-[9px]" style={{ color: palette.faintText }}>
+                              {option.description}
+                            </span>
+                          </span>
+                          <span
+                            className="grid h-5 w-5 shrink-0 place-items-center rounded-full"
+                            style={{
+                              background: selected ? 'rgba(139,92,246,0.14)' : 'transparent',
+                              color: selected ? '#8B5CF6' : 'transparent',
+                            }}
+                          >
+                            <Check size={12} strokeWidth={2.8} aria-hidden="true" />
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             <button
               onClick={openExportModal}
               disabled={isAnyExporting || monthlyRecords.length === 0}
@@ -811,7 +949,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
       )}
       {activeTab === 'records' && (
         <RecordsListTab
-          records={monthlyRecords}
+          records={sortedRecordsForList}
           onSelectRecord={setSelectedRecordForDetail}
           onUpdateRecord={handleMonthlyRecordUpdate}
           onRequestDeleteRecord={requestDeleteRecord}
