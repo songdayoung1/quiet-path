@@ -1,0 +1,120 @@
+
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: quietpath-mysql
+    restart: unless-stopped
+    mem_limit: 640m
+    environment:
+      TZ: Asia/Seoul
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-quietpath}
+      MYSQL_USER: ${MYSQL_USER:-quietpath}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --innodb-buffer-pool-size=256M
+      - --max-connections=50
+    volumes:
+      - /opt/quietpath/data/mysql:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -uroot --password="$${MYSQL_ROOT_PASSWORD}" --silent
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - quietpath-net
+
+  redis:
+    image: redis:7.0-alpine
+    container_name: quietpath-redis
+    restart: unless-stopped
+    mem_limit: 160m
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD}
+    volumes:
+      - /opt/quietpath/data/redis:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli -a "$${REDIS_PASSWORD}" ping | grep -q PONG
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - quietpath-net
+
+  backend:
+    image: 381492289409.dkr.ecr.ap-northeast-2.amazonaws.com/quietpath/backend:${IMAGE_TAG}
+    container_name: quietpath-backend
+    restart: unless-stopped
+    mem_limit: 768m
+    environment:
+      TZ: Asia/Seoul
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx512m -XX:+UseG1GC
+
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-quietpath}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&useUnicode=true&connectionCollation=utf8mb4_unicode_ci
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-quietpath}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      APP_CORS_ALLOWED_ORIGIN_PATTERNS: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS}
+      APP_AUTH_REFRESH_COOKIE_SECURE: ${APP_AUTH_REFRESH_COOKIE_SECURE}
+
+      KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      KAKAO_ADMIN_KEY: ${KAKAO_ADMIN_KEY:-}
+      KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI}
+
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.5}
+
+      APP_RECORD_IMAGE_STORAGE: s3
+      APP_RECORD_IMAGE_S3_BUCKET: ${APP_RECORD_IMAGE_S3_BUCKET}
+      APP_RECORD_IMAGE_S3_REGION: ap-northeast-2
+      APP_RECORD_IMAGE_S3_BASE_URL: ${APP_RECORD_IMAGE_S3_BASE_URL}
+
+      APP_WEB_PUSH_PUBLIC_KEY: ${APP_WEB_PUSH_PUBLIC_KEY:-}
+      APP_WEB_PUSH_PRIVATE_KEY: ${APP_WEB_PUSH_PRIVATE_KEY:-}
+      APP_WEB_PUSH_SUBJECT: ${APP_WEB_PUSH_SUBJECT:-}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8080"
+    networks:
+      - quietpath-net
+
+  frontend:
+    image: 381492289409.dkr.ecr.ap-northeast-2.amazonaws.com/quietpath/frontend:${IMAGE_TAG}
+    container_name: quietpath-frontend
+    restart: unless-stopped
+    mem_limit: 128m
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - quietpath-net
+
+networks:
+  quietpath-net:
+    name: quietpath-net

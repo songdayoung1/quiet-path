@@ -1,0 +1,53 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 5
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${SPRING_DATA_REDIS_PASSWORD}
+
+server:
+  forward-headers-strategy: framework
+
+kakao:
+  auth:
+    client-id: ${KAKAO_REST_API_KEY}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    admin-key: ${KAKAO_ADMIN_KEY:}
+    redirect-uri: ${KAKAO_REDIRECT_URI}
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET}
+    access-token-ttl-seconds: ${APP_JWT_ACCESS_TOKEN_TTL_SECONDS:3600}
+    refresh-token-ttl-seconds: ${APP_JWT_REFRESH_TOKEN_TTL_SECONDS:15552000}
+    issuer: ${APP_JWT_ISSUER:quiet-path}
+
+  cors:
+    allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS}
+
+  auth:
+    refresh-cookie:
+      secure: ${APP_AUTH_REFRESH_COOKIE_SECURE:true}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: ${OPENAI_MODEL:gpt-5.5}
+  summary-prompt-version: ${OPENAI_SUMMARY_PROMPT_VERSION:v1}
+  summary-timeout-ms: ${OPENAI_SUMMARY_TIMEOUT_MS:45000}
