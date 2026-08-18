@@ -1,0 +1,9 @@
+.gradle
+build
+out
+.idea
+*.iml
+.env
+.env.*
+docker-compose*.yml
+mysql
