@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(RecordImageProperties.class)
@@ -19,7 +20,18 @@ public class RecordImageConfig {
         String region = requireS3Property(properties.getS3().getRegion(), "region");
         return S3Client.builder()
             .region(Region.of(region))
-            .credentialsProvider(DefaultCredentialsProvider.create())
+            .credentialsProvider(DefaultCredentialsProvider.builder().build())
+            .build();
+    }
+
+    /** 실행 환경의 기본 자격 증명 체인을 사용해 S3 조회 URL 서명기를 생성한다. */
+    @Bean
+    @ConditionalOnProperty(name = "app.record-image.storage", havingValue = "s3")
+    public S3Presigner recordImageS3Presigner(RecordImageProperties properties) {
+        String region = requireS3Property(properties.getS3().getRegion(), "region");
+        return S3Presigner.builder()
+            .region(Region.of(region))
+            .credentialsProvider(DefaultCredentialsProvider.builder().build())
             .build();
     }
 

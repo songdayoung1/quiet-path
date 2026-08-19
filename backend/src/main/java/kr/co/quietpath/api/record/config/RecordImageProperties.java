@@ -3,6 +3,7 @@ package kr.co.quietpath.api.record.config;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 import lombok.Getter;
@@ -58,5 +59,9 @@ public class RecordImageProperties {
         private String region;
 
         private String baseUrl;
+
+        @Positive
+        @Max(604800)
+        private long presignedUrlTtlSeconds = 600;
     }
 }

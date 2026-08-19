@@ -32,6 +32,7 @@ app:
       bucket: ${APP_RECORD_IMAGE_S3_BUCKET:}
       region: ${APP_RECORD_IMAGE_S3_REGION:ap-northeast-2}
       base-url: ${APP_RECORD_IMAGE_S3_BASE_URL:}
+      presigned-url-ttl-seconds: ${APP_RECORD_IMAGE_S3_PRESIGNED_URL_TTL_SECONDS:600}
   auth:
     refresh-cookie:
       name: ${APP_AUTH_REFRESH_COOKIE_NAME:refresh_token}

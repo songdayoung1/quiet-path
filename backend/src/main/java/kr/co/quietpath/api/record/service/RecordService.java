@@ -24,6 +24,7 @@ import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.entity.RecordImage;
+import kr.co.quietpath.domain.record.image.RecordImageUrlResolver;
 import kr.co.quietpath.domain.record.image.StoredRecordImage;
 import kr.co.quietpath.domain.record.repository.RecordImageRepository;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
@@ -60,6 +61,7 @@ public class RecordService {
     private final CommentRepository commentRepository;
     private final WeeklyTop3CacheService weeklyTop3CacheService;
     private final CommentPageCacheService commentPageCacheService;
+    private final RecordImageUrlResolver recordImageUrlResolver;
 
     @Transactional
     public RecordCreateResponse createRecord(Long userId, RecordCreateRequest request) {
@@ -123,7 +125,7 @@ public class RecordService {
             .oneWordText(record.getOneWordText())
             .tomorrowText(record.getTomorrowText())
             .moodCode(record.getMoodCode())
-            .imageUrl(record.getImageUrl())
+            .imageUrl(resolveImageUrl(record))
             .imagePositionX(resolvePositionX(record))
             .imagePositionY(resolvePositionY(record))
             .imageScale(resolveScale(record))
@@ -207,7 +209,7 @@ public class RecordService {
                 .oneWordText(record.getOneWordText())
                 .tomorrowText(record.getTomorrowText())
                 .moodCode(record.getMoodCode())
-                .imageUrl(record.getImageUrl())
+                .imageUrl(resolveImageUrl(record))
                 .imagePositionX(resolvePositionX(record))
                 .imagePositionY(resolvePositionY(record))
                 .imageScale(resolveScale(record))
@@ -248,7 +250,7 @@ public class RecordService {
             .content(resolveContent(record))
             .moodCode(record.getMoodCode())
             .visibility(record.getVisibility())
-            .imageUrl(record.getImageUrl())
+            .imageUrl(resolveImageUrl(record))
             .imagePositionX(resolvePositionX(record))
             .imagePositionY(resolvePositionY(record))
             .imageScale(resolveScale(record))
@@ -297,7 +299,7 @@ public class RecordService {
             .oneWordText(record.getOneWordText())
             .tomorrowText(record.getTomorrowText())
             .moodCode(record.getMoodCode())
-            .imageUrl(record.getImageUrl())
+            .imageUrl(resolveImageUrl(record))
             .imagePositionX(resolvePositionX(record))
             .imagePositionY(resolvePositionY(record))
             .imageScale(resolveScale(record))
@@ -454,6 +456,14 @@ public class RecordService {
         return record.getOneWordText();
     }
 
+    private String resolveImageUrl(Record record) {
+        RecordImage image = record.getImage();
+        if (image == null) {
+            return null;
+        }
+        return recordImageUrlResolver.resolve(image.getStorageKey(), image.getImageUrl());
+    }
+
     private RecordListItem toListItem(Record record) {
         Path path = record.getPath();
         return RecordListItem.builder()
@@ -467,7 +477,7 @@ public class RecordService {
             .oneWordText(record.getOneWordText())
             .tomorrowText(record.getTomorrowText())
             .moodCode(record.getMoodCode())
-            .imageUrl(record.getImageUrl())
+            .imageUrl(resolveImageUrl(record))
             .imagePositionX(resolvePositionX(record))
             .imagePositionY(resolvePositionY(record))
             .imageScale(resolveScale(record))
