@@ -110,17 +110,25 @@ jobs:
         run: |
           set -euo pipefail
 
+          COMPOSE_B64="$(base64 < deploy/docker-compose.prod.yml | tr -d '\n')"
+          CADDYFILE_B64="$(base64 < deploy/Caddyfile | tr -d '\n')"
+
           DEPLOY_PARAMETERS="$(
             jq -n \
               --arg image_tag "$IMAGE_TAG" \
               --arg aws_region "$AWS_REGION" \
               --arg registry "$ECR_REGISTRY" \
+              --arg compose_b64 "$COMPOSE_B64" \
+              --arg caddyfile_b64 "$CADDYFILE_B64" \
               '{
                 commands: [
                   "set -eu",
                   "cd /opt/quietpath/deploy",
                   "test -f .env",
-                  "test -f docker-compose.prod.yml",
+                  ("printf %s " + ($compose_b64 | @sh) + " | base64 -d > docker-compose.prod.yml"),
+                  ("printf %s " + ($caddyfile_b64 | @sh) + " | base64 -d > Caddyfile"),
+                  "chown ubuntu:ubuntu docker-compose.prod.yml Caddyfile",
+                  "chmod 644 docker-compose.prod.yml Caddyfile",
                   ("export IMAGE_TAG=" + $image_tag),
                   ("aws ecr get-login-password --region " + $aws_region + " | docker login --username AWS --password-stdin " + $registry),
                   "docker compose --env-file .env -f docker-compose.prod.yml config --quiet",
