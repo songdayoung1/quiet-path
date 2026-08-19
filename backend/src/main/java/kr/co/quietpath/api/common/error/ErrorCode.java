@@ -38,6 +38,7 @@ public enum ErrorCode {
     IMAGE_TOO_LARGE(HttpStatus.BAD_REQUEST, "IMAGE_TOO_LARGE", "이미지 파일이 허용 크기를 초과했습니다."),
     INVALID_IMAGE_DIMENSIONS(HttpStatus.BAD_REQUEST, "INVALID_IMAGE_DIMENSIONS", "이미지 해상도가 올바르지 않습니다."),
     IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "IMAGE_UPLOAD_FAILED", "이미지 저장에 실패했습니다."),
+    IMAGE_URL_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "IMAGE_URL_GENERATION_FAILED", "이미지 조회 주소 생성에 실패했습니다."),
     PATH_SUMMARY_LOCKED(HttpStatus.CONFLICT, "PATH_SUMMARY_LOCKED", "아직 회고 캡슐을 열 수 없습니다."),
     PATH_SUMMARY_EMPTY(HttpStatus.CONFLICT, "PATH_SUMMARY_EMPTY", "기록이 없어 회고 캡슐을 만들 수 없습니다."),
     PATH_SUMMARY_NOT_COMPLETED(HttpStatus.CONFLICT, "PATH_SUMMARY_NOT_COMPLETED", "종료된 방향만 회고 캡슐을 만들 수 있습니다."),

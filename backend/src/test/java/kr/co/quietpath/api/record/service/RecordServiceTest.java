@@ -14,6 +14,7 @@ import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.entity.RecordImage;
+import kr.co.quietpath.domain.record.image.RecordImageUrlResolver;
 import kr.co.quietpath.domain.record.repository.RecordImageRepository;
 import kr.co.quietpath.domain.record.repository.RecordRepository;
 import kr.co.quietpath.domain.user.entity.User;
@@ -63,6 +64,9 @@ class RecordServiceTest {
 
     @Mock
     private CommentPageCacheService commentPageCacheService;
+
+    @Mock
+    private RecordImageUrlResolver recordImageUrlResolver;
 
     @InjectMocks
     private RecordService recordService;
@@ -151,6 +155,32 @@ class RecordServiceTest {
     }
 
     @Test
+    void getRecords_returnsResolvedImageUrl() {
+        User user = User.createGoogle("provider", "user@example.com", "nick");
+        setId(user, 1L);
+        Record record = buildRecord(user, LocalDate.now());
+        record.attachImage(RecordImage.builder()
+            .storageKey("records/2026/08/19/image.webp")
+            .imageUrl("https://bucket.s3.amazonaws.com/records/2026/08/19/image.webp")
+            .build());
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(recordRepository.findByUser_IdAndIsHiddenFalseOrderByPinnedAtDescRecordDateDescIdDesc(1L))
+            .thenReturn(List.of(record));
+        when(recordImageUrlResolver.resolve(
+            "records/2026/08/19/image.webp",
+            "https://bucket.s3.amazonaws.com/records/2026/08/19/image.webp"
+        )).thenReturn("https://signed.example.com/records/2026/08/19/image.webp?signature=test");
+
+        var response = recordService.getRecords(1L);
+
+        assertEquals(
+            "https://signed.example.com/records/2026/08/19/image.webp?signature=test",
+            response.getItems().get(0).getImageUrl()
+        );
+    }
+
+    @Test
     void getMonthlyRecords_returnsMonthlyKpisAndPinnedFlag() {
         User user = User.createGoogle("provider", "user@example.com", "nick");
         setId(user, 1L);
@@ -164,6 +194,9 @@ class RecordServiceTest {
             .positionY(new BigDecimal("50.00"))
             .scale(new BigDecimal("1.00"))
             .build());
+
+        when(recordImageUrlResolver.resolve(null, "https://image.test/sample.png"))
+            .thenReturn("https://image.test/sample.png");
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(recordRepository.findByUser_IdAndIsHiddenFalseAndRecordDateBetweenOrderByPinnedAtDescRecordDateDescIdDesc(
