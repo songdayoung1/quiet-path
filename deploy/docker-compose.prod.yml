@@ -110,11 +110,36 @@ services:
     mem_limit: 128m
     depends_on:
       - backend
+    expose:
+      - "80"
+    networks:
+      - quietpath-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: quietpath-caddy
+    restart: unless-stopped
+    mem_limit: 128m
+    depends_on:
+      - frontend
+      - backend
     ports:
       - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       - quietpath-net
 
 networks:
   quietpath-net:
     name: quietpath-net
+
+volumes:
+  caddy_data:
+    name: quietpath-caddy-data
+  caddy_config:
+    name: quietpath-caddy-config
