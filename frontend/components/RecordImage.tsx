@@ -18,6 +18,7 @@ export const RecordImage: React.FC<RecordImageProps> = ({ record, className = ''
   return (
     <img
       {...props}
+      crossOrigin="anonymous"
       src={record.imageUrl}
       className={`object-cover ${className}`}
       style={{

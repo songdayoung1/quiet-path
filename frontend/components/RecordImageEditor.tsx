@@ -128,6 +128,7 @@ export const RecordImageEditor: React.FC<RecordImageEditorProps> = ({
         onPointerCancel={endDrag}
       >
         <img
+          crossOrigin="anonymous"
           src={imageUrl}
           alt="기록 사진 미리보기"
           draggable={false}
