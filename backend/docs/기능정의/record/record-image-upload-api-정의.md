@@ -238,7 +238,7 @@ APP_RECORD_IMAGE_S3_BASE_URL=https://cdn.example.com
 }
 ```
 
-카드 저장 기능은 원격 이미지를 Canvas에 그리므로 버킷 또는 CDN CORS에 실제 프론트 Origin의 `GET`과 `HEAD`를 허용해야 함. 현재 `baseUrl` 구현은 브라우저가 직접 접근 가능한 URL을 전제로 하며, private 객체용 presigned URL은 별도 후속 범위임.
+카드 저장 기능은 원격 이미지를 Canvas에 그리므로 버킷 또는 CDN CORS에 실제 프론트 Origin의 `GET`과 `HEAD`를 허용해야 함. 운영 버킷은 비공개 상태를 유지하고 presigned URL로 조회하며, 실제 CORS 설정은 `deploy/s3-record-images-cors.json`에서 관리함.
 
 실제 버킷 연결 후 다음을 확인함.
 

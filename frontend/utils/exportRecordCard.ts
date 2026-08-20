@@ -142,14 +142,35 @@ const roundedRect = (
   ctx.closePath();
 };
 
-const loadImage = (src: string) =>
+const decodeImage = (src: string) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
-    image.crossOrigin = 'anonymous';
     image.onload = () => resolve(image);
     image.onerror = () => reject(new Error('이미지를 불러오지 못했어요.'));
     image.src = src;
   });
+
+const loadImage = async (src: string) => {
+  if (src.startsWith('blob:') || src.startsWith('data:')) {
+    return decodeImage(src);
+  }
+
+  const response = await fetch(src, {
+    cache: 'no-store',
+    credentials: 'omit',
+    mode: 'cors',
+  });
+  if (!response.ok) {
+    throw new Error('이미지를 불러오지 못했어요.');
+  }
+
+  const objectUrl = URL.createObjectURL(await response.blob());
+  try {
+    return await decodeImage(objectUrl);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+};
 
 const clipImageCover = (
   ctx: CanvasRenderingContext2D,

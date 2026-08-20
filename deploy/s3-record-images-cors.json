@@ -1,0 +1,21 @@
+{
+  "CORSRules": [
+    {
+      "AllowedHeaders": [
+        "*"
+      ],
+      "AllowedMethods": [
+        "GET",
+        "HEAD"
+      ],
+      "AllowedOrigins": [
+        "https://qpathlog.com",
+        "https://www.qpathlog.com"
+      ],
+      "ExposeHeaders": [
+        "ETag"
+      ],
+      "MaxAgeSeconds": 3600
+    }
+  ]
+}
