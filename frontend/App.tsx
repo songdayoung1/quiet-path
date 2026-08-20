@@ -26,6 +26,7 @@ import { recordApi, RecordResponse } from './api/recordApi';
 import { notificationApi, type NotificationItem } from './api/notificationApi';
 import { Settings, Compass, AlertCircle, Bell } from 'lucide-react';
 import { AppModal } from './components/AppModal';
+import { RecordImageRefreshProvider } from './contexts/RecordImageRefreshContext';
 import { CATEGORIES } from './constants';
 import { getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from './utils/recordScope';
 import { disableWebPush } from './services/webPush';
@@ -309,6 +310,52 @@ const App: React.FC = () => {
     afterCloseView?: ViewState;
     variant?: 'primary' | 'danger';
   } | null>(null);
+  const activeImageRefreshRequestsRef = useRef<Map<string, Promise<string | null>>>(new Map());
+
+  const refreshRecordImageUrl = useCallback(async (recordId: string) => {
+    const token = state.auth?.token;
+    const numericRecordId = Number(recordId);
+    if (
+      !state.auth?.isLoggedIn ||
+      !token ||
+      isMockAccessToken(token) ||
+      !Number.isInteger(numericRecordId)
+    ) {
+      return null;
+    }
+
+    const activeRequest = activeImageRefreshRequestsRef.current.get(recordId);
+    if (activeRequest) {
+      return activeRequest;
+    }
+
+    const request = recordApi.getDetail(token, numericRecordId)
+      .then((detail) => {
+        const nextImageUrl = detail.imageUrl ?? null;
+        setState((prev) => ({
+          ...prev,
+          records: prev.records.map((record) => (
+            record.id === recordId
+              ? {
+                  ...record,
+                  imageUrl: nextImageUrl ?? undefined,
+                  imagePositionX: detail.imagePositionX ?? undefined,
+                  imagePositionY: detail.imagePositionY ?? undefined,
+                  imageScale: detail.imageScale ?? undefined,
+                }
+              : record
+          )),
+        }));
+        return nextImageUrl;
+      })
+      .catch(() => null)
+      .finally(() => {
+        activeImageRefreshRequestsRef.current.delete(recordId);
+      });
+
+    activeImageRefreshRequestsRef.current.set(recordId, request);
+    return request;
+  }, [state.auth?.isLoggedIn, state.auth?.token]);
   const [expiredDirectionResolution, setExpiredDirectionResolution] = useState<ExpiredDirectionResolutionState | null>(null);
   const [expiredDirectionReviewAt, setExpiredDirectionReviewAt] = useState(() => buildFutureDateInputValue(7));
   const [isExpiredDirectionResolving, setIsExpiredDirectionResolving] = useState(false);
@@ -1376,10 +1423,11 @@ const App: React.FC = () => {
 
   /* ── 3. Main App Layout (Header + Bottom Nav) ── */
   return (
-    <div
-      className="min-h-screen max-w-[430px] mx-auto relative flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-      style={shellFrameStyle}
-    >
+    <RecordImageRefreshProvider refreshImageUrl={refreshRecordImageUrl}>
+      <div
+        className="min-h-screen max-w-[430px] mx-auto relative flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+        style={shellFrameStyle}
+      >
       
       {/* Header Overlay (Gradient Blur) */}
       {currentView !== 'SETTINGS' && currentView !== 'NOTIFICATIONS' && (
@@ -1730,7 +1778,8 @@ const App: React.FC = () => {
           </nav>
         </div>
       )}
-    </div>
+      </div>
+    </RecordImageRefreshProvider>
   );
 };
 

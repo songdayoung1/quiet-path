@@ -10,6 +10,7 @@ import { AppModal } from '../AppModal';
 import { exportRecordCard } from '../../utils/exportRecordCard';
 import { RecordPreviewLine } from '../RecordPreviewLine';
 import { RecordImage } from '../RecordImage';
+import { useRecordImageRefresh } from '../../contexts/RecordImageRefreshContext';
 
 interface RecordsListTabProps {
   records: RecordType[];
@@ -51,6 +52,7 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   selectedRecordIds = [],
   onToggleSelectRecord,
 }) => {
+  const refreshImageUrl = useRecordImageRefresh();
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const isServerBacked = !!accessToken && !isMockAccessToken(accessToken);
@@ -164,7 +166,15 @@ export const RecordsListTab: React.FC<RecordsListTabProps> = ({
   const handleExportRecord = async (record: RecordType) => {
     setIsExportingRecordCard(true);
     try {
-      await exportRecordCard(record, record.imageUrl ? { mode: 'poster' } : undefined);
+      const nextImageUrl = record.imageUrl ? await refreshImageUrl?.(record.id) : null;
+      const refreshedRecord = nextImageUrl ? { ...record, imageUrl: nextImageUrl } : record;
+      if (nextImageUrl) {
+        onUpdateRecord(refreshedRecord);
+      }
+      await exportRecordCard(
+        refreshedRecord,
+        refreshedRecord.imageUrl ? { mode: 'poster' } : undefined,
+      );
       openNoticeModal(
         '카드를 저장했어요',
         '기록 카드 이미지를 브라우저에서 다운로드했어요.'

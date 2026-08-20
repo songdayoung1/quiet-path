@@ -5,6 +5,7 @@ import { loadImageTextTones, type ImageTextTones } from '../utils/imageContrast'
 import { getRecordParagraphs } from '../utils/recordText';
 import { WaterDropCharacter, type CharacterMood } from './WaterDropCharacter';
 import { RecordImage } from './RecordImage';
+import { useRecordImageRefresh } from '../contexts/RecordImageRefreshContext';
 
 interface Props {
   record: RecordType;
@@ -68,6 +69,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
   onShare,
   onDelete,
 }) => {
+  const refreshImageUrl = useRecordImageRefresh();
   const posterCardRef = React.useRef<HTMLElement>(null);
   const [photoTextTones, setPhotoTextTones] = React.useState<ImageTextTones>({
     left: 'light',
@@ -128,8 +130,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
       };
     }
 
-    setPhotoTextTones({ left: 'light', right: 'light', body: 'light' });
-    loadImageTextTones(record.imageUrl, {
+    const composition = {
       positionX: record.imagePositionX,
       positionY: record.imagePositionY,
       scale: record.imageScale,
@@ -141,7 +142,21 @@ export const RecordDetailDiary: React.FC<Props> = ({
             bodySampleEnd: 0.96,
           }
         : {}),
-    })
+    };
+
+    const loadTones = async () => {
+      try {
+        return await loadImageTextTones(record.imageUrl!, composition);
+      } catch (error) {
+        const nextImageUrl = await refreshImageUrl?.(record.id);
+        if (!nextImageUrl || nextImageUrl === record.imageUrl) {
+          throw error;
+        }
+        return loadImageTextTones(nextImageUrl, composition);
+      }
+    };
+
+    void loadTones()
       .then((tones) => {
         if (!cancelled) {
           setPhotoTextTones(tones);
@@ -159,10 +174,12 @@ export const RecordDetailDiary: React.FC<Props> = ({
   }, [
     isPosterMode,
     posterAspectRatio,
+    record.id,
     record.imagePositionX,
     record.imagePositionY,
     record.imageScale,
     record.imageUrl,
+    refreshImageUrl,
   ]);
 
   const cardSurfaceStyle: React.CSSProperties = {

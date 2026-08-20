@@ -13,6 +13,7 @@ import { isMockAccessToken } from '../api/authApi';
 import { AppModal } from '../components/AppModal';
 import { exportRecordCard, exportMonthlyCalendar, exportMonthlyCollage } from '../utils/exportRecordCard';
 import { buildLatestRecordByDateMap } from '../utils/heatmap';
+import { useRecordImageRefresh } from '../contexts/RecordImageRefreshContext';
 
 interface RecordsViewProps {
   records: RecordType[];
@@ -151,6 +152,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   accessToken,
   onLoginRequired,
 }) => {
+  const refreshImageUrl = useRecordImageRefresh();
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const [selectedRecordForDetail, setSelectedRecordForDetail] = useState<RecordType | null>(null);
@@ -420,6 +422,25 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     onUpdateRecord(updatedRecord);
   };
 
+  const refreshRecordForExport = async (record: RecordType): Promise<RecordType> => {
+    if (!record.imageUrl || !refreshImageUrl) {
+      return record;
+    }
+
+    const nextImageUrl = await refreshImageUrl(record.id);
+    return nextImageUrl ? { ...record, imageUrl: nextImageUrl } : record;
+  };
+
+  const refreshMonthlyRecordsForExport = async (): Promise<RecordType[]> => {
+    if (!isServerBacked || !accessToken) {
+      return monthlyRecords;
+    }
+
+    const refreshedReport = await recordApi.getMonthly(accessToken, targetYear, targetMonth + 1);
+    setMonthlyReport(refreshedReport);
+    return refreshedReport.items.map(buildRecordFromMonthlyItem);
+  };
+
   const requestDeleteRecord = (record: RecordType) => {
     setPendingDeleteRecord(record);
   };
@@ -475,7 +496,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   const handleExportRecord = async (record: RecordType, mode?: RecordCardDisplayMode) => {
     setIsExportingRecordCard(true);
     try {
-      await exportRecordCard(record, mode ? { mode } : undefined);
+      const refreshedRecord = await refreshRecordForExport(record);
+      await exportRecordCard(refreshedRecord, mode ? { mode } : undefined);
       setShareNotice({
         title: '카드를 저장했어요',
         description: '기록 카드 이미지를 브라우저에서 다운로드했어요.',
@@ -531,7 +553,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
     if (isExportingCollage || monthlyRecords.length === 0) return;
     setIsExportingCollage(true);
     try {
-      const result = await exportMonthlyCollage(monthlyRecords, targetYear, targetMonth + 1);
+      const refreshedRecords = await refreshMonthlyRecordsForExport();
+      const result = await exportMonthlyCollage(refreshedRecords, targetYear, targetMonth + 1);
       setShareNotice({
         title: '전체 기록 저장이 완료되었어요',
         description:
@@ -584,8 +607,11 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
 
     setIsExportingSelectedRecords(true);
     try {
-      if (selectedRecords.length === 1) {
-        const targetRecord = selectedRecords[0];
+      const refreshedRecords = await refreshMonthlyRecordsForExport();
+      const refreshedSelectedRecords = refreshedRecords.filter((record) => selectedRecordIds.includes(record.id));
+
+      if (refreshedSelectedRecords.length === 1) {
+        const targetRecord = refreshedSelectedRecords[0];
         await exportRecordCard(
           targetRecord,
           targetRecord.imageUrl ? { mode: 'poster' } : undefined,
@@ -595,15 +621,15 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
           description: '선택한 기록 카드를 브라우저에서 다운로드했어요.',
         });
       } else {
-        const result = await exportMonthlyCollage(monthlyRecords, targetYear, targetMonth + 1, {
-          records: selectedRecords,
+        const result = await exportMonthlyCollage(refreshedRecords, targetYear, targetMonth + 1, {
+          records: refreshedSelectedRecords,
         });
         setShareNotice({
           title: '선택 기록 저장이 완료되었어요',
           description:
             result.pages > 1
               ? `${result.pages}장으로 나눠 브라우저에서 다운로드했어요.`
-              : `선택한 ${selectedRecords.length}개의 장면을 브라우저에서 다운로드했어요.`,
+              : `선택한 ${refreshedSelectedRecords.length}개의 장면을 브라우저에서 다운로드했어요.`,
         });
       }
 

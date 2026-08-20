@@ -49,6 +49,11 @@ export interface RecordResponse {
 
 export type RecordCreateResponse = RecordResponse;
 
+export interface RecordDetailResponse extends RecordImagePosition {
+  id: number;
+  imageUrl?: string | null;
+}
+
 export interface RecordUpdateResponse {
   id: number;
   content: string;
@@ -133,6 +138,20 @@ export const recordApi = {
     if (response.status === 204) {
       return null;
     }
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+
+    return response.json();
+  },
+
+  async getDetail(token: string, recordId: number): Promise<RecordDetailResponse> {
+    const response = await apiFetch(`/api/v1/records/${recordId}`, {
+      method: 'GET',
+    }, {
+      accessToken: token,
+    });
 
     if (!response.ok) {
       throw await buildApiError(response);
