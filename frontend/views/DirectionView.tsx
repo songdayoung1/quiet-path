@@ -21,12 +21,20 @@ const formatDateInputValue = (date: Date) => {
 interface DirectionViewProps {
   currentDirection: Direction | null;
   records: RecordType[];
+  startSetupImmediately?: boolean;
   onStartDirection: (newDirection: Partial<Direction>) => void | Promise<void>;
   onFinishDirection: () => void | Promise<void>;
   onHistoryClick: () => void;
 }
 
-export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, records, onStartDirection, onFinishDirection, onHistoryClick }) => {
+export const DirectionView: React.FC<DirectionViewProps> = ({
+  currentDirection,
+  records,
+  startSetupImmediately = false,
+  onStartDirection,
+  onFinishDirection,
+  onHistoryClick,
+}) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const categoryCardStyle: React.CSSProperties = {
@@ -35,9 +43,9 @@ export const DirectionView: React.FC<DirectionViewProps> = ({ currentDirection, 
       : 'linear-gradient(118deg, rgba(243,240,255,0.92) 0%, rgba(255,255,255,0.96) 46%, rgba(232,236,255,0.74) 100%)',
     borderColor: theme === 'dark' ? 'rgba(167,139,250,0.24)' : 'rgba(196,181,253,0.38)',
   };
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(startSetupImmediately && !currentDirection);
   const [finishModalOpen, setFinishModalOpen] = useState(false);
-  const [showCategorySelect, setShowCategorySelect] = useState(false);
+  const [showCategorySelect, setShowCategorySelect] = useState(startSetupImmediately && !currentDirection);
   const [question, setQuestion] = useState('');
   const [description, setDescription] = useState('');
   const [durationDays, setDurationDays] = useState<number | null>(null);

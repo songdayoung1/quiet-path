@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Bell,
+  BookOpen,
+  ChevronRight,
   Clock3,
   Info,
   LogOut,
@@ -26,6 +28,7 @@ import {
 } from '../services/webPush';
 import { generateNickname } from './NicknameSetupView';
 import { AppModal } from '../components/AppModal';
+import { AppGuideSheet } from '../components/AppGuideSheet';
 
 interface SettingsViewProps {
   state: AppState;
@@ -34,6 +37,7 @@ interface SettingsViewProps {
   onLogout: () => void | Promise<void>;
   onWithdrawalComplete: () => void;
   onReauthenticate: () => void;
+  onReplayTutorial: () => void;
 }
 
 type ThemeMode = 'system' | 'light' | 'dark';
@@ -216,6 +220,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onLogout,
   onWithdrawalComplete,
   onReauthenticate,
+  onReplayTutorial,
 }) => {
   const isLoggedIn = !!state.auth?.isLoggedIn;
   const token = state.auth?.token ?? null;
@@ -225,6 +230,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [busy, setBusy] = useState<Partial<Record<BusyKey, boolean>>>({});
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [browserPushEnabled, setBrowserPushEnabled] = useState(false);
+  const [appGuideOpen, setAppGuideOpen] = useState(false);
 
   const [nicknameEditing, setNicknameEditing] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState('');
@@ -1118,6 +1124,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <section>
         <SectionLabel icon={<Info size={13} />} title="기타" />
         <div style={panelStyle}>
+          <button
+            type="button"
+            onClick={() => setAppGuideOpen(true)}
+            className="w-full px-4 py-3.5 flex items-center gap-3 text-left"
+            style={{ borderBottom: '1px solid var(--qp-divider)' }}
+          >
+            <span
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px]"
+              style={{ background: 'var(--qp-accent-soft)', color: 'var(--qp-accent-text)' }}
+            >
+              <BookOpen size={17} />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[14px] font-bold" style={{ color: 'var(--qp-text-strong)' }}>
+                앱 사용 가이드
+              </span>
+              <span className="mt-0.5 block text-[11px]" style={{ color: 'var(--qp-text-muted)' }}>
+                방향, 기록, AI 회고 사용법 보기
+              </span>
+            </span>
+            <ChevronRight size={17} style={{ color: 'var(--qp-text-faint)' }} />
+          </button>
           <div className="px-4 py-3.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--qp-divider)' }}>
             <p className="text-[14px] font-semibold" style={{ color: 'var(--qp-text-strong)' }}>
               앱 버전
@@ -1159,6 +1187,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <p className="text-center text-[10px] tracking-[0.18em] pt-6" style={{ color: 'var(--qp-text-faint)' }}>
         QUIET PATH · © 2026
       </p>
+
+      <AppGuideSheet
+        open={appGuideOpen}
+        onClose={() => setAppGuideOpen(false)}
+        onReplayTutorial={onReplayTutorial}
+        themeVars={themeVars}
+        theme={resolvedTheme}
+      />
 
       <AppModal
         open={logoutModalOpen}
