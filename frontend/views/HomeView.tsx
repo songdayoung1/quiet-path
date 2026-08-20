@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AppState } from '../types';
 import { MoodSticker, SoftButton } from '../components/UI';
-import { History, BookOpen } from 'lucide-react';
+import { History, BookOpen, X } from 'lucide-react';
 import { getThemePalette, useResolvedTheme } from '../theme';
 
 // Import New Components
@@ -27,9 +27,20 @@ interface HomeViewProps {
   onHistoryClick: () => void;
   onRecordsClick: () => void;
   isHomeDataLoading?: boolean;
+  showFirstRecordCoachmark?: boolean;
+  onDismissFirstRecordCoachmark?: () => void;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDirectionClick, onHistoryClick, onRecordsClick, isHomeDataLoading = false }) => {
+export const HomeView: React.FC<HomeViewProps> = ({
+  state,
+  onLogClick,
+  onStartDirectionClick,
+  onHistoryClick,
+  onRecordsClick,
+  isHomeDataLoading = false,
+  showFirstRecordCoachmark = false,
+  onDismissFirstRecordCoachmark,
+}) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const [isHeatmapSheetOpen, setIsHeatmapSheetOpen] = useState(false);
@@ -133,13 +144,36 @@ export const HomeView: React.FC<HomeViewProps> = ({ state, onLogClick, onStartDi
       </div>
 
       {/* Tier 1: Action (TodaysCard) */}
-      <TodaysCard 
-        hasLoggedToday={effectiveHasLoggedToday} 
-        hasActiveDirection={hasActiveDirection}
-        todayRecord={visibleTodayRecord} 
-        onLogClick={handleLogClick} 
-        onEditClick={handleLogClick} // Simplify for now, editing uses the same form 
-      />
+      <div
+        className="relative rounded-[30px] transition-shadow duration-300"
+        style={showFirstRecordCoachmark && hasActiveDirection && !effectiveHasLoggedToday ? {
+          boxShadow: '0 0 0 3px rgba(139,92,246,0.24), 0 16px 36px rgba(124,58,237,0.14)',
+        } : undefined}
+      >
+        {showFirstRecordCoachmark && hasActiveDirection && !effectiveHasLoggedToday && (
+          <div
+            className="absolute -top-4 right-4 z-20 flex items-center gap-2 rounded-full px-3.5 py-2 text-[11px] font-extrabold text-white shadow-[0_8px_24px_rgba(124,58,237,0.28)]"
+            style={{ background: 'linear-gradient(135deg, #A78BFA 0%, #7C3AED 100%)' }}
+          >
+            첫 기록은 여기서 시작해요
+            <button
+              type="button"
+              onClick={onDismissFirstRecordCoachmark}
+              className="grid h-5 w-5 place-items-center rounded-full bg-white/15"
+              aria-label="첫 기록 안내 닫기"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+        <TodaysCard
+          hasLoggedToday={effectiveHasLoggedToday}
+          hasActiveDirection={hasActiveDirection}
+          todayRecord={visibleTodayRecord}
+          onLogClick={handleLogClick}
+          onEditClick={handleLogClick} // Simplify for now, editing uses the same form
+        />
+      </div>
 
       {/* Tier 2: Path & Progress */}
       <div className="flex flex-col gap-4 xl:gap-3">

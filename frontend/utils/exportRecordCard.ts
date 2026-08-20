@@ -663,8 +663,10 @@ const drawDirectionSummaryWithText = (
   maxWidth: number,
   directionText: string,
   textColor: string,
-  labelColor: string
+  labelColor: string,
+  align: CanvasTextAlign = 'left'
 ) => {
+  ctx.textAlign = align;
   ctx.fillStyle = labelColor;
   ctx.font = '700 18px "SF Pro Display", "Pretendard", sans-serif';
   ctx.fillText('현재 방향', x, y);
@@ -859,18 +861,18 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     });
     ctx.restore();
 
-    const dirLeftX = cardX + cardWidth - 340;
+    const rightContentX = cardX + cardWidth - 72;
     ctx.save();
     setPhotoTextShadow(ctx, photoTextTones.right);
-    ctx.textAlign = 'left';
     drawDirectionSummaryWithText(
       ctx,
-      dirLeftX,
+      rightContentX,
       cardY + 83,
       268,
       directionText,
       rightTextColors.primary,
       rightTextColors.secondary,
+      'right',
     );
     ctx.restore();
 
@@ -890,13 +892,13 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     ctx.textAlign = 'right';
     ctx.fillStyle = rightTextColors.primary;
     ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
-    ctx.fillText(fmtTime(date), cardX + cardWidth - 72, cardY + 224);
+    ctx.fillText(fmtTime(date), rightContentX, cardY + 224);
     ctx.restore();
 
     if (record.moodCode) {
       ctx.font = '700 24px "SF Pro Display", "Pretendard", sans-serif';
       const moodWidth = Math.max(ctx.measureText(record.moodCode).width + 60, 120);
-      roundedRect(ctx, cardX + cardWidth - 72 - moodWidth, cardY + 270, moodWidth, 52, 26);
+      roundedRect(ctx, rightContentX - moodWidth, cardY + 270, moodWidth, 52, 26);
       ctx.fillStyle = rightTextColors.chipFill;
       ctx.fill();
       ctx.strokeStyle = rightTextColors.chipBorder;
@@ -906,7 +908,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       setPhotoTextShadow(ctx, photoTextTones.right);
       ctx.fillStyle = rightTextColors.primary;
       ctx.textAlign = 'center';
-      ctx.fillText(record.moodCode, cardX + cardWidth - 72 - moodWidth / 2, cardY + 302);
+      ctx.fillText(record.moodCode, rightContentX - moodWidth / 2, cardY + 302);
       ctx.restore();
     }
 
@@ -995,15 +997,15 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     gap: 8,
   });
 
-  const dirLeftX = cardX + cardWidth - 340;
-  ctx.textAlign = 'left';
+  const rightContentX = cardX + cardWidth - 72;
+  ctx.textAlign = 'right';
   ctx.fillStyle = '#94A3B8';
   ctx.font = '700 13px "SF Pro Display", "Pretendard", sans-serif';
-  ctx.fillText('현재 방향', dirLeftX, cardY + 83);
+  ctx.fillText('현재 방향', rightContentX, cardY + 83);
   ctx.fillStyle = '#7C3AED';
   ctx.font = '700 26px "SF Pro Display", "Pretendard", sans-serif';
   const noDirLines = wrapText(ctx, directionText, 268, 2);
-  noDirLines.forEach((line, i) => ctx.fillText(line, dirLeftX, cardY + 116 + i * 38));
+  noDirLines.forEach((line, i) => ctx.fillText(line, rightContentX, cardY + 116 + i * 38));
 
   ctx.textAlign = 'left';
   ctx.fillStyle = '#1E293B';
@@ -1016,7 +1018,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     ctx.font = '700 24px "SF Pro Display", "Pretendard", sans-serif';
     const moodWidth = Math.max(ctx.measureText(record.moodCode).width + 78, 152);
     const moodColors = MOOD_CHIP_COLORS[record.moodCode] ?? MOOD_CHIP_COLORS['포근'];
-    roundedRect(ctx, cardX + cardWidth - 72 - moodWidth, cardY + 232, moodWidth, 56, 28);
+    roundedRect(ctx, rightContentX - moodWidth, cardY + 232, moodWidth, 56, 28);
     ctx.fillStyle = moodColors.bg;
     ctx.fill();
     ctx.strokeStyle = moodColors.border;
@@ -1024,7 +1026,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     ctx.stroke();
     ctx.fillStyle = moodColors.text;
     ctx.textAlign = 'center';
-    ctx.fillText(record.moodCode, cardX + cardWidth - 72 - moodWidth / 2, cardY + 270);
+    ctx.fillText(record.moodCode, rightContentX - moodWidth / 2, cardY + 270);
   }
 
   let cursorY = cardY + 420;
@@ -1218,18 +1220,18 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   });
   ctx.restore();
 
-  const dirLeftX = cardX + cardWidth - 340;
+  const rightContentX = cardX + cardWidth - 72;
   ctx.save();
   setPhotoTextShadow(ctx, photoTextTones.right);
-  ctx.textAlign = 'left';
   drawDirectionSummaryWithText(
     ctx,
-    dirLeftX,
+    rightContentX,
     cardY + 83,
     268,
     directionText,
     rightTextColors.primary,
     rightTextColors.secondary,
+    'right',
   );
   ctx.restore();
 
@@ -1249,13 +1251,13 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   ctx.textAlign = 'right';
   ctx.fillStyle = rightTextColors.primary;
   ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
-  ctx.fillText(fmtTime(date), cardX + cardWidth - 72, cardY + 224);
+  ctx.fillText(fmtTime(date), rightContentX, cardY + 224);
   ctx.restore();
 
   if (record.moodCode) {
     ctx.font = '700 24px "SF Pro Display", "Pretendard", sans-serif';
     const moodWidth = Math.max(ctx.measureText(record.moodCode).width + 60, 120);
-    roundedRect(ctx, cardX + cardWidth - 72 - moodWidth, cardY + 270, moodWidth, 52, 26);
+    roundedRect(ctx, rightContentX - moodWidth, cardY + 270, moodWidth, 52, 26);
     ctx.fillStyle = rightTextColors.chipFill;
     ctx.fill();
     ctx.strokeStyle = rightTextColors.chipBorder;
@@ -1265,7 +1267,7 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
     setPhotoTextShadow(ctx, photoTextTones.right);
     ctx.fillStyle = rightTextColors.primary;
     ctx.textAlign = 'center';
-    ctx.fillText(record.moodCode, cardX + cardWidth - 72 - moodWidth / 2, cardY + 302);
+    ctx.fillText(record.moodCode, rightContentX - moodWidth / 2, cardY + 302);
     ctx.restore();
   }
 

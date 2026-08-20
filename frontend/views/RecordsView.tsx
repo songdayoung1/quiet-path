@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Record as RecordType, type RecordCardDisplayMode } from '../types';
-import { AlertTriangle, ArrowDownUp, BookOpenText, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Image as ImageIcon } from 'lucide-react';
+import { AlertTriangle, ArrowDownUp, BookOpenText, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Image as ImageIcon, X } from 'lucide-react';
 import { RecordDetailDiary } from '../components/RecordDetailDiary';
 import { AlbumTab } from '../components/records/AlbumTab';
 import { RecordsListTab } from '../components/records/RecordsListTab';
@@ -21,6 +21,8 @@ interface RecordsViewProps {
   onDeleteRecord: (recordId: string) => void;
   accessToken?: string | null;
   onLoginRequired: () => void;
+  showRecordsTabCoachmark?: boolean;
+  onDismissRecordsTabCoachmark?: () => void;
 }
 
 const RECORD_DELETE_DESCRIPTION = (
@@ -151,6 +153,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   onDeleteRecord,
   accessToken,
   onLoginRequired,
+  showRecordsTabCoachmark = false,
+  onDismissRecordsTabCoachmark,
 }) => {
   const refreshImageUrl = useRecordImageRefresh();
   const theme = useResolvedTheme();
@@ -819,21 +823,51 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               { id: 'records', icon: <BookOpenText size={15} />, label: '기록' },
               { id: 'calendar', icon: <Calendar size={15} />, label: '캘린더' },
             ] as const
-          ).map(({ id, icon, label }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className="rounded-full px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-1.5"
-              style={{
-                background: activeTab === id ? palette.activeTabBg : 'transparent',
-                color: activeTab === id ? palette.activeTabText : palette.mutedText,
-                boxShadow: activeTab === id ? palette.shadow : 'none',
-              }}
-            >
-              {icon}
-              {label}
-            </button>
-          ))}
+          ).map(({ id, icon, label }) => {
+            const showCoachmark = id === 'records' && showRecordsTabCoachmark;
+            return (
+              <div key={id} className="relative min-w-0">
+                {showCoachmark && (
+                  <div
+                    className="absolute -top-[52px] left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-[11px] font-extrabold text-white shadow-[0_8px_24px_rgba(124,58,237,0.28)]"
+                    style={{ background: 'linear-gradient(135deg, #A78BFA 0%, #7C3AED 100%)' }}
+                  >
+                    작성한 내용은 여기서 확인해요
+                    <button
+                      type="button"
+                      onClick={onDismissRecordsTabCoachmark}
+                      className="grid h-5 w-5 place-items-center rounded-full bg-white/15"
+                      aria-label="기록 탭 안내 닫기"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(id);
+                    if (id === 'records' && showCoachmark) {
+                      onDismissRecordsTabCoachmark?.();
+                    }
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-sm font-medium transition-all"
+                  style={{
+                    background: activeTab === id ? palette.activeTabBg : 'transparent',
+                    color: activeTab === id ? palette.activeTabText : palette.mutedText,
+                    boxShadow: showCoachmark
+                      ? '0 0 0 3px rgba(139,92,246,0.24), 0 8px 22px rgba(124,58,237,0.16)'
+                      : activeTab === id
+                        ? palette.shadow
+                        : 'none',
+                  }}
+                >
+                  {icon}
+                  {label}
+                </button>
+              </div>
+            );
+          })}
         </div>
         {activeTab === 'records' && isSelectionMode ? (
           <div

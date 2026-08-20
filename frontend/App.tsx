@@ -26,10 +26,18 @@ import { recordApi, RecordResponse } from './api/recordApi';
 import { notificationApi, type NotificationItem } from './api/notificationApi';
 import { Settings, Compass, AlertCircle, Bell } from 'lucide-react';
 import { AppModal } from './components/AppModal';
+import { AppTutorial } from './components/AppTutorial';
 import { RecordImageRefreshProvider } from './contexts/RecordImageRefreshContext';
 import { CATEGORIES } from './constants';
 import { getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from './utils/recordScope';
 import { disableWebPush } from './services/webPush';
+import {
+  completeRecordsTabGuide,
+  hasCompletedAppGuide,
+  hasPendingRecordsTabGuide,
+  markAppGuideCompleted,
+  queueRecordsTabGuide,
+} from './utils/appGuideStorage';
 
 const OAUTH_PENDING_CODE_KEY = 'qp.oauth.pending.code';
 const OAUTH_PENDING_ERROR_KEY = 'qp.oauth.pending.error';
@@ -304,6 +312,10 @@ const App: React.FC = () => {
   const [settingsButtonPressed, setSettingsButtonPressed] = useState(false);
   const [isHomeDataLoading, setIsHomeDataLoading] = useState(false);
   const [recordGuardModalOpen, setRecordGuardModalOpen] = useState(false);
+  const [appTutorialOpen, setAppTutorialOpen] = useState(false);
+  const [firstRecordCoachmarkOpen, setFirstRecordCoachmarkOpen] = useState(false);
+  const [recordsTabCoachmarkOpen, setRecordsTabCoachmarkOpen] = useState(() => hasPendingRecordsTabGuide());
+  const [tutorialGuidedStartPending, setTutorialGuidedStartPending] = useState(false);
   const [noticeModal, setNoticeModal] = useState<{
     title: string;
     description: string;
@@ -390,6 +402,17 @@ const App: React.FC = () => {
     }),
     [appFlowABgStyle, resolvedTheme]
   );
+
+  const openFirstUseTutorial = useCallback(() => {
+    if (!hasCompletedAppGuide()) {
+      setAppTutorialOpen(true);
+    }
+  }, []);
+
+  const completeAppTutorial = useCallback(() => {
+    markAppGuideCompleted();
+    setAppTutorialOpen(false);
+  }, []);
   currentAuthRef.current = {
     isLoggedIn: state.auth.isLoggedIn,
     token: state.auth.token,
@@ -676,6 +699,7 @@ const App: React.FC = () => {
               return;
             }
             setCurrentView('NOW');
+            openFirstUseTutorial();
             return;
           }
           setNoticeModal({
@@ -693,9 +717,11 @@ const App: React.FC = () => {
           hasSeenOnboarding: true 
       }));
       setCurrentView('NOW');
+      openFirstUseTutorial();
   };
 
   const handleSaveLog = (record: Record, directionUpdate?: Partial<Direction>) => {
+    const isFirstRecord = state.records.length === 0;
     setState(prev => {
         let currentDirection = prev.currentDirection;
         if (currentDirection && directionUpdate) {
@@ -711,7 +737,16 @@ const App: React.FC = () => {
             hasLoggedToday: hasLoggedTodayForCurrentPath(records, currentDirection)
         };
     });
+    if (isFirstRecord) {
+      queueRecordsTabGuide();
+      setRecordsTabCoachmarkOpen(true);
+    }
     setCurrentView('NOW');
+  };
+
+  const completeRecordsTabCoachmark = () => {
+    completeRecordsTabGuide();
+    setRecordsTabCoachmarkOpen(false);
   };
 
   const handleUpdateLog = (updatedRecord: Record) => {
@@ -1084,7 +1119,12 @@ const App: React.FC = () => {
             openExpiredDirectionResolution(activeDirection, 'DIRECTION', 'DIRECTION');
             return;
           }
-          setCurrentView('NOW');
+          if (tutorialGuidedStartPending) {
+            setTutorialGuidedStartPending(false);
+            setCurrentView('WRITE_LOG');
+          } else {
+            setCurrentView('NOW');
+          }
           return;
         }
         if (isPathReviewRequiredError(err)) {
@@ -1106,7 +1146,13 @@ const App: React.FC = () => {
       hasSeenOnboarding: true,
     }));
     await waitForMinimumDuration(startedAt, MIN_DIRECTION_LOADING_MS);
-    setCurrentView('NOW');
+    if (tutorialGuidedStartPending) {
+      setTutorialGuidedStartPending(false);
+      setCurrentView('NOW');
+      setFirstRecordCoachmarkOpen(true);
+    } else {
+      setCurrentView('NOW');
+    }
   };
 
   const handleFinishDirection = async () => {
@@ -1391,6 +1437,7 @@ const App: React.FC = () => {
                       setState(prev => ({ ...prev, hasSeenOnboarding: true }));
                    }
                    setCurrentView('NOW');
+                   openFirstUseTutorial();
                 }}
              />
           </div>
@@ -1414,6 +1461,7 @@ const App: React.FC = () => {
                 onStartGuest={() => {
                    setState(prev => ({ ...prev, hasSeenOnboarding: true }));
                    setCurrentView('NOW');
+                   openFirstUseTutorial();
                 }}
                 initialStep={state.auth?.isLoggedIn ? 1 : 0}
             />
@@ -1557,11 +1605,16 @@ const App: React.FC = () => {
         {currentView === 'NOW' && (
           <HomeView
             state={state}
-            onLogClick={handleOpenLogEditor}
+            onLogClick={() => {
+              setFirstRecordCoachmarkOpen(false);
+              handleOpenLogEditor();
+            }}
             onStartDirectionClick={handleOpenDirectionView}
             onHistoryClick={() => setCurrentView('PAST_DIRECTIONS')}
             onRecordsClick={() => setCurrentView('RECORDS')}
             isHomeDataLoading={isHomeDataLoading}
+            showFirstRecordCoachmark={firstRecordCoachmarkOpen}
+            onDismissFirstRecordCoachmark={() => setFirstRecordCoachmarkOpen(false)}
           />
         )}
         {currentView === 'RECORDS' && (
@@ -1571,12 +1624,15 @@ const App: React.FC = () => {
             onDeleteRecord={handleDeleteLog}
             accessToken={state.auth?.token}
             onLoginRequired={() => setCurrentView('ACCOUNT_CONNECT')}
+            showRecordsTabCoachmark={recordsTabCoachmarkOpen && state.records.length > 0}
+            onDismissRecordsTabCoachmark={completeRecordsTabCoachmark}
           />
         )}
         {currentView === 'DIRECTION' && (
           <DirectionView 
-            currentDirection={state.currentDirection} 
+            currentDirection={state.currentDirection}
             records={state.records}
+            startSetupImmediately={tutorialGuidedStartPending}
             onStartDirection={handleStartDirection}
             onFinishDirection={handleFinishDirection}
             onHistoryClick={() => setCurrentView('PAST_DIRECTIONS')}
@@ -1611,6 +1667,10 @@ const App: React.FC = () => {
               onLogout={handleLogout}
               onWithdrawalComplete={handleWithdrawalComplete}
               onReauthenticate={handleWithdrawalReauthenticate}
+              onReplayTutorial={() => {
+                setCurrentView('NOW');
+                setAppTutorialOpen(true);
+              }}
            />
         )}
         {currentView === 'NOTIFICATIONS' && state.auth.token && (
@@ -1778,6 +1838,20 @@ const App: React.FC = () => {
           </nav>
         </div>
       )}
+      <AppTutorial
+        open={appTutorialOpen}
+        theme={resolvedTheme}
+        hasActiveDirection={!!state.currentDirection}
+        onComplete={completeAppTutorial}
+        onPrimaryAction={() => {
+          completeAppTutorial();
+          if (state.currentDirection) handleOpenLogEditor();
+          else {
+            setTutorialGuidedStartPending(true);
+            handleOpenDirectionView();
+          }
+        }}
+      />
       </div>
     </RecordImageRefreshProvider>
   );
