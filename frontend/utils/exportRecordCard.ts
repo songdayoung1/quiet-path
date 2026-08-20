@@ -930,7 +930,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       cursorY += 34;
       const quoteText = `"${record.oneWordText.trim()}"`;
       ctx.textAlign = 'center';
-      ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
+      ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
       const textWidth = ctx.measureText(quoteText).width;
       const pillWidth = Math.min(contentWidth - 20, textWidth + 180);
 
@@ -947,7 +947,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
       ctx.fillStyle = '#CBD2D9';
       ctx.fillRect(CANVAS_WIDTH / 2 - textWidth / 2 + 14, cursorY + 41, 26, 2);
       ctx.fillStyle = '#7C3AED';
-      ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
+      ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
       ctx.fillText(quoteText, CANVAS_WIDTH / 2 + 50, cursorY + 52);
     }
 
@@ -1052,7 +1052,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     ctx.textAlign = 'center';
 
     const quoteText = `"${record.oneWordText.trim()}"`;
-    ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
+    ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
     const textWidth = ctx.measureText(quoteText).width;
     const pillWidth = Math.min(contentWidth, textWidth + 180);
 
@@ -1069,7 +1069,7 @@ const createPosterRecordCardBlob = async (record: RecordType) => {
     ctx.fillStyle = '#CBD2D9';
     ctx.fillRect(CANVAS_WIDTH / 2 - textWidth / 2 + 14, cursorY + 41, 26, 2);
     ctx.fillStyle = '#7C3AED';
-    ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
+    ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText(quoteText, CANVAS_WIDTH / 2 + 50, cursorY + 52);
     cursorY += 106;
   }
@@ -1292,7 +1292,7 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
   if (record.oneWordText?.trim()) {
     cursorY += 34;
     const quoteText = `"${record.oneWordText.trim()}"`;
-    ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
+    ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
     const textWidth = ctx.measureText(quoteText).width;
     const pillWidth = Math.min(contentWidth - 20, textWidth + 180);
     roundedRect(ctx, contentX - pillWidth / 2, cursorY, pillWidth, 82, 41);
@@ -1307,7 +1307,7 @@ const createDiaryPhotoRecordCardBlob = async (record: RecordType) => {
     ctx.fillStyle = '#CBD2D9';
     ctx.fillRect(contentX - textWidth / 2 + 14, cursorY + 41, 26, 2);
     ctx.fillStyle = '#7C3AED';
-    ctx.font = '700 30px "SF Pro Display", "Pretendard", sans-serif';
+    ctx.font = '700 22px "SF Pro Display", "Pretendard", sans-serif';
     ctx.fillText(quoteText, contentX + 50, cursorY + 52);
     cursorY += 106;
   }

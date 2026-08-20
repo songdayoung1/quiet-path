@@ -386,7 +386,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
                       <div className="flex items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
                         <span className={defaultSectionLabelClassName}>한 단어</span>
                         <span className="h-px w-[14px] bg-mist-200" />
-                        <span className="text-[18px] font-semibold italic tracking-[-0.01em] text-point-600">
+                        <span className="min-w-0 break-words text-center text-[13px] font-semibold italic leading-[1.45] tracking-[-0.01em] text-point-600">
                           "{record.oneWordText}"
                         </span>
                       </div>
@@ -504,7 +504,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
                       <div className="flex items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
                         <span className={defaultSectionLabelClassName}>한 단어</span>
                         <span className="h-px w-[14px] bg-mist-200" />
-                        <span className="text-[18px] font-semibold italic tracking-[-0.01em] text-point-600">
+                        <span className="min-w-0 break-words text-center text-[13px] font-semibold italic leading-[1.45] tracking-[-0.01em] text-point-600">
                           "{record.oneWordText}"
                         </span>
                       </div>
@@ -583,7 +583,7 @@ export const RecordDetailDiary: React.FC<Props> = ({
                     <div className="mx-auto flex w-fit items-center gap-[10px] rounded-full border border-point-100/80 bg-point-50/55 px-4 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
                       <span className={defaultSectionLabelClassName}>한 단어</span>
                       <span className="h-px w-[14px] bg-mist-200" />
-                      <span className="text-[15px] font-semibold italic tracking-[-0.01em] text-point-600">
+                      <span className="min-w-0 break-words text-center text-[13px] font-semibold italic leading-[1.45] tracking-[-0.01em] text-point-600">
                         "{record.oneWordText}"
                       </span>
                     </div>
