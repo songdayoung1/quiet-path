@@ -278,9 +278,14 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
             className="w-full max-w-sm rounded-[2rem] border p-7 text-center"
             style={cardStyle}
           >
-            <h2 className="text-lg font-bold leading-tight text-mist-600">기록하려면 먼저 방향을 시작해 주세요.</h2>
-            <p className="mt-3 text-sm leading-relaxed text-mist-400">
-              지금은 쉬는 상태예요. 원할 때 새 방향을 만들고 다시 기록을 이어갈 수 있어요.
+            <h2 className="text-lg font-bold leading-tight text-mist-600 break-keep">
+              <span className="block">기록하려면 먼저 방향을</span>
+              <span className="block">시작해 주세요.</span>
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-mist-400 break-keep">
+              <span className="block">지금은 쉬는 상태예요.</span>
+              <span className="block">원할 때 새 방향을 만들고</span>
+              <span className="block">다시 기록을 이어갈 수 있어요.</span>
             </p>
             <div className="mt-6 flex flex-col gap-3">
               <SoftButton onClick={onStartDirection} className="shadow-lg shadow-point-200/40">
@@ -330,7 +335,9 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
             style={{ background: 'rgba(255,255,255,0.6)', borderColor: 'rgba(255,255,255,0.9)' }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-point-400" />
-            <span className="text-[12px] font-semibold text-mist-500">{currentDirection.description || currentDirection.question}</span>
+            <span className="max-w-[240px] text-center text-[12px] font-semibold leading-relaxed text-mist-500 break-keep">
+              {currentDirection.description || currentDirection.question}
+            </span>
           </div>
         </div>
 
@@ -381,15 +388,18 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
               <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">02 · RECORD</span>
             </div>
             <AutoTextArea
-              rows={3}
-              placeholder={'기억에 남는 순간이나 오늘의 흐름을 편하게 적어주세요.\n엔터로 문단을 나누면 그대로 보여줘요.'}
+              rows={4}
+              placeholder={'기억에 남는 순간이나\n오늘의 흐름을 적어주세요.\n줄을 나눠 적어도\n그대로 보여줘요.'}
               value={action}
               onChange={(e) => setAction(e.target.value)}
               autoFocus
-              className="w-full min-h-[88px] resize-none leading-[1.7] rounded-[14px] !p-4 focus:!ring-1 focus:!ring-point-200 text-sm transition-shadow outline-none"
+              className="w-full min-h-[116px] resize-none leading-[1.7] rounded-[14px] !p-4 focus:!ring-1 focus:!ring-point-200 text-sm transition-shadow outline-none"
               style={inputStyle}
             />
-            <p className="text-[11px] text-mist-400 mt-3 pl-[13px]">줄을 나누면 카드와 상세 화면에서도 그대로 보여줘요.</p>
+            <p className="mt-3 pl-[13px] text-[11px] leading-relaxed text-mist-400 break-keep">
+              <span className="block">줄을 나누면 카드와 상세 화면에서도</span>
+              <span className="block">그대로 보여줘요.</span>
+            </p>
           </div>
 
           {/* 03 · WORD */}
@@ -420,10 +430,13 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
               </div>
               <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">04 · MEMO</span>
             </div>
-            <p className="text-[11px] text-mist-400 mb-3 pl-[13px]">선택 사항이에요. 부담 없이 적어보세요.</p>
+            <p className="mb-3 pl-[13px] text-[11px] leading-relaxed text-mist-400 break-keep">
+              <span className="block">선택 사항이에요.</span>
+              <span className="block">부담 없이 적어보세요.</span>
+            </p>
             <input
               type="text"
-              placeholder="내일의 작은 목표나 기억하고 싶은 메모를 적어보세요."
+              placeholder="작은 목표나 메모를 적어보세요."
               value={tomorrowText}
               onChange={(e) => setTomorrowText(e.target.value)}
               className="w-full rounded-[14px] !p-4 focus:ring-1 focus:ring-mist-200 text-sm outline-none transition-shadow mb-4"

@@ -750,14 +750,18 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   return (
     <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen">
       <div className="px-4 mb-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: palette.strongText }}>
-              {targetYear}년 {targetMonth + 1}월의 궤적
+        <div className="flex flex-col gap-4 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between min-[390px]:gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[22px] sm:text-2xl font-bold leading-[1.15] tracking-tight" style={{ color: palette.strongText }}>
+              <span className="block whitespace-nowrap">{targetYear}년 {targetMonth + 1}월의</span>
+              <span className="block">궤적</span>
             </h1>
-            <p className="text-sm mt-1" style={{ color: palette.mutedText }}>한 달 동안 남긴 기록들을 모아 보여줍니다.</p>
+            <p className="mt-2 text-[13px] sm:text-sm leading-relaxed break-keep" style={{ color: palette.mutedText }}>
+              <span className="block">한 달 동안 남긴 기록들을</span>
+              <span className="block">모아 보여줍니다.</span>
+            </p>
           </div>
-          <div className="flex items-center gap-1 rounded-full px-2 py-2 shadow-sm border" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
+          <div className="flex shrink-0 self-end items-center gap-1 rounded-full px-2 py-2 shadow-sm border min-[390px]:mt-1 min-[390px]:self-start" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
             <button
               onClick={() => canGoPrevMonth && setSelectedMonthDate(new Date(targetYear, targetMonth - 1, 1))}
               disabled={!canGoPrevMonth}
@@ -851,7 +855,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
                       onDismissRecordsTabCoachmark?.();
                     }
                   }}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-sm font-medium transition-all"
+                  className="flex w-full items-center justify-center gap-1 rounded-full px-1 py-3 text-sm font-medium transition-all min-[390px]:gap-1.5 min-[390px]:px-4"
                   style={{
                     background: activeTab === id ? palette.activeTabBg : 'transparent',
                     color: activeTab === id ? palette.activeTabText : palette.mutedText,
@@ -863,7 +867,7 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
                   }}
                 >
                   {icon}
-                  {label}
+                  <span className="whitespace-nowrap">{label}</span>
                 </button>
               </div>
             );
