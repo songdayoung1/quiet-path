@@ -322,12 +322,27 @@ export const DirectionView: React.FC<DirectionViewProps> = ({
                   </div>
                   
                   {/* Dates Row */}
-                  <div className="flex items-center justify-center gap-2 text-[11px] font-medium" style={{ color: palette.mutedText }}>
-                    <CheckCircle2 size={12} className="text-point-300" />
-                    <span>{new Date(currentDirection.createdAt).toLocaleDateString()} 시작</span>
-                    <ArrowRight size={10} style={{ color: palette.faintText }} />
-                    <Calendar size={12} className="text-point-300" />
-                    <span>{currentDirection.reviewAt ? new Date(currentDirection.reviewAt).toLocaleDateString() : '-'} 회고</span>
+                  <div
+                    className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1 text-[11px] font-medium"
+                    style={{ color: palette.mutedText }}
+                  >
+                    <div className="flex min-w-0 items-center justify-center gap-1.5">
+                      <CheckCircle2 size={12} className="shrink-0 text-point-300" />
+                      <span className="flex min-w-0 flex-col items-center leading-snug">
+                        <span className="whitespace-nowrap">{new Date(currentDirection.createdAt).toLocaleDateString()}</span>
+                        <span className="mt-0.5 whitespace-nowrap text-[10px]" style={{ color: palette.faintText }}>시작</span>
+                      </span>
+                    </div>
+                    <ArrowRight size={10} className="shrink-0" style={{ color: palette.faintText }} />
+                    <div className="flex min-w-0 items-center justify-center gap-1.5">
+                      <Calendar size={12} className="shrink-0 text-point-300" />
+                      <span className="flex min-w-0 flex-col items-center leading-snug">
+                        <span className="whitespace-nowrap">
+                          {currentDirection.reviewAt ? new Date(currentDirection.reviewAt).toLocaleDateString() : '-'}
+                        </span>
+                        <span className="mt-0.5 whitespace-nowrap text-[10px]" style={{ color: palette.faintText }}>회고</span>
+                      </span>
+                    </div>
                   </div>
                 </div>
 
