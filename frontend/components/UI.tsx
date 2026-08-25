@@ -32,6 +32,14 @@ export const Card: React.FC<{
   return (
     <div
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      } : undefined}
       style={{
         background: palette.cardBg,
         borderWidth: '1px',
@@ -43,8 +51,7 @@ export const Card: React.FC<{
       className={`
         glass-panel rounded-[2rem] p-6 transition-all duration-300 ease-out 
         relative overflow-hidden
-        hover:shadow-[0_8px_30px_rgba(139,92,246,0.08)] 
-        hover:scale-[1.015] active:scale-[0.99]
+        ${onClick ? 'cursor-pointer hover:shadow-[0_8px_30px_rgba(139,92,246,0.08)] hover:scale-[1.015] active:scale-[0.99]' : ''}
         ${breathe ? 'animate-breathe' : ''}
         ${className}
       `}
@@ -211,7 +218,7 @@ export const MoodSticker: React.FC<{
         inline-flex shrink-0 items-center justify-center whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-bold tracking-wide leading-none transition-all duration-300
         border-[1.5px]
         ${sticker.color}
-        ${selected ? 'scale-105 ring-2 ring-violet-300/35 ring-offset-1 opacity-100 z-10' : 'opacity-95 hover:opacity-100 hover:scale-105'}
+        ${selected ? 'scale-105 ring-2 ring-violet-300/35 ring-offset-1 opacity-100 z-10' : `opacity-95 ${onClick ? 'hover:opacity-100 hover:scale-105' : ''}`}
         ${!onClick ? 'cursor-default' : ''}
         ${className}
       `}
@@ -411,7 +418,7 @@ export const ForestObject: React.FC<{ index: number; type: string; isLocked: boo
 
   return (
     <div 
-      className={`absolute flex flex-col items-center cursor-pointer group transition-all duration-700 hover:scale-125`}
+      className="absolute flex flex-col items-center"
       style={{ 
         left: `${x}%`, 
         bottom: `${y}%`, 
@@ -427,10 +434,6 @@ export const ForestObject: React.FC<{ index: number; type: string; isLocked: boo
         size={32} 
       />
       
-      {/* Tooltip on Hover */}
-      <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg text-[8px] whitespace-nowrap shadow-sm text-mist-500 pointer-events-none z-50">
-          Step {index + 1}
-      </div>
     </div>
   );
 };

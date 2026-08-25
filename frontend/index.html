@@ -171,6 +171,26 @@
       #root {
         min-height: 100%;
       }
+
+      :is(button:not(:disabled), a[href], [role='button']:not([aria-disabled='true']), .cursor-pointer) {
+        cursor: pointer;
+      }
+
+      :is(button, a[href], [role='button']):focus-visible {
+        outline: 2px solid rgba(139, 92, 246, 0.58);
+        outline-offset: 3px;
+      }
+
+      @media (hover: hover) and (pointer: fine) {
+        :is(button:not(:disabled), a[href], [role='button']:not([aria-disabled='true']), .cursor-pointer):hover {
+          filter: brightness(0.96);
+        }
+
+        html[data-qp-theme='dark']
+          :is(button:not(:disabled), a[href], [role='button']:not([aria-disabled='true']), .cursor-pointer):hover {
+          filter: brightness(1.08);
+        }
+      }
       
       /* Film Grain Overlay */
       .film-grain {
