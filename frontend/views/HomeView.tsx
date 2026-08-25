@@ -10,6 +10,7 @@ import { CurrentPathStrip } from '../components/CurrentPathStrip';
 import { ProgressBand } from '../components/ProgressBand';
 import { MemoryPreviewStrip } from '../components/MemoryPreviewStrip';
 import { ExpandedHeatmapSheet } from '../components/ExpandedHeatmapSheet';
+import { MainScreenHeader } from '../components/MainScreenHeader';
 import { getCurrentPathRecords, getCurrentPathTodayRecord, hasLoggedTodayForCurrentPath } from '../utils/recordScope';
 import { calculatePathProgress } from '../utils/pathProgress';
 import {
@@ -118,10 +119,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
     <div className="flex flex-col gap-6 xl:gap-5 animate-slide-up pb-32 pt-2 relative z-10">
 
       {/* 0. Hero Header */}
-      <div className="px-2 mt-2 xl:mt-1 flex justify-between items-start">
-        <div>
+      <MainScreenHeader
+        bottomSpacing={false}
+        eyebrow={(
           <span
-            className="text-[10px] px-3 py-1 rounded-full backdrop-blur-sm shadow-sm font-medium tracking-wide"
+            className="rounded-full px-3 py-1 text-[10px] font-medium tracking-wide shadow-sm backdrop-blur-sm"
             style={{
               background: palette.pillBg,
               border: `1px solid ${palette.pillBorder}`,
@@ -130,18 +132,16 @@ export const HomeView: React.FC<HomeViewProps> = ({
           >
             {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
           </span>
-          <h1 className="text-xl xl:text-lg font-semibold mt-3 xl:mt-2 px-1" style={{ color: palette.strongText }}>{heroTitle}</h1>
-          <p className="text-sm xl:text-[13px] mt-1 px-1" style={{ color: palette.mutedText }}>
-             {heroSubtitle}
-          </p>
-        </div>
-        {hasActiveDirection && !effectiveHasLoggedToday && lastRecord?.moodCode && (
-          <div className="shrink-0 flex flex-col items-center">
-             <span className="text-[10px] text-mist-300 mb-1">최근 무드</span>
-             <MoodSticker code={lastRecord.moodCode} className="opacity-100" />
-          </div>
         )}
-      </div>
+        title={heroTitle}
+        description={heroSubtitle}
+        action={hasActiveDirection && !effectiveHasLoggedToday && lastRecord?.moodCode ? (
+          <div className="shrink-0 flex flex-col items-center">
+            <span className="mb-1 text-[10px] text-mist-300">최근 무드</span>
+            <MoodSticker code={lastRecord.moodCode} className="opacity-100" />
+          </div>
+        ) : undefined}
+      />
 
       {/* Tier 1: Action (TodaysCard) */}
       <div

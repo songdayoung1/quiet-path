@@ -178,10 +178,10 @@ export const MemoryPreviewStripSkeleton: React.FC = () => {
 // ── Hero header skeleton ──────────────────────────────────────────────────────
 
 export const HeroSkeleton: React.FC = () => (
-  <div className="px-2 mt-2 flex justify-between items-start">
+  <div className="mt-2 flex items-start justify-between px-2">
     <div className="flex flex-col gap-2 pt-1">
       <SkeletonBlock className="h-5 w-24 rounded-full" style={{ marginBottom: 4 }} />
-      <SkeletonBlock className="h-6 w-44 rounded-lg" />
+      <SkeletonBlock className="h-7 w-48 rounded-lg" />
       <SkeletonBlock className="h-4 w-36 rounded-full mt-0.5" />
     </div>
   </div>
