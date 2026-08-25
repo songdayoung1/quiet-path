@@ -14,6 +14,7 @@ import { AppModal } from '../components/AppModal';
 import { exportRecordCard, exportMonthlyCalendar, exportMonthlyCollage } from '../utils/exportRecordCard';
 import { buildLatestRecordByDateMap } from '../utils/heatmap';
 import { useRecordImageRefresh } from '../contexts/RecordImageRefreshContext';
+import { MainScreenHeader } from '../components/MainScreenHeader';
 
 interface RecordsViewProps {
   records: RecordType[];
@@ -748,20 +749,23 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
   }
 
   return (
-    <div className="pb-28 animate-slide-up pt-4 relative z-10 min-h-screen">
-      <div className="px-4 mb-6">
-        <div className="flex flex-col gap-4 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between min-[390px]:gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-[22px] sm:text-2xl font-bold leading-[1.15] tracking-tight" style={{ color: palette.strongText }}>
-              <span className="block whitespace-nowrap">{targetYear}년 {targetMonth + 1}월의</span>
-              <span className="block">궤적</span>
-            </h1>
-            <p className="mt-2 text-[13px] sm:text-sm leading-relaxed break-keep" style={{ color: palette.mutedText }}>
-              <span className="block">한 달 동안 남긴 기록들을</span>
-              <span className="block">모아 보여줍니다.</span>
-            </p>
-          </div>
-          <div className="flex shrink-0 self-end items-center gap-1 rounded-full px-2 py-2 shadow-sm border min-[390px]:mt-1 min-[390px]:self-start" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
+    <div className="pb-28 animate-slide-up pt-2 relative z-10 min-h-screen">
+      <MainScreenHeader
+        actionBelowOnNarrow
+        title={(
+          <>
+            <span className="block whitespace-nowrap">{targetYear}년 {targetMonth + 1}월의</span>
+            <span className="block">궤적</span>
+          </>
+        )}
+        description={(
+          <>
+            <span className="block">한 달 동안 남긴 기록들을</span>
+            <span className="block">모아 보여줍니다.</span>
+          </>
+        )}
+        action={(
+          <div className="flex items-center gap-1 rounded-full border px-2 py-2 shadow-sm" style={{ background: palette.pillBg, borderColor: palette.pillBorder }}>
             <button
               onClick={() => canGoPrevMonth && setSelectedMonthDate(new Date(targetYear, targetMonth - 1, 1))}
               disabled={!canGoPrevMonth}
@@ -782,8 +786,8 @@ export const RecordsView: React.FC<RecordsViewProps> = ({
               <ChevronRight size={16} />
             </button>
           </div>
-        </div>
-      </div>
+        )}
+      />
 
       {monthlyError && (
         <div className="px-4 mb-4">

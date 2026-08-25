@@ -10,6 +10,7 @@ import { getThemePalette, useResolvedTheme } from '../theme';
 import { RecordImage } from '../components/RecordImage';
 import { getCurrentPathRecords } from '../utils/recordScope';
 import { calculatePathProgress } from '../utils/pathProgress';
+import { MainScreenHeader } from '../components/MainScreenHeader';
 
 const formatDateInputValue = (date: Date) => {
   const year = date.getFullYear();
@@ -249,9 +250,10 @@ export const DirectionView: React.FC<DirectionViewProps> = ({
 
   return (
     <div className="animate-slide-up pb-28 pt-2">
-      <div className="flex justify-between items-start">
-        <PageHeader title="Current Path" subtitle="지금 걷고 있는 방향과 흐름을 확인합니다." />
-      </div>
+      <MainScreenHeader
+        title="Current Path"
+        description="지금 걷고 있는 방향과 흐름을 확인합니다."
+      />
 
       <div className="relative px-2">
         <div

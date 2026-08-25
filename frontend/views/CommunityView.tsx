@@ -5,6 +5,7 @@ import { feedApi, FeedCategory, FeedItemResponse, WeeklyTop3ItemResponse } from 
 import { getThemePalette, useResolvedTheme } from '../theme';
 import { AppModal } from '../components/AppModal';
 import { CommunityCommentsSheet } from '../components/CommunityCommentsSheet';
+import { MainScreenHeader } from '../components/MainScreenHeader';
 
 interface CommunityViewProps {
   accessToken?: string | null;
@@ -691,10 +692,10 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
 
   return (
     <div className="pb-28 animate-slide-up pt-2">
-      <div className="text-center px-6 mb-5">
-        <h1 className="text-[22px] font-semibold tracking-tight mb-1" style={{ color: palette.strongText }}>조용한 피드</h1>
-        <p className="text-[12px]" style={{ color: palette.mutedText }}>다른 사람들과 하루의 기록을 공유하세요.</p>
-      </div>
+      <MainScreenHeader
+        title="조용한 피드"
+        description="다른 사람들과 하루의 기록을 공유하세요."
+      />
 
       <nav
         aria-label="커뮤니티 카테고리"
