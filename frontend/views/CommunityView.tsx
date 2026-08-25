@@ -693,7 +693,7 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
     <div className="pb-28 animate-slide-up pt-2">
       <div className="text-center px-6 mb-5">
         <h1 className="text-[22px] font-semibold tracking-tight mb-1" style={{ color: palette.strongText }}>조용한 피드</h1>
-        <p className="text-[12px]" style={{ color: palette.mutedText }}>다른 이들의 궤적을 조용히 둘러봅니다.</p>
+        <p className="text-[12px]" style={{ color: palette.mutedText }}>다른 사람들과 하루의 기록을 공유하세요.</p>
       </div>
 
       <nav
@@ -827,16 +827,6 @@ export const CommunityView: React.FC<CommunityViewProps> = ({
               <GuestLockCard onLoginClick={onLoginClick} />
             </div>
           )}
-        </div>
-      )}
-
-      {!isGuest && !isInitialLoading && !error && (
-        <div className="text-center mt-8 px-8 mb-2">
-          <p className="text-[11px] text-mist-300 leading-loose opacity-70 tracking-wide">
-            이곳은 소란한 피드가 아닙니다.
-            <br />
-            조용히 공감하고, 나의 길로 돌아가는 곳입니다.
-          </p>
         </div>
       )}
 
