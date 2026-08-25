@@ -79,6 +79,15 @@ export const KakaoInAppBrowserNotice: React.FC = () => {
     }
   };
 
+  const handleConfirm = () => {
+    if (copyState === 'copied') {
+      setOpen(false);
+      return;
+    }
+
+    void handleCopy();
+  };
+
   const guide = getGuide(platform);
 
   return (
@@ -115,9 +124,7 @@ export const KakaoInAppBrowserNotice: React.FC = () => {
       }
       confirmLabel={copyState === 'copied' ? '복사 완료' : '현재 링크 복사'}
       cancelLabel="여기서 계속 보기"
-      onConfirm={() => {
-        void handleCopy();
-      }}
+      onConfirm={handleConfirm}
       onClose={() => setOpen(false)}
     />
   );
