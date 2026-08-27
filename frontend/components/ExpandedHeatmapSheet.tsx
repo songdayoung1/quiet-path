@@ -74,6 +74,10 @@ const buildMonthGrid = (
     });
   }
 
+  // Always render six calendar rows so the sheet and month controls stay fixed
+  // while moving between months with different week counts.
+  while (cells.length < 42) cells.push(null);
+
   return cells;
 };
 
