@@ -421,29 +421,15 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
             />
           </div>
 
-          {/* 04 · OPTIONAL */}
+          {/* 04 · PHOTO */}
           <div className="animate-slide-up rounded-[24px] p-5 border" style={{ ...cardStyle, animationDelay: '0.2s' }}>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <span className="w-[3px] h-3.5 rounded-full flex-shrink-0" style={{ background: 'linear-gradient(180deg, #C4B5FD, #A78BFA)' }} />
-                <span className="text-[13px] font-bold text-mist-600">내일의 메모</span>
+                <span className="text-[13px] font-bold text-mist-600">오늘의 사진 한 장</span>
               </div>
-              <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">04 · MEMO</span>
+              <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">04 · PHOTO</span>
             </div>
-            <p className="mb-3 pl-[13px] text-[11px] leading-relaxed text-mist-400 break-keep">
-              <span className="block">선택 사항이에요.</span>
-              <span className="block">부담 없이 적어보세요.</span>
-            </p>
-            <input
-              type="text"
-              placeholder="작은 목표나 메모를 적어보세요."
-              value={tomorrowText}
-              onChange={(e) => setTomorrowText(e.target.value)}
-              className="w-full rounded-[14px] !p-4 focus:ring-1 focus:ring-mist-200 text-sm outline-none transition-shadow mb-4"
-              style={inputStyle}
-            />
-
-            <label className="block text-[11px] font-bold text-mist-500 mb-2 pl-[13px] tracking-wide">오늘의 사진 한 장</label>
             <RecordImageEditor
               imageUrl={imageUrl}
               positionX={imagePositionX}
@@ -458,6 +444,29 @@ export const DailyRecordEditorView: React.FC<DailyRecordEditorViewProps> = ({
               }}
               onScaleChange={setImageScale}
               onError={setNoticeMessage}
+            />
+          </div>
+
+          {/* 05 · MEMO */}
+          <div className="animate-slide-up rounded-[24px] p-5 border" style={{ ...cardStyle, animationDelay: '0.25s' }}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2.5">
+                <span className="w-[3px] h-3.5 rounded-full flex-shrink-0" style={{ background: 'linear-gradient(180deg, #C4B5FD, #A78BFA)' }} />
+                <span className="text-[13px] font-bold text-mist-600">내일의 메모</span>
+              </div>
+              <span className="font-mono text-[10px] font-bold tracking-[0.18em] text-point-400">05 · MEMO</span>
+            </div>
+            <p className="mb-3 pl-[13px] text-[11px] leading-relaxed text-mist-400 break-keep">
+              <span className="block">선택 사항이에요.</span>
+              <span className="block">부담 없이 적어보세요.</span>
+            </p>
+            <input
+              type="text"
+              placeholder="작은 목표나 메모를 적어보세요."
+              value={tomorrowText}
+              onChange={(e) => setTomorrowText(e.target.value)}
+              className="w-full rounded-[14px] !p-4 focus:ring-1 focus:ring-mist-200 text-sm outline-none transition-shadow"
+              style={inputStyle}
             />
           </div>
 
