@@ -20,6 +20,12 @@ public class RecordImageService {
         return storage.store(processedImage);
     }
 
+    /** 기록 외 이미지도 같은 검증·변환 파이프라인을 사용하되 저장 경로는 분리한다. */
+    public StoredRecordImage store(MultipartFile file, String keyPrefix) {
+        ProcessedRecordImage processedImage = processor.process(file);
+        return storage.store(processedImage, keyPrefix);
+    }
+
     /** DB 연결 해제 이후 저장소의 이미지 파일을 제거할 때 사용한다. */
     public void delete(String storageKey) {
         storage.delete(storageKey);

@@ -12,6 +12,7 @@ import kr.co.quietpath.domain.notification.repository.NotificationRepository;
 import kr.co.quietpath.domain.notification.repository.WebPushSubscriptionRepository;
 import kr.co.quietpath.domain.path.entity.Path;
 import kr.co.quietpath.domain.path.repository.PathRepository;
+import kr.co.quietpath.domain.path.repository.PathCoverImageRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
 import kr.co.quietpath.domain.record.entity.RecordImage;
@@ -66,6 +67,9 @@ class AccountWithdrawalServiceTest {
     private UserTitleRepository userTitleRepository;
     @Mock
     private PathRepository pathRepository;
+
+    @Mock
+    private PathCoverImageRepository pathCoverImageRepository;
     @Mock
     private PathSummaryRepository pathSummaryRepository;
     @Mock

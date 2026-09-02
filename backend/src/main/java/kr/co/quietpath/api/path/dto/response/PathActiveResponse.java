@@ -16,6 +16,7 @@ public class PathActiveResponse {
     private String createdAt;
     private String reviewAt;
     private Boolean expired;
+    private PathCoverImageResponse coverImage;
 
     public static PathActiveResponse empty() {
         return PathActiveResponse.builder()

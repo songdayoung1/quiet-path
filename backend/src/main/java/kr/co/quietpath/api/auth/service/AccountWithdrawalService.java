@@ -11,6 +11,8 @@ import kr.co.quietpath.domain.notification.repository.NotificationPreferenceRepo
 import kr.co.quietpath.domain.notification.repository.NotificationRepository;
 import kr.co.quietpath.domain.notification.repository.WebPushSubscriptionRepository;
 import kr.co.quietpath.domain.path.entity.Path;
+import kr.co.quietpath.domain.path.entity.PathCoverImage;
+import kr.co.quietpath.domain.path.repository.PathCoverImageRepository;
 import kr.co.quietpath.domain.path.repository.PathRepository;
 import kr.co.quietpath.domain.reaction.repository.ReactionRepository;
 import kr.co.quietpath.domain.record.entity.Record;
@@ -27,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Objects;
 
 @Service
@@ -43,6 +46,7 @@ public class AccountWithdrawalService {
     private final NotificationDeliveryRepository notificationDeliveryRepository;
     private final UserTitleRepository userTitleRepository;
     private final PathRepository pathRepository;
+    private final PathCoverImageRepository pathCoverImageRepository;
     private final PathSummaryRepository pathSummaryRepository;
     private final RecordRepository recordRepository;
     private final RecordImageRepository recordImageRepository;
@@ -79,11 +83,19 @@ public class AccountWithdrawalService {
         List<Long> imageIds = recordImages.stream()
             .map(RecordImage::getId)
             .toList();
-        List<String> storageKeys = recordImages.stream()
+        List<String> storageKeys = new ArrayList<>(recordImages.stream()
             .map(RecordImage::getStorageKey)
             .filter(this::hasText)
             .distinct()
-            .toList();
+            .toList());
+        List<PathCoverImage> pathCoverImages = pathIds.isEmpty()
+            ? List.of()
+            : pathCoverImageRepository.findAllByPath_IdIn(pathIds);
+        pathCoverImages.stream()
+            .map(PathCoverImage::getStorageKey)
+            .filter(this::hasText)
+            .filter(storageKey -> !storageKeys.contains(storageKey))
+            .forEach(storageKeys::add);
 
         notificationRepository.deleteAllByRecipientOrActorUserId(userId);
         notificationPreferenceRepository.deleteAllByUserId(userId);
@@ -99,6 +111,9 @@ public class AccountWithdrawalService {
         }
         if (!pathIds.isEmpty()) {
             pathSummaryRepository.deleteAllByPathIds(pathIds);
+        }
+        if (!pathCoverImages.isEmpty()) {
+            pathCoverImageRepository.deleteAll(pathCoverImages);
         }
         pathRepository.deleteAllByUserId(userId);
         if (!imageIds.isEmpty()) {

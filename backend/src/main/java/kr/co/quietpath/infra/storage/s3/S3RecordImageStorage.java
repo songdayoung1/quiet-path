@@ -36,8 +36,8 @@ public class S3RecordImageStorage implements RecordImageStorage {
 
     /** 날짜별 객체 키에 이미지를 업로드하고 클라이언트가 사용할 URL을 반환한다. */
     @Override
-    public StoredRecordImage store(ProcessedRecordImage image) {
-        String storageKey = createStorageKey(image.extension());
+    public StoredRecordImage store(ProcessedRecordImage image, String keyPrefix) {
+        String storageKey = createStorageKey(keyPrefix, image.extension());
         PutObjectRequest request = PutObjectRequest.builder()
             .bucket(bucket)
             .key(storageKey)
@@ -70,9 +70,22 @@ public class S3RecordImageStorage implements RecordImageStorage {
         }
     }
 
-    private String createStorageKey(String extension) {
+    private String createStorageKey(String keyPrefix, String extension) {
         String datePath = LocalDate.now().format(DIRECTORY_FORMAT);
-        return "records/" + datePath + "/" + UUID.randomUUID() + "." + extension;
+        return normalizeKeyPrefix(keyPrefix) + "/" + datePath + "/" + UUID.randomUUID() + "." + extension;
+    }
+
+    private String normalizeKeyPrefix(String keyPrefix) {
+        if (keyPrefix == null || keyPrefix.isBlank() || keyPrefix.startsWith("/") || keyPrefix.contains("..")) {
+            throw new ApiException(ErrorCode.INVALID_IMAGE_FILE);
+        }
+        String normalized = keyPrefix.endsWith("/")
+            ? keyPrefix.substring(0, keyPrefix.length() - 1)
+            : keyPrefix;
+        if (!normalized.matches("[a-zA-Z0-9/_-]+")) {
+            throw new ApiException(ErrorCode.INVALID_IMAGE_FILE);
+        }
+        return normalized;
     }
 
     private String requireProperty(String value, String name) {

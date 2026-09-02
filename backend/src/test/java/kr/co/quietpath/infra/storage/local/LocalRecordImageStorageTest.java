@@ -40,4 +40,23 @@ class LocalRecordImageStorageTest {
 
         assertFalse(Files.exists(storedPath));
     }
+
+    @Test
+    void storeWithPrefix_separatesPathCoverDirectory() {
+        RecordImageProperties properties = new RecordImageProperties();
+        properties.getLocal().setRootDirectory(tempDirectory.toString());
+        properties.getLocal().setPublicPath("/uploads");
+        LocalRecordImageStorage storage = new LocalRecordImageStorage(properties);
+        ProcessedRecordImage image = new ProcessedRecordImage(
+            new byte[]{1, 2, 3},
+            "image/webp",
+            "webp"
+        );
+
+        StoredRecordImage stored = storage.store(image, "path-covers/17");
+
+        assertTrue(stored.storageKey().startsWith("path-covers/17/"));
+        assertTrue(stored.imageUrl().startsWith("/uploads/path-covers/17/"));
+        assertTrue(Files.exists(tempDirectory.resolve(stored.storageKey())));
+    }
 }
