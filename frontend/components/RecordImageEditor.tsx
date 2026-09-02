@@ -12,6 +12,9 @@ interface RecordImageEditorProps {
   onPositionChange: (positionX: number, positionY: number) => void;
   onScaleChange: (scale: number) => void;
   onError: (message: string) => void;
+  frameAspectRatio?: number;
+  previewAlt?: string;
+  dragHint?: string;
 }
 
 interface DragState {
@@ -21,8 +24,6 @@ interface DragState {
   positionX: number;
   positionY: number;
 }
-
-const FRAME_ASPECT_RATIO = 4 / 3;
 
 export const RecordImageEditor: React.FC<RecordImageEditorProps> = ({
   imageUrl,
@@ -35,6 +36,9 @@ export const RecordImageEditor: React.FC<RecordImageEditorProps> = ({
   onPositionChange,
   onScaleChange,
   onError,
+  frameAspectRatio = 4 / 3,
+  previewAlt = '기록 사진 미리보기',
+  dragHint = '사진을 드래그해 보이는 위치를 조정하세요',
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -42,12 +46,12 @@ export const RecordImageEditor: React.FC<RecordImageEditorProps> = ({
   const [naturalSize, setNaturalSize] = useState({ width: 4, height: 3 });
 
   const imageAspectRatio = naturalSize.width / naturalSize.height;
-  const baseWidth = imageAspectRatio >= FRAME_ASPECT_RATIO
-    ? (imageAspectRatio / FRAME_ASPECT_RATIO) * 100
+  const baseWidth = imageAspectRatio >= frameAspectRatio
+    ? (imageAspectRatio / frameAspectRatio) * 100
     : 100;
-  const baseHeight = imageAspectRatio >= FRAME_ASPECT_RATIO
+  const baseHeight = imageAspectRatio >= frameAspectRatio
     ? 100
-    : (FRAME_ASPECT_RATIO / imageAspectRatio) * 100;
+    : (frameAspectRatio / imageAspectRatio) * 100;
   const renderedWidth = baseWidth * scale;
   const renderedHeight = baseHeight * scale;
   const overflowX = Math.max(0, renderedWidth - 100);
@@ -121,7 +125,8 @@ export const RecordImageEditor: React.FC<RecordImageEditorProps> = ({
     <div className="space-y-3">
       <div
         ref={frameRef}
-        className="relative w-full aspect-[4/3] overflow-hidden rounded-2xl border border-white/70 bg-mist-100 shadow-sm touch-none cursor-grab active:cursor-grabbing"
+        className="relative w-full overflow-hidden rounded-2xl border border-white/70 bg-mist-100 shadow-sm touch-none cursor-grab active:cursor-grabbing"
+        style={{ aspectRatio: frameAspectRatio }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={endDrag}
@@ -130,7 +135,7 @@ export const RecordImageEditor: React.FC<RecordImageEditorProps> = ({
         <img
           crossOrigin="anonymous"
           src={imageUrl}
-          alt="기록 사진 미리보기"
+          alt={previewAlt}
           draggable={false}
           onLoad={(event) => setNaturalSize({
             width: event.currentTarget.naturalWidth,
@@ -145,7 +150,7 @@ export const RecordImageEditor: React.FC<RecordImageEditorProps> = ({
           }}
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/45 to-transparent px-3 pb-2 pt-8 text-[10px] font-semibold text-white/90">
-          사진을 드래그해 보이는 위치를 조정하세요
+          {dragHint}
         </div>
       </div>
 

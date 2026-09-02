@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppState } from '../types';
+import type { PathCoverImageUpdate } from '../api/pathApi';
 import { MoodSticker, SoftButton } from '../components/UI';
 import { History, BookOpen, X } from 'lucide-react';
 import { getThemePalette, useResolvedTheme } from '../theme';
@@ -30,6 +31,11 @@ interface HomeViewProps {
   isHomeDataLoading?: boolean;
   showFirstRecordCoachmark?: boolean;
   onDismissFirstRecordCoachmark?: () => void;
+  canEditCover: boolean;
+  onLoginRequired: () => void;
+  onSaveCover: (request: PathCoverImageUpdate) => Promise<void>;
+  onDeleteCover: () => Promise<void>;
+  onRefreshCover: () => Promise<string | null>;
 }
 
 export const HomeView: React.FC<HomeViewProps> = ({
@@ -41,6 +47,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
   isHomeDataLoading = false,
   showFirstRecordCoachmark = false,
   onDismissFirstRecordCoachmark,
+  canEditCover,
+  onLoginRequired,
+  onSaveCover,
+  onDeleteCover,
+  onRefreshCover,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
@@ -172,6 +183,12 @@ export const HomeView: React.FC<HomeViewProps> = ({
           todayRecord={visibleTodayRecord}
           onLogClick={handleLogClick}
           onEditClick={handleLogClick} // Simplify for now, editing uses the same form
+          coverImage={currentDirection?.coverImage}
+          canEditCover={canEditCover}
+          onLoginRequired={onLoginRequired}
+          onSaveCover={onSaveCover}
+          onDeleteCover={onDeleteCover}
+          onRefreshCover={onRefreshCover}
         />
       </div>
 

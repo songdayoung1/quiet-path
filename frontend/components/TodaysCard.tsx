@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { Record as RecordType } from '../types';
+import React, { useEffect, useRef, useState } from 'react';
+import { DirectionCoverImage, Record as RecordType } from '../types';
+import type { PathCoverImageUpdate } from '../api/pathApi';
 import { Card, SoftButton, MoodSticker } from './UI';
-import { RefreshCw, Sparkles, PenLine } from 'lucide-react';
+import { Camera, RefreshCw, PenLine } from 'lucide-react';
 import { WaterDropCharacter, CharacterMood } from './WaterDropCharacter';
 import { getThemePalette, useResolvedTheme } from '../theme';
 import { RecordPreviewLine } from './RecordPreviewLine';
 import { RecordImage } from './RecordImage';
+import { PathCoverImageModal } from './PathCoverImageModal';
 
 interface TodaysCardProps {
   hasLoggedToday: boolean;
@@ -13,6 +15,12 @@ interface TodaysCardProps {
   todayRecord: RecordType | null;
   onLogClick: () => void;
   onEditClick: () => void;
+  coverImage?: DirectionCoverImage;
+  canEditCover: boolean;
+  onLoginRequired: () => void;
+  onSaveCover: (request: PathCoverImageUpdate) => Promise<void>;
+  onDeleteCover: () => Promise<void>;
+  onRefreshCover: () => Promise<string | null>;
 }
 
 export const TodaysCard: React.FC<TodaysCardProps> = ({ 
@@ -21,16 +29,64 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
   todayRecord, 
   onLogClick, 
   onEditClick,
+  coverImage,
+  canEditCover,
+  onLoginRequired,
+  onSaveCover,
+  onDeleteCover,
+  onRefreshCover,
 }) => {
   const theme = useResolvedTheme();
   const palette = getThemePalette(theme);
   const [isEditHovered, setIsEditHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [coverModalOpen, setCoverModalOpen] = useState(false);
+  const [resolvedCoverImageUrl, setResolvedCoverImageUrl] = useState(coverImage?.imageUrl);
+  const lastCoverRefreshAtRef = useRef(0);
   const isRestingState = !hasActiveDirection;
 
   useEffect(() => {
     setIsExpanded(false);
   }, [todayRecord?.id]);
+
+  useEffect(() => {
+    setResolvedCoverImageUrl(coverImage?.imageUrl);
+  }, [coverImage?.imageUrl]);
+
+  const openCoverModal = () => {
+    if (!canEditCover) {
+      onLoginRequired();
+      return;
+    }
+    setCoverModalOpen(true);
+  };
+
+  const handleCoverImageError = async () => {
+    const now = Date.now();
+    if (now - lastCoverRefreshAtRef.current < 30_000) return;
+    lastCoverRefreshAtRef.current = now;
+    const nextUrl = await onRefreshCover();
+    setResolvedCoverImageUrl(nextUrl ?? '');
+  };
+
+  const hasFixedCover = !!coverImage && !!resolvedCoverImageUrl;
+  const fixedCoverBackground = hasFixedCover ? (
+    <>
+      <img
+        crossOrigin="anonymous"
+        src={resolvedCoverImageUrl}
+        alt="홈 카드 고정 배경"
+        onError={() => void handleCoverImageError()}
+        className="absolute inset-0 z-0 h-full w-full object-cover"
+        style={{
+          objectPosition: `${coverImage.positionX}% ${coverImage.positionY}%`,
+          transform: `scale(${coverImage.scale})`,
+          transformOrigin: `${coverImage.positionX}% ${coverImage.positionY}%`,
+        }}
+      />
+      <div className="absolute inset-0 z-0 bg-black/20 backdrop-blur-[1px]" />
+    </>
+  ) : null;
 
   // 1. Resting state - no active direction
   if (isRestingState) {
@@ -63,34 +119,59 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
   // 2. Before Record State — character waits for you
   if (!hasLoggedToday) {
     return (
-      <Card className="backdrop-blur-md shadow-sm !p-6 xl:!p-5" style={{ background: palette.cardBg, borderColor: palette.border }}>
-        <div className="flex items-center gap-5">
-          <div className="shrink-0">
-            <WaterDropCharacter size={90} mood="waiting" animate={true} />
+      <>
+        <Card
+          className={`relative overflow-hidden shadow-sm ${hasFixedCover ? '!p-0 text-white' : 'backdrop-blur-md !p-6 xl:!p-5'}`}
+          style={{ background: hasFixedCover ? undefined : palette.cardBg, borderColor: hasFixedCover ? 'transparent' : palette.border }}
+        >
+          {fixedCoverBackground}
+          <div className={`relative z-10 ${hasFixedCover ? 'p-6 xl:p-5' : ''}`}>
+            <div className="flex items-center gap-5">
+              <div className="shrink-0">
+                <WaterDropCharacter size={90} mood="waiting" animate={true} />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-point-300 mb-2">TODAY&apos;S RECORD</p>
+                <h2 className="text-lg font-bold leading-tight break-keep whitespace-pre-line" style={{ color: hasFixedCover ? '#FFFFFF' : palette.strongText }}>
+                  오늘 남기고 싶은
+                  <br />
+                  기록이 있나요?
+                </h2>
+                <p className="text-sm mt-2 break-keep" style={{ color: hasFixedCover ? 'rgba(255,255,255,0.78)' : palette.mutedText }}>한 줄만 남겨도 충분해요.</p>
+              </div>
+            </div>
+            <div className="mt-4 xl:mt-3 flex gap-2.5">
+              <SoftButton onClick={onLogClick} className="!py-3 shadow-lg shadow-point-200/30">
+                <PenLine size={16} />
+                <span className="text-sm font-semibold">기록 남기기</span>
+              </SoftButton>
+              <button
+                type="button"
+                onClick={openCoverModal}
+                className={`grid min-w-[48px] place-items-center rounded-2xl border transition-colors ${hasFixedCover ? 'border-white/30 bg-white/20 text-white hover:bg-white/30' : ''}`}
+                style={hasFixedCover ? undefined : { background: palette.cardBgSoft, borderColor: palette.border, color: palette.mutedText }}
+                aria-label={coverImage ? '홈 카드 배경 변경' : '홈 카드 배경 설정'}
+              >
+                <Camera size={17} />
+              </button>
+            </div>
           </div>
-          <div className="flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-point-300 mb-2">TODAY&apos;S RECORD</p>
-            <h2 className="text-lg font-bold leading-tight break-keep whitespace-pre-line" style={{ color: palette.strongText }}>
-              오늘 남기고 싶은
-              <br />
-              기록이 있나요?
-            </h2>
-            <p className="text-sm mt-2 break-keep" style={{ color: palette.mutedText }}>한 줄만 남겨도 충분해요.</p>
-          </div>
-        </div>
-        <div className="mt-4 xl:mt-3">
-          <SoftButton onClick={onLogClick} className="!py-3 shadow-lg shadow-point-200/30">
-            <PenLine size={16} />
-            <span className="text-sm font-semibold">기록 남기기</span>
-          </SoftButton>
-        </div>
-      </Card>
+        </Card>
+        <PathCoverImageModal
+          open={coverModalOpen}
+          coverImage={coverImage}
+          onClose={() => setCoverModalOpen(false)}
+          onSave={onSaveCover}
+          onDelete={onDeleteCover}
+        />
+      </>
     );
   }
 
   // 3. After Record State (Result Display)
   if (todayRecord) {
-    const hasImage = !!todayRecord.imageUrl;
+    const hasDailyImage = !!todayRecord.imageUrl;
+    const hasImage = hasFixedCover || hasDailyImage;
     const editButtonStyle = hasImage
       ? undefined
       : {
@@ -106,6 +187,7 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
             : undefined,
         };
     return (
+      <>
       <Card 
         className={`!p-0 relative overflow-hidden shadow-sm group ${hasImage ? 'text-white' : 'backdrop-blur-md'} ${isExpanded ? 'min-h-[280px] xl:min-h-[238px] h-auto' : ''}`}
         style={{
@@ -113,8 +195,8 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
           borderColor: hasImage ? 'transparent' : palette.border,
         }}
       >
-        {/* Background Image Setup */}
-        {hasImage && (
+        {/* 고정 배경이 있으면 우선 사용하고, 없을 때만 일일 기록 사진을 사용합니다. */}
+        {hasFixedCover ? fixedCoverBackground : hasDailyImage && (
           <>
             <RecordImage record={todayRecord} alt="오늘의 기록 사진" className="absolute inset-0 z-0 h-full w-full" />
             {/* Dark overlay for text readability on images */}
@@ -169,12 +251,16 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
           </div>
 
           <div className="mt-4 xl:mt-2.5 flex items-center justify-between gap-3 shrink-0 pt-4 xl:pt-2.5 relative">
-            {!hasImage ? (
-              <div className="flex items-center gap-2" style={{ color: palette.faintText }}>
-                <Sparkles size={12} className="opacity-70" />
-                <span className="text-[10px] font-medium tracking-tight">기록을 남기면 배경 이미지로 바뀌어요 ✨</span>
-              </div>
-            ) : <div />}
+            <button
+              type="button"
+              onClick={openCoverModal}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[11px] font-semibold transition-colors ${hasImage ? 'border-white/30 bg-white/20 text-white hover:bg-white/30' : ''}`}
+              style={hasImage ? undefined : { background: palette.cardBgSoft, borderColor: palette.border, color: palette.mutedText }}
+              aria-label={coverImage ? '홈 카드 배경 변경' : '홈 카드 배경 설정'}
+            >
+              <Camera size={13} />
+              <span>{coverImage ? '배경 변경' : '배경 설정'}</span>
+            </button>
 
             <button
               onClick={onEditClick}
@@ -189,6 +275,14 @@ export const TodaysCard: React.FC<TodaysCardProps> = ({
           </div>
         </div>
       </Card>
+      <PathCoverImageModal
+        open={coverModalOpen}
+        coverImage={coverImage}
+        onClose={() => setCoverModalOpen(false)}
+        onSave={onSaveCover}
+        onDelete={onDeleteCover}
+      />
+      </>
     );
   }
 
