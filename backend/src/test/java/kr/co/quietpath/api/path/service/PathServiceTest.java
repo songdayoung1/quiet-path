@@ -51,6 +51,9 @@ class PathServiceTest {
     @Mock
     private PathSummaryRepository pathSummaryRepository;
 
+    @Mock
+    private PathCoverImageService pathCoverImageService;
+
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
 

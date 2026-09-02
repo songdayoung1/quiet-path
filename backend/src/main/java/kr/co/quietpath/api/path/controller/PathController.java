@@ -6,12 +6,17 @@ import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.path.dto.request.PathCreateRequest;
 import kr.co.quietpath.api.path.dto.request.PathReviewExtendRequest;
+import kr.co.quietpath.api.path.dto.request.PathCoverImageUpdateRequest;
 import kr.co.quietpath.api.path.dto.response.*;
+import kr.co.quietpath.api.path.service.PathCoverImageCommandService;
 import kr.co.quietpath.api.path.service.PathService;
 import kr.co.quietpath.api.summary.service.PathSummaryCommandService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
@@ -19,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
 public class PathController {
 
     private final PathService pathService;
+    private final PathCoverImageCommandService pathCoverImageCommandService;
     private final PathSummaryCommandService pathSummaryCommandService;
 
     @GetMapping("/active")
@@ -53,6 +59,27 @@ public class PathController {
     ) {
         Long userId = extractUserId(principal);
         return pathService.extendReviewAt(userId, pathId, request);
+    }
+
+    @PutMapping(path = "/{pathId}/cover-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public PathCoverImageResponse updateCoverImage(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long pathId,
+        @Valid @RequestPart("cover") PathCoverImageUpdateRequest request,
+        @RequestPart(value = "image", required = false) MultipartFile image
+    ) {
+        Long userId = extractUserId(principal);
+        return pathCoverImageCommandService.update(userId, pathId, request, image);
+    }
+
+    @DeleteMapping("/{pathId}/cover-image")
+    public ResponseEntity<Void> deleteCoverImage(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long pathId
+    ) {
+        Long userId = extractUserId(principal);
+        pathCoverImageCommandService.delete(userId, pathId);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping

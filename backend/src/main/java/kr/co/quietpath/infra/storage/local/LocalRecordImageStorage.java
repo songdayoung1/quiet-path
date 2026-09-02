@@ -33,9 +33,9 @@ public class LocalRecordImageStorage implements RecordImageStorage {
 
     /** 날짜별 경로와 UUID 파일명을 사용해 로컬 파일시스템에 이미지를 저장한다. */
     @Override
-    public StoredRecordImage store(ProcessedRecordImage image) {
+    public StoredRecordImage store(ProcessedRecordImage image, String keyPrefix) {
         String datePath = LocalDate.now().format(DIRECTORY_FORMAT);
-        String storageKey = "records/" + datePath + "/" + UUID.randomUUID() + "." + image.extension();
+        String storageKey = normalizeKeyPrefix(keyPrefix) + "/" + datePath + "/" + UUID.randomUUID() + "." + image.extension();
         Path target = resolveStoragePath(storageKey);
 
         try {
@@ -66,6 +66,19 @@ public class LocalRecordImageStorage implements RecordImageStorage {
             throw new ApiException(ErrorCode.INVALID_IMAGE_FILE);
         }
         return resolved;
+    }
+
+    private String normalizeKeyPrefix(String keyPrefix) {
+        if (keyPrefix == null || keyPrefix.isBlank() || keyPrefix.startsWith("/") || keyPrefix.contains("..")) {
+            throw new ApiException(ErrorCode.INVALID_IMAGE_FILE);
+        }
+        String normalized = keyPrefix.endsWith("/")
+            ? keyPrefix.substring(0, keyPrefix.length() - 1)
+            : keyPrefix;
+        if (!normalized.matches("[a-zA-Z0-9/_-]+")) {
+            throw new ApiException(ErrorCode.INVALID_IMAGE_FILE);
+        }
+        return normalized;
     }
 
     private String normalizePublicPath(String path) {

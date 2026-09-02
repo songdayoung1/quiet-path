@@ -21,7 +21,7 @@ import {
   createWithdrawalQaLoginCode,
   isMockAccessToken,
 } from './api/authApi';
-import { pathApi, PastPathListItem, PathActiveResponse, PathCreateResponse } from './api/pathApi';
+import { pathApi, PastPathListItem, PathActiveResponse, PathCreateResponse, PathCoverImageUpdate } from './api/pathApi';
 import { recordApi, RecordResponse } from './api/recordApi';
 import { notificationApi, type NotificationItem } from './api/notificationApi';
 import { Settings, Compass, AlertCircle, Bell } from 'lucide-react';
@@ -206,6 +206,14 @@ const buildDirectionFromActivePath = (
             reviewAt,
             isActive: path.status ? path.status === 'ACTIVE' : true,
           }),
+    coverImage: path.coverImage
+      ? {
+          imageUrl: path.coverImage.imageUrl,
+          positionX: path.coverImage.positionX,
+          positionY: path.coverImage.positionY,
+          scale: path.coverImage.scale,
+        }
+      : undefined,
   };
 };
 
@@ -1159,6 +1167,89 @@ const App: React.FC = () => {
     await finishDirection();
   };
 
+  const handleSaveHomeCover = async (request: PathCoverImageUpdate) => {
+    const token = state.auth?.token;
+    const currentDirection = state.currentDirection;
+    if (!state.auth?.isLoggedIn || !token || !currentDirection) {
+      throw new Error('로그인 후 홈 카드 배경을 설정할 수 있어요.');
+    }
+
+    const pathId = Number(currentDirection.id);
+    if (!Number.isInteger(pathId)) {
+      throw new Error('현재 방향 정보를 다시 불러온 뒤 시도해 주세요.');
+    }
+
+    const coverImage = await pathApi.updateCoverImage(token, pathId, request);
+    setState((prev) => {
+      if (!prev.currentDirection || prev.currentDirection.id !== currentDirection.id) return prev;
+      return {
+        ...prev,
+        currentDirection: {
+          ...prev.currentDirection,
+          coverImage: {
+            imageUrl: coverImage.imageUrl,
+            positionX: coverImage.positionX,
+            positionY: coverImage.positionY,
+            scale: coverImage.scale,
+          },
+        },
+      };
+    });
+  };
+
+  const handleDeleteHomeCover = async () => {
+    const token = state.auth?.token;
+    const currentDirection = state.currentDirection;
+    if (!state.auth?.isLoggedIn || !token || !currentDirection) {
+      throw new Error('로그인 후 홈 카드 배경을 삭제할 수 있어요.');
+    }
+
+    const pathId = Number(currentDirection.id);
+    if (!Number.isInteger(pathId)) {
+      throw new Error('현재 방향 정보를 다시 불러온 뒤 시도해 주세요.');
+    }
+
+    await pathApi.deleteCoverImage(token, pathId);
+    setState((prev) => {
+      if (!prev.currentDirection || prev.currentDirection.id !== currentDirection.id) return prev;
+      const { coverImage: _removedCoverImage, ...directionWithoutCover } = prev.currentDirection;
+      return {
+        ...prev,
+        currentDirection: directionWithoutCover,
+      };
+    });
+  };
+
+  const handleRefreshHomeCover = async () => {
+    const token = state.auth?.token;
+    const currentDirection = state.currentDirection;
+    if (!state.auth?.isLoggedIn || !token || !currentDirection) return null;
+
+    try {
+      const activePath = await pathApi.getActive(token);
+      if (String(activePath.pathId) !== currentDirection.id || !activePath.coverImage) return null;
+      const nextCoverImage = {
+        imageUrl: activePath.coverImage.imageUrl,
+        positionX: activePath.coverImage.positionX,
+        positionY: activePath.coverImage.positionY,
+        scale: activePath.coverImage.scale,
+      };
+      setState((prev) => {
+        if (!prev.currentDirection || prev.currentDirection.id !== currentDirection.id) return prev;
+        return {
+          ...prev,
+          currentDirection: {
+            ...prev.currentDirection,
+            coverImage: nextCoverImage,
+          },
+        };
+      });
+      return nextCoverImage.imageUrl;
+    } catch {
+      return null;
+    }
+  };
+
   const handleOpenDirectionView = () => {
     if (requestExpiredDirectionResolution('DIRECTION', 'DIRECTION')) {
       return;
@@ -1615,6 +1706,11 @@ const App: React.FC = () => {
             isHomeDataLoading={isHomeDataLoading}
             showFirstRecordCoachmark={firstRecordCoachmarkOpen}
             onDismissFirstRecordCoachmark={() => setFirstRecordCoachmarkOpen(false)}
+            canEditCover={!!state.auth?.isLoggedIn && !!state.auth?.token}
+            onLoginRequired={() => setCurrentView('ACCOUNT_CONNECT')}
+            onSaveCover={handleSaveHomeCover}
+            onDeleteCover={handleDeleteHomeCover}
+            onRefreshCover={handleRefreshHomeCover}
           />
         )}
         {currentView === 'RECORDS' && (

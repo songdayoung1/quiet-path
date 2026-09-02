@@ -24,6 +24,21 @@ export interface PathActiveResponse {
   createdAt?: string;
   reviewAt?: string;
   expired?: boolean;
+  coverImage?: PathCoverImageResponse | null;
+}
+
+export interface PathCoverImageResponse {
+  imageUrl: string;
+  positionX: number;
+  positionY: number;
+  scale: number;
+}
+
+export interface PathCoverImageUpdate {
+  imageFile?: File | null;
+  positionX: number;
+  positionY: number;
+  scale: number;
 }
 
 export interface PathFinishResponse {
@@ -150,6 +165,47 @@ export const pathApi = {
     }
 
     return response.json();
+  },
+
+  async updateCoverImage(
+    token: string,
+    pathId: number,
+    request: PathCoverImageUpdate,
+  ): Promise<PathCoverImageResponse> {
+    const formData = new FormData();
+    formData.append('cover', new Blob([JSON.stringify({
+      positionX: request.positionX,
+      positionY: request.positionY,
+      scale: request.scale,
+    })], { type: 'application/json' }));
+    if (request.imageFile) {
+      formData.append('image', request.imageFile);
+    }
+
+    const response = await apiFetch(`/api/v1/paths/${pathId}/cover-image`, {
+      method: 'PUT',
+      body: formData,
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+
+    return response.json();
+  },
+
+  async deleteCoverImage(token: string, pathId: number): Promise<void> {
+    const response = await apiFetch(`/api/v1/paths/${pathId}/cover-image`, {
+      method: 'DELETE',
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
   },
 
   async getDetail(token: string, pathId: number): Promise<PathDetailResponse> {

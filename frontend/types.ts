@@ -66,6 +66,14 @@ export interface Direction {
   isActive: boolean;
   expired?: boolean;
   aiSummary?: string; // The "Future Retrieval" summary
+  coverImage?: DirectionCoverImage;
+}
+
+export interface DirectionCoverImage {
+  imageUrl: string;
+  positionX: number;
+  positionY: number;
+  scale: number;
 }
 
 export type ViewState = 'ONBOARDING' | 'ACCOUNT_CONNECT' | 'OAUTH_CALLBACK' | 'NICKNAME_SETUP' | 'NOW' | 'RECORDS' | 'DIRECTION' | 'COMMUNITY' | 'WRITE_LOG' | 'SETTINGS' | 'NOTIFICATIONS' | 'PAST_DIRECTIONS';

@@ -45,6 +45,7 @@ public class PathService {
     private final UserRepository userRepository;
     private final RecordRepository recordRepository;
     private final PathSummaryRepository pathSummaryRepository;
+    private final PathCoverImageService pathCoverImageService;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
@@ -64,6 +65,7 @@ public class PathService {
             .createdAt(formatDate(currentPath.getCreatedAt()))
             .reviewAt(formatDate(currentPath.getReviewAt()))
             .expired(isExpired(currentPath))
+            .coverImage(pathCoverImageService.getByPathId(currentPath.getId()))
             .build();
     }
 
