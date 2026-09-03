@@ -1,6 +1,6 @@
 package kr.co.quietpath.api.auth.service;
 
-import kr.co.quietpath.api.comment.service.CommentPageCacheService;
+import kr.co.quietpath.api.comment.service.CommentCacheInvalidationRequestedEvent;
 import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
 import kr.co.quietpath.domain.reaction.entity.Reaction;
@@ -12,14 +12,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -34,7 +37,7 @@ class WithdrawalCommunityDataServiceTest {
     private ReactionRepository reactionRepository;
 
     @Mock
-    private CommentPageCacheService commentPageCacheService;
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @Mock
     private WeeklyTop3CacheService weeklyTop3CacheService;
@@ -58,8 +61,10 @@ class WithdrawalCommunityDataServiceTest {
 
         withdrawalCommunityDataService.anonymizeCommentsAndDeleteReactions(1L);
 
-        verify(commentPageCacheService).evictRecord(10L);
-        verify(commentPageCacheService).evictRecord(11L);
+        verify(applicationEventPublisher).publishEvent(argThat((Object event) ->
+            event instanceof CommentCacheInvalidationRequestedEvent cacheEvent
+                && cacheEvent.recordIds().equals(Set.of(10L, 11L))
+        ));
         verify(reactionRepository).deleteAllInBatch(List.of(firstReaction, secondReaction));
         verify(weeklyTop3CacheService).evict();
         assertEquals(1, firstRecord.getReactionCount());
@@ -74,7 +79,7 @@ class WithdrawalCommunityDataServiceTest {
 
         withdrawalCommunityDataService.anonymizeCommentsAndDeleteReactions(1L);
 
-        verifyNoInteractions(commentPageCacheService, weeklyTop3CacheService);
+        verifyNoInteractions(applicationEventPublisher, weeklyTop3CacheService);
     }
 
     private Record buildRecord() {

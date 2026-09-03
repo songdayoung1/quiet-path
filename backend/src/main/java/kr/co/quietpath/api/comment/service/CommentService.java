@@ -57,7 +57,7 @@ public class CommentService {
 
         commentRepository.save(comment);
         long commentCount = commentRepository.countByRecordIdAndDeletedFalse(comment.getRecordId());
-        commentPageCacheService.evictRecord(comment.getRecordId());
+        requestCommentCacheInvalidation(comment.getRecordId());
         weeklyTop3CacheService.evict();
         applicationEventPublisher.publishEvent(new CommunityNotificationRequestedEvent(
             CommunityNotificationType.COMMENT,
@@ -98,7 +98,7 @@ public class CommentService {
         validateOwner(userId, comment);
         comment.updateContent(request.getContent());
         long commentCount = commentRepository.countByRecordIdAndDeletedFalse(comment.getRecordId());
-        commentPageCacheService.evictRecord(comment.getRecordId());
+        requestCommentCacheInvalidation(comment.getRecordId());
 
         return CommentUpdateResponse.builder()
             .commentId(comment.getId())
@@ -116,7 +116,7 @@ public class CommentService {
         validateOwner(userId, comment);
         comment.softDelete();
         long commentCount = commentRepository.countByRecordIdAndDeletedFalse(comment.getRecordId());
-        commentPageCacheService.evictRecord(comment.getRecordId());
+        requestCommentCacheInvalidation(comment.getRecordId());
         weeklyTop3CacheService.evict();
 
         return CommentDeleteResponse.builder()
@@ -153,6 +153,10 @@ public class CommentService {
         if (comment.getUserId() == null || !comment.getUserId().equals(userId)) {
             throw new ApiException(ErrorCode.NOT_OWNER);
         }
+    }
+
+    private void requestCommentCacheInvalidation(Long recordId) {
+        applicationEventPublisher.publishEvent(CommentCacheInvalidationRequestedEvent.forRecord(recordId));
     }
 
     // 외부 입력값을 캐시 키와 DB 조회 기준으로 바로 쓰지 않도록 size를 정규화한다.

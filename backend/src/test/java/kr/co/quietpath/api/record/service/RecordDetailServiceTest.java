@@ -2,7 +2,6 @@ package kr.co.quietpath.api.record.service;
 
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
-import kr.co.quietpath.api.comment.service.CommentPageCacheService;
 import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
 import kr.co.quietpath.api.record.dto.response.RecordDetailResponse;
 import kr.co.quietpath.domain.comment.repository.CommentRepository;
@@ -18,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
@@ -49,7 +49,7 @@ class RecordDetailServiceTest {
     private WeeklyTop3CacheService weeklyTop3CacheService;
 
     @Mock
-    private CommentPageCacheService commentPageCacheService;
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
     private RecordService recordService;
