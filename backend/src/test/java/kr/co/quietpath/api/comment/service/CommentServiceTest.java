@@ -25,6 +25,7 @@ import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -95,11 +96,15 @@ class CommentServiceTest {
         assertEquals(10L, response.getRecordId());
         assertEquals(3L, response.getCommentCount());
         verify(commentRepository).save(argThat(comment -> comment.getRecordId().equals(10L)));
-        verify(commentPageCacheService).evictRecord(10L);
+        verify(applicationEventPublisher).publishEvent(argThat((Object event) ->
+            event instanceof CommentCacheInvalidationRequestedEvent cacheEvent
+                && cacheEvent.recordIds().equals(Set.of(10L))
+        ));
         verify(weeklyTop3CacheService).evict();
         verify(applicationEventPublisher).publishEvent(argThat((Object event) -> {
-            CommunityNotificationRequestedEvent notificationEvent =
-                (CommunityNotificationRequestedEvent) event;
+            if (!(event instanceof CommunityNotificationRequestedEvent notificationEvent)) {
+                return false;
+            }
             return notificationEvent.type() == CommunityNotificationType.COMMENT
                 && notificationEvent.sourceId().equals(101L)
                 && notificationEvent.recipientUserId().equals(2L)
@@ -126,7 +131,10 @@ class CommentServiceTest {
         assertEquals(10L, response.getRecordId());
         assertEquals(4L, response.getCommentCount());
         assertEquals(true, response.isDeleted());
-        verify(commentPageCacheService).evictRecord(10L);
+        verify(applicationEventPublisher).publishEvent(argThat((Object event) ->
+            event instanceof CommentCacheInvalidationRequestedEvent cacheEvent
+                && cacheEvent.recordIds().equals(Set.of(10L))
+        ));
         verify(weeklyTop3CacheService).evict();
     }
 

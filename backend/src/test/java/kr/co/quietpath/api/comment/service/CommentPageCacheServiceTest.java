@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.script.RedisScript;
 
 import java.lang.reflect.Field;
 import java.time.Duration;
@@ -20,7 +21,14 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -101,12 +109,83 @@ class CommentPageCacheServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void evictRecord_incrementsVersionNamespace() {
-        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(stringRedisTemplate.execute(
+            any(RedisScript.class),
+            eq(List.of("comments:version:10")),
+            eq(String.valueOf(Duration.ofHours(24).toSeconds()))
+        )).thenReturn(1L);
+
         commentPageCacheService.evictRecord(10L);
 
-        verify(valueOperations).increment("comments:version:10");
-        verify(stringRedisTemplate).expire("comments:version:10", Duration.ofHours(24));
+        var scriptCaptor = org.mockito.ArgumentCaptor.forClass(RedisScript.class);
+        verify(stringRedisTemplate).execute(
+            scriptCaptor.capture(),
+            eq(List.of("comments:version:10")),
+            eq(String.valueOf(Duration.ofHours(24).toSeconds()))
+        );
+        String script = scriptCaptor.getValue().getScriptAsString();
+        assertTrue(script.contains("redis.call('INCR', KEYS[1])"));
+        assertTrue(script.contains("redis.call('EXPIRE', KEYS[1], ARGV[1])"));
+    }
+
+    @Test
+    void buildCacheKey_whenVersionLookupFails_usesUniqueDatabaseFallbackKey() {
+        when(stringRedisTemplate.opsForValue()).thenThrow(new IllegalStateException("redis unavailable"));
+
+        String firstKey = commentPageCacheService.buildCacheKey(10L, 0, 20);
+        String secondKey = commentPageCacheService.buildCacheKey(10L, 0, 20);
+
+        assertTrue(firstKey.startsWith("10:0:20:db-fallback:"));
+        assertTrue(secondKey.startsWith("10:0:20:db-fallback:"));
+        assertNotEquals(firstKey, secondKey);
+        assertTrue(commentPageCacheService.consumeCacheBypass());
+        assertFalse(commentPageCacheService.consumeCacheBypass());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void buildCacheKey_whenVersionValueIsInvalid_recoversWithoutReusingVersionZero() {
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.get("comments:version:10")).thenReturn("invalid");
+        when(stringRedisTemplate.execute(
+            any(RedisScript.class),
+            eq(List.of("comments:version:10")),
+            eq(String.valueOf(Duration.ofHours(24).toSeconds())),
+            eq("invalid")
+        )).thenReturn(1_788_000_000_000_000L);
+
+        String key = commentPageCacheService.buildCacheKey(10L, 0, 20);
+
+        assertEquals("10:0:20:1788000000000000", key);
+        assertFalse(commentPageCacheService.consumeCacheBypass());
+
+        var scriptCaptor = org.mockito.ArgumentCaptor.forClass(RedisScript.class);
+        verify(stringRedisTemplate).execute(
+            scriptCaptor.capture(),
+            eq(List.of("comments:version:10")),
+            eq(String.valueOf(Duration.ofHours(24).toSeconds())),
+            eq("invalid")
+        );
+        String script = scriptCaptor.getValue().getScriptAsString();
+        assertTrue(script.contains("value ~= ARGV[2]"));
+        assertTrue(script.contains("redis.pcall('INCRBY', KEYS[1], 0)"));
+        assertTrue(script.contains("redis.call('SET', KEYS[1], recovered, 'EX', ARGV[1])"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void evictRecord_whenRedisFails_propagatesToAfterCommitHandler() {
+        doThrow(new IllegalStateException("redis unavailable"))
+            .when(stringRedisTemplate)
+            .execute(
+                any(RedisScript.class),
+                eq(List.of("comments:version:10")),
+                eq(String.valueOf(Duration.ofHours(24).toSeconds()))
+            );
+
+        assertThrows(IllegalStateException.class, () -> commentPageCacheService.evictRecord(10L));
     }
 
     private User buildUser(Long userId) {

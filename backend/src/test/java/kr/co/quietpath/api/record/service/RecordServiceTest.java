@@ -2,7 +2,7 @@ package kr.co.quietpath.api.record.service;
 
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
-import kr.co.quietpath.api.comment.service.CommentPageCacheService;
+import kr.co.quietpath.api.comment.service.CommentCacheInvalidationRequestedEvent;
 import kr.co.quietpath.api.feed.service.WeeklyTop3CacheService;
 import kr.co.quietpath.api.record.dto.request.RecordCreateRequest;
 import kr.co.quietpath.api.record.dto.request.RecordUpdateRequest;
@@ -24,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.lang.reflect.Field;
 import java.time.LocalDate;
@@ -31,10 +32,12 @@ import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,7 +66,7 @@ class RecordServiceTest {
     private WeeklyTop3CacheService weeklyTop3CacheService;
 
     @Mock
-    private CommentPageCacheService commentPageCacheService;
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @Mock
     private RecordImageUrlResolver recordImageUrlResolver;
@@ -343,7 +346,7 @@ class RecordServiceTest {
         assertEquals(true, record.getSharedAt() != null);
         assertEquals(true, response.getSharedAt() != null);
         verify(weeklyTop3CacheService).evict();
-        verify(commentPageCacheService).evictRecord(10L);
+        verifyCommentCacheInvalidationRequested(10L);
     }
 
     @Test
@@ -364,7 +367,7 @@ class RecordServiceTest {
         assertEquals(null, record.getSharedAt());
         assertEquals(null, response.getSharedAt());
         verify(weeklyTop3CacheService).evict();
-        verify(commentPageCacheService).evictRecord(10L);
+        verifyCommentCacheInvalidationRequested(10L);
     }
 
     @Test
@@ -378,7 +381,7 @@ class RecordServiceTest {
 
         assertEquals("PUBLIC", response.getVisibility());
         verify(weeklyTop3CacheService).evict();
-        verify(commentPageCacheService).evictRecord(10L);
+        verifyCommentCacheInvalidationRequested(10L);
     }
 
     @Test
@@ -393,7 +396,7 @@ class RecordServiceTest {
 
         assertEquals(true, record.getIsHidden());
         verify(weeklyTop3CacheService).evict();
-        verify(commentPageCacheService).evictRecord(10L);
+        verifyCommentCacheInvalidationRequested(10L);
     }
 
     private Path buildPath(Long id) {
@@ -406,6 +409,13 @@ class RecordServiceTest {
             .build();
         setId(path, id);
         return path;
+    }
+
+    private void verifyCommentCacheInvalidationRequested(Long recordId) {
+        verify(applicationEventPublisher).publishEvent(argThat((Object event) ->
+            event instanceof CommentCacheInvalidationRequestedEvent cacheEvent
+                && cacheEvent.recordIds().equals(Set.of(recordId))
+        ));
     }
 
     private Path buildExpiredPath(Long id) {
