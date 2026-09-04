@@ -12,6 +12,7 @@ import {
   Palette,
   Pencil,
   RefreshCcw,
+  Smartphone,
   Sun,
   User,
   X,
@@ -29,6 +30,7 @@ import {
 import { generateNickname } from './NicknameSetupView';
 import { AppModal } from '../components/AppModal';
 import { AppGuideSheet } from '../components/AppGuideSheet';
+import { PwaInstallGuideSheet } from '../components/PwaInstallGuideSheet';
 
 interface SettingsViewProps {
   state: AppState;
@@ -231,6 +233,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [browserPushEnabled, setBrowserPushEnabled] = useState(false);
   const [appGuideOpen, setAppGuideOpen] = useState(false);
+  const [installGuideOpen, setInstallGuideOpen] = useState(false);
 
   const [nicknameEditing, setNicknameEditing] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState('');
@@ -1126,6 +1129,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div style={panelStyle}>
           <button
             type="button"
+            onClick={() => setInstallGuideOpen(true)}
+            className="w-full px-4 py-3.5 flex items-center gap-3 text-left"
+            style={{ borderBottom: '1px solid var(--qp-divider)' }}
+          >
+            <span
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px]"
+              style={{ background: 'var(--qp-accent-soft)', color: 'var(--qp-accent-text)' }}
+            >
+              <Smartphone size={17} />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-[14px] font-bold" style={{ color: 'var(--qp-text-strong)' }}>
+                홈 화면에 추가
+              </span>
+              <span className="mt-0.5 block text-[11px]" style={{ color: 'var(--qp-text-muted)' }}>
+                iOS·Android에서 앱처럼 바로 열기
+              </span>
+            </span>
+            <ChevronRight size={17} style={{ color: 'var(--qp-text-faint)' }} />
+          </button>
+          <button
+            type="button"
             onClick={() => setAppGuideOpen(true)}
             className="w-full px-4 py-3.5 flex items-center gap-3 text-left"
             style={{ borderBottom: '1px solid var(--qp-divider)' }}
@@ -1194,6 +1219,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         onReplayTutorial={onReplayTutorial}
         themeVars={themeVars}
         theme={resolvedTheme}
+      />
+
+      <PwaInstallGuideSheet
+        open={installGuideOpen}
+        onClose={() => setInstallGuideOpen(false)}
+        themeVars={themeVars}
       />
 
       <AppModal
