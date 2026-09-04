@@ -1,6 +1,5 @@
 import { notificationApi, WebPushSubscriptionPayload } from '../api/notificationApi';
-
-const SERVICE_WORKER_PATH = '/sw.js';
+import { registerAppServiceWorker } from './pwa';
 
 export const isWebPushSupported = () =>
   typeof window !== 'undefined' &&
@@ -44,8 +43,11 @@ const toPayload = (subscription: PushSubscription): WebPushSubscriptionPayload =
 };
 
 const getRegistration = async () => {
-  await navigator.serviceWorker.register(SERVICE_WORKER_PATH, { scope: '/' });
-  return navigator.serviceWorker.ready;
+  const registration = await registerAppServiceWorker();
+  if (!registration) {
+    throw new Error('이 브라우저는 서비스 워커를 지원하지 않습니다.');
+  }
+  return registration;
 };
 
 export const enableWebPush = async (token: string) => {
