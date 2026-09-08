@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDateTime;
 
@@ -52,6 +53,12 @@ public class PathSummary {
     private String inputHash;
 
     @Column(nullable = false)
+    @ColumnDefault("0")
+    private int regenerationCount;
+
+    private Boolean helpful;
+
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
@@ -72,6 +79,7 @@ public class PathSummary {
         this.promptVersion = promptVersion;
         this.model = model;
         this.inputHash = inputHash;
+        this.regenerationCount = 0;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
@@ -105,6 +113,13 @@ public class PathSummary {
         this.promptVersion = promptVersion;
         this.model = model;
         this.inputHash = inputHash;
+        this.regenerationCount++;
+        this.helpful = null;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void updateFeedback(boolean helpful) {
+        this.helpful = helpful;
         this.updatedAt = LocalDateTime.now();
     }
 }

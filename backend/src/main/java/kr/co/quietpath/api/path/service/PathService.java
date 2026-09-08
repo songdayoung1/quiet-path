@@ -241,6 +241,10 @@ public class PathService {
             .completedAt(formatNullableDate(path.getCompletedAt()))
             .summary(summary)
             .summaryStatus(summaryStatus)
+            .summaryRegenerationCount(latestSummary == null ? 0 : latestSummary.getRegenerationCount())
+            .summaryRegenerationLimit(PathSummaryPolicy.MAX_REGENERATION_COUNT)
+            .summaryRegenerationRemaining(PathSummaryPolicy.remainingRegenerationCount(latestSummary))
+            .summaryHelpful(latestSummary == null ? null : latestSummary.getHelpful())
             .records(recordItems)
             .build();
     }

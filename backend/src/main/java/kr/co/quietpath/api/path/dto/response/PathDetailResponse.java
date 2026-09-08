@@ -17,5 +17,9 @@ public class PathDetailResponse {
     private String completedAt;
     private PathSummaryPayload summary;
     private String summaryStatus;
+    private int summaryRegenerationCount;
+    private int summaryRegenerationLimit;
+    private int summaryRegenerationRemaining;
+    private Boolean summaryHelpful;
     private List<PathRecordItem> records;
 }

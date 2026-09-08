@@ -8,4 +8,7 @@ import lombok.Getter;
 public class PathSummaryStartResponse {
     private Long pathId;
     private String summaryStatus;
+    private int regenerationCount;
+    private int regenerationLimit;
+    private int regenerationRemaining;
 }

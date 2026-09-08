@@ -247,6 +247,8 @@ CREATE TABLE path_summaries (
     prompt_version VARCHAR(30),
     model VARCHAR(50),
     input_hash CHAR(64),
+    regeneration_count INT NOT NULL DEFAULT 0,
+    helpful BOOLEAN DEFAULT NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
     UNIQUE KEY uk_path_version (path_id, version_no),
