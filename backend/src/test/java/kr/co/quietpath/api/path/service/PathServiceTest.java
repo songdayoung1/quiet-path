@@ -277,6 +277,16 @@ class PathServiceTest {
 
         assertEquals("DONE", response.getSummaryStatus());
         assertEquals("천천히 나아갔습니다.", response.getSummary().getHeadline());
+        assertEquals("흐름이 이어졌습니다.", response.getSummary().getBody());
+        assertEquals("스스로 흔들림을 줄이려는 관점이 읽힙니다.", response.getSummary().getPerspective());
+        assertEquals(List.of("기록이 끊기지 않았습니다."), response.getSummary().getObservations());
+        assertEquals(List.of("흔들린 날의 이유를 더 또렷하게 남기면 좋습니다."), response.getSummary().getImprovements());
+        assertEquals(List.of("내일 한 걸음을 더 작게 쪼개 적어보세요."), response.getSummary().getSuggestions());
+        assertEquals("다음에도 이어가 보세요.", response.getSummary().getClosing());
+        assertEquals(0, response.getSummaryRegenerationCount());
+        assertEquals(3, response.getSummaryRegenerationLimit());
+        assertEquals(3, response.getSummaryRegenerationRemaining());
+        assertNull(response.getSummaryHelpful());
     }
 
     private Path buildFutureReviewPath(Long id) {

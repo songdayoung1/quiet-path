@@ -1,8 +1,10 @@
 package kr.co.quietpath.domain.path.repository;
 
+import jakarta.persistence.LockModeType;
 import kr.co.quietpath.domain.path.entity.Path;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,6 +24,10 @@ public interface PathRepository extends JpaRepository<Path, Long> {
     Optional<Path> findByUserIdAndStatus(Long userId, String status);
 
     Optional<Path> findByIdAndUserId(Long id, Long userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Path p where p.id = :id")
+    Optional<Path> findByIdForUpdate(@Param("id") Long id);
 
     List<Path> findByUserIdInAndStatus(List<Long> userIds, String status);
 

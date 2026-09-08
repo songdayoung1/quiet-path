@@ -59,7 +59,7 @@ class PathSummaryCommandServiceTest {
     @Test
     void requestSummary_beforeReviewAt_returnsLocked() {
         Path path = buildCompletedPath(1L, LocalDateTime.now().plusDays(1));
-        when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
+        when(pathRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(path));
         doNothing().when(aiSummaryClient).ensureConfigured();
 
         ApiException ex = assertThrows(ApiException.class, () -> pathSummaryCommandService.requestSummary(1L, 1L));
@@ -70,7 +70,7 @@ class PathSummaryCommandServiceTest {
     @Test
     void requestSummary_withoutRecords_returnsEmpty() {
         Path path = buildCompletedPath(1L, LocalDateTime.now().minusDays(1));
-        when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
+        when(pathRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(path));
         when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of());
         doNothing().when(aiSummaryClient).ensureConfigured();
 
@@ -92,7 +92,7 @@ class PathSummaryCommandServiceTest {
             .build();
         summary.complete("{\"headline\":\"done\"}");
 
-        when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
+        when(pathRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(path));
         when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
         when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
         when(pathSummaryRepository.save(any(PathSummary.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -107,6 +107,9 @@ class PathSummaryCommandServiceTest {
         assertEquals("v2", summary.getPromptVersion());
         assertEquals("gpt-5.5", summary.getModel());
         assertEquals("JSON", summary.getFormat());
+        assertEquals(1, response.getRegenerationCount());
+        assertEquals(3, response.getRegenerationLimit());
+        assertEquals(2, response.getRegenerationRemaining());
         verify(pathSummaryRepository).save(summary);
         verify(applicationEventPublisher).publishEvent(any(PathSummaryRequestedEvent.class));
     }
@@ -124,7 +127,7 @@ class PathSummaryCommandServiceTest {
             .build();
         summary.startProcessing();
 
-        when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
+        when(pathRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(path));
         when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
         when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
         doNothing().when(aiSummaryClient).ensureConfigured();
@@ -132,6 +135,8 @@ class PathSummaryCommandServiceTest {
         PathSummaryStartResponse response = pathSummaryCommandService.requestSummary(1L, 1L);
 
         assertEquals("PROCESSING", response.getSummaryStatus());
+        assertEquals(0, response.getRegenerationCount());
+        assertEquals(3, response.getRegenerationRemaining());
         verify(pathSummaryRepository, never()).save(any(PathSummary.class));
         verify(applicationEventPublisher, never()).publishEvent(any());
     }
@@ -141,7 +146,7 @@ class PathSummaryCommandServiceTest {
         Path path = buildCompletedPath(1L, LocalDateTime.now().minusDays(1));
         Record record = buildRecord(path, 10L);
 
-        when(pathRepository.findById(1L)).thenReturn(Optional.of(path));
+        when(pathRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(path));
         when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
         when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.empty());
         when(pathSummaryRepository.save(any(PathSummary.class))).thenAnswer(invocation -> {
@@ -160,9 +165,43 @@ class PathSummaryCommandServiceTest {
         ArgumentCaptor<PathSummaryRequestedEvent> eventCaptor = ArgumentCaptor.forClass(PathSummaryRequestedEvent.class);
         verify(applicationEventPublisher).publishEvent(eventCaptor.capture());
         assertEquals("PROCESSING", response.getSummaryStatus());
+        assertEquals(0, response.getRegenerationCount());
+        assertEquals(3, response.getRegenerationRemaining());
         assertEquals("PENDING", summaryCaptor.getValue().getStatus());
         assertEquals("JSON", summaryCaptor.getValue().getFormat());
         assertEquals(99L, eventCaptor.getValue().summaryId());
+    }
+
+    @Test
+    void requestSummary_afterThreeRegenerations_returnsLimitExceeded() {
+        Path path = buildCompletedPath(1L, LocalDateTime.now().minusDays(1));
+        Record record = buildRecord(path, 10L);
+        PathSummary summary = PathSummary.builder()
+            .path(path)
+            .versionNo(1)
+            .promptVersion("v1")
+            .model("gpt-test")
+            .inputHash("hash")
+            .build();
+        for (int i = 0; i < 3; i++) {
+            summary.complete("{\"headline\":\"done\"}");
+            summary.retry("v1", "gpt-test", "hash-" + i);
+        }
+        summary.complete("{\"headline\":\"done\"}");
+
+        when(pathRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(path));
+        when(recordRepository.findAllByPath_IdAndIsHiddenFalseOrderByRecordDateAsc(1L)).thenReturn(List.of(record));
+        when(pathSummaryRepository.findTopByPathIdOrderByVersionNoDesc(1L)).thenReturn(Optional.of(summary));
+        doNothing().when(aiSummaryClient).ensureConfigured();
+
+        ApiException ex = assertThrows(
+            ApiException.class,
+            () -> pathSummaryCommandService.requestSummary(1L, 1L)
+        );
+
+        assertEquals(ErrorCode.AI_SUMMARY_REGENERATION_LIMIT_EXCEEDED, ex.getErrorCode());
+        verify(pathSummaryRepository, never()).save(any(PathSummary.class));
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     private Path buildCompletedPath(Long id, LocalDateTime reviewAt) {

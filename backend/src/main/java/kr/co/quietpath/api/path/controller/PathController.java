@@ -5,12 +5,14 @@ import kr.co.quietpath.api.auth.UserPrincipal;
 import kr.co.quietpath.api.common.error.ApiException;
 import kr.co.quietpath.api.common.error.ErrorCode;
 import kr.co.quietpath.api.path.dto.request.PathCreateRequest;
+import kr.co.quietpath.api.path.dto.request.PathSummaryFeedbackRequest;
 import kr.co.quietpath.api.path.dto.request.PathReviewExtendRequest;
 import kr.co.quietpath.api.path.dto.request.PathCoverImageUpdateRequest;
 import kr.co.quietpath.api.path.dto.response.*;
 import kr.co.quietpath.api.path.service.PathCoverImageCommandService;
 import kr.co.quietpath.api.path.service.PathService;
 import kr.co.quietpath.api.summary.service.PathSummaryCommandService;
+import kr.co.quietpath.api.summary.service.PathSummaryFeedbackService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,7 @@ public class PathController {
     private final PathService pathService;
     private final PathCoverImageCommandService pathCoverImageCommandService;
     private final PathSummaryCommandService pathSummaryCommandService;
+    private final PathSummaryFeedbackService pathSummaryFeedbackService;
 
     @GetMapping("/active")
     public PathActiveResponse getActivePath(@AuthenticationPrincipal UserPrincipal principal) {
@@ -112,6 +115,16 @@ public class PathController {
     ) {
         Long userId = extractUserId(principal);
         return pathSummaryCommandService.requestSummary(userId, pathId);
+    }
+
+    @PutMapping("/{pathId}/summary/feedback")
+    public PathSummaryFeedbackResponse updateSummaryFeedback(
+        @AuthenticationPrincipal UserPrincipal principal,
+        @PathVariable Long pathId,
+        @Valid @RequestBody PathSummaryFeedbackRequest request
+    ) {
+        Long userId = extractUserId(principal);
+        return pathSummaryFeedbackService.update(userId, pathId, request.getHelpful());
     }
 
     private Long extractUserId(UserPrincipal principal) {

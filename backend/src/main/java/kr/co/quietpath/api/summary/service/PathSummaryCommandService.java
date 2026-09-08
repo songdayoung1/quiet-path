@@ -40,7 +40,7 @@ public class PathSummaryCommandService {
     public PathSummaryStartResponse requestSummary(Long userId, Long pathId) {
         aiSummaryClient.ensureConfigured();
 
-        Path path = pathRepository.findById(pathId)
+        Path path = pathRepository.findByIdForUpdate(pathId)
             .orElseThrow(() -> new ApiException(ErrorCode.PATH_NOT_FOUND));
         if (!path.getUserId().equals(userId)) {
             throw new ApiException(ErrorCode.NOT_OWNER);
@@ -62,10 +62,11 @@ public class PathSummaryCommandService {
         // 진행 중인 요약은 그대로 유지하고, DONE/FAILED는 같은 재생성 경로로 태운다.
         if (latestSummary != null && PathSummaryPolicy.isInFlight(latestSummary.getStatus())
             && !PathSummaryPolicy.isStale(latestSummary)) {
-            return PathSummaryStartResponse.builder()
-                .pathId(pathId)
-                .summaryStatus(PathSummaryPolicy.STATUS_PROCESSING)
-                .build();
+            return buildProcessingResponse(pathId, latestSummary);
+        }
+        if (latestSummary != null
+            && PathSummaryPolicy.remainingRegenerationCount(latestSummary) == 0) {
+            throw new ApiException(ErrorCode.AI_SUMMARY_REGENERATION_LIMIT_EXCEEDED);
         }
 
         String inputHash = hash(buildHashSource(path, records));
@@ -74,9 +75,16 @@ public class PathSummaryCommandService {
         pathSummaryRepository.save(summary);
         applicationEventPublisher.publishEvent(new PathSummaryRequestedEvent(summary.getId()));
 
+        return buildProcessingResponse(pathId, summary);
+    }
+
+    private PathSummaryStartResponse buildProcessingResponse(Long pathId, PathSummary summary) {
         return PathSummaryStartResponse.builder()
             .pathId(pathId)
             .summaryStatus(PathSummaryPolicy.STATUS_PROCESSING)
+            .regenerationCount(summary.getRegenerationCount())
+            .regenerationLimit(PathSummaryPolicy.MAX_REGENERATION_COUNT)
+            .regenerationRemaining(PathSummaryPolicy.remainingRegenerationCount(summary))
             .build();
     }
 
