@@ -94,12 +94,24 @@ export interface PathDetailResponse {
   completedAt?: string | null;
   summaryStatus: 'LOCKED' | 'EMPTY' | 'READY' | 'PROCESSING' | 'DONE' | 'FAILED';
   summary: PathSummaryPayload | null;
+  summaryRegenerationCount: number;
+  summaryRegenerationLimit: number;
+  summaryRegenerationRemaining: number;
+  summaryHelpful: boolean | null;
   records: PathDetailRecordItem[];
 }
 
 export interface PathSummaryStartResponse {
   pathId: number;
   summaryStatus: 'PROCESSING';
+  regenerationCount: number;
+  regenerationLimit: number;
+  regenerationRemaining: number;
+}
+
+export interface PathSummaryFeedbackResponse {
+  pathId: number;
+  helpful: boolean;
 }
 
 export const pathApi = {
@@ -247,6 +259,28 @@ export const pathApi = {
   async requestSummary(token: string, pathId: number): Promise<PathSummaryStartResponse> {
     const response = await apiFetch(`/api/v1/paths/${pathId}/summary`, {
       method: 'POST',
+    }, {
+      accessToken: token,
+    });
+
+    if (!response.ok) {
+      throw await buildApiError(response);
+    }
+
+    return response.json();
+  },
+
+  async updateSummaryFeedback(
+    token: string,
+    pathId: number,
+    helpful: boolean,
+  ): Promise<PathSummaryFeedbackResponse> {
+    const response = await apiFetch(`/api/v1/paths/${pathId}/summary/feedback`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ helpful }),
     }, {
       accessToken: token,
     });

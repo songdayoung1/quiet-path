@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Direction, Record as RecordType } from '../types';
 import { PageHeader } from '../components/UI';
 import { ChevronLeft } from 'lucide-react';
@@ -21,6 +21,8 @@ const TRAIL_PAD = 30;
 const TRAIL_ACCENT = '#C4B5FD';
 const TRAIL_MID = '#A78BFA';
 const CP = 88; // bezier control point amplitude
+const SUMMARY_POLL_DELAYS = [2000, 3000, 5000, 8000, 12000];
+const SUMMARY_POLL_MAX_ATTEMPTS = 30;
 
 interface TrailSVGProps {
   count: number;
@@ -130,7 +132,9 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
   const [selectedPathDetail, setSelectedPathDetail] = useState<PathDetailResponse | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSummarySubmitting, setIsSummarySubmitting] = useState(false);
+  const [isFeedbackSubmitting, setIsFeedbackSubmitting] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const summaryRequestInFlight = useRef(false);
 
   const glassCard: React.CSSProperties = theme === 'dark'
     ? { background: palette.cardBgStrong, borderColor: palette.border }
@@ -142,15 +146,17 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
         borderColor: 'rgba(255,255,255,0.7)',
       };
 
-  const loadDetail = async (pathId: number, silent = false) => {
-    if (!accessToken) { onLoginRequired(); return; }
+  const loadDetail = async (pathId: number, silent = false): Promise<PathDetailResponse | null> => {
+    if (!accessToken) { onLoginRequired(); return null; }
     if (!silent) setIsDetailLoading(true);
-    setDetailError(null);
+    if (!silent) setDetailError(null);
     try {
       const detail = await pathApi.getDetail(accessToken, pathId);
       setSelectedPathDetail(detail);
+      return detail;
     } catch (error) {
       setDetailError(buildApiErrorMessage(error, '방향 상세를 불러오지 못했어요.'));
+      return null;
     } finally {
       if (!silent) setIsDetailLoading(false);
     }
@@ -161,6 +167,8 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
       setSelectedPathDetail(null);
       setDetailError(null);
       setIsSummarySubmitting(false);
+      setIsFeedbackSubmitting(false);
+      summaryRequestInFlight.current = false;
       return;
     }
     const pathId = Number(selectedDirection.id);
@@ -169,26 +177,94 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
   }, [selectedDirection, accessToken]);
 
   useEffect(() => {
-    if (!selectedDirection || selectedPathDetail?.summaryStatus !== 'PROCESSING') return;
+    if (!selectedDirection || !accessToken || selectedPathDetail?.summaryStatus !== 'PROCESSING') return;
     const pathId = Number(selectedDirection.id);
-    const timer = window.setInterval(() => void loadDetail(pathId, true), 2500);
-    return () => window.clearInterval(timer);
+    let cancelled = false;
+    let attempt = 0;
+    let timer: number | undefined;
+
+    const poll = () => {
+      if (cancelled) return;
+      if (attempt >= SUMMARY_POLL_MAX_ATTEMPTS) {
+        setDetailError('AI 회고 생성이 길어지고 있어요. 잠시 뒤 다시 확인해 주세요.');
+        return;
+      }
+
+      const delay = SUMMARY_POLL_DELAYS[Math.min(attempt, SUMMARY_POLL_DELAYS.length - 1)];
+      timer = window.setTimeout(async () => {
+        attempt += 1;
+        try {
+          const nextDetail = await pathApi.getDetail(accessToken, pathId);
+          if (cancelled) return;
+          setSelectedPathDetail(nextDetail);
+          setDetailError(null);
+          if (nextDetail.summaryStatus === 'PROCESSING') poll();
+        } catch (error) {
+          if (cancelled) return;
+          if (attempt >= SUMMARY_POLL_MAX_ATTEMPTS) {
+            setDetailError(buildApiErrorMessage(error, 'AI 회고 상태를 확인하지 못했어요.'));
+            return;
+          }
+          poll();
+        }
+      }, delay);
+    };
+
+    poll();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   }, [selectedDirection, selectedPathDetail?.summaryStatus, accessToken]);
 
   const handleSummarize = async () => {
     if (!selectedDirection) return;
     if (!accessToken) { onLoginRequired(); return; }
+    if (summaryRequestInFlight.current) return;
     const pathId = Number(selectedDirection.id);
     if (!Number.isFinite(pathId)) return;
+    summaryRequestInFlight.current = true;
     setIsSummarySubmitting(true);
     setDetailError(null);
     try {
-      await pathApi.requestSummary(accessToken, pathId);
-      await loadDetail(pathId, true);
+      const response = await pathApi.requestSummary(accessToken, pathId);
+      setSelectedPathDetail((current) => current ? {
+        ...current,
+        summary: null,
+        summaryStatus: response.summaryStatus,
+        summaryRegenerationCount: response.regenerationCount,
+        summaryRegenerationLimit: response.regenerationLimit,
+        summaryRegenerationRemaining: response.regenerationRemaining,
+        summaryHelpful: null,
+      } : current);
     } catch (error) {
       setDetailError(buildApiErrorMessage(error, 'AI 요약 요청에 실패했어요.'));
     } finally {
+      summaryRequestInFlight.current = false;
       setIsSummarySubmitting(false);
+    }
+  };
+
+  const handleSummaryFeedback = async () => {
+    if (!selectedDirection) return;
+    if (!accessToken) { onLoginRequired(); return; }
+    if (isFeedbackSubmitting) return;
+    const pathId = Number(selectedDirection.id);
+    if (!Number.isFinite(pathId)) return;
+    const helpful = selectedPathDetail?.summaryHelpful !== true;
+
+    setIsFeedbackSubmitting(true);
+    setDetailError(null);
+    try {
+      const response = await pathApi.updateSummaryFeedback(accessToken, pathId, helpful);
+      setSelectedPathDetail((current) => current ? {
+        ...current,
+        summaryHelpful: response.helpful,
+      } : current);
+    } catch (error) {
+      setDetailError(buildApiErrorMessage(error, 'AI 회고 피드백을 저장하지 못했어요.'));
+    } finally {
+      setIsFeedbackSubmitting(false);
     }
   };
 
@@ -282,13 +358,15 @@ export const PastDirectionsView: React.FC<PastDirectionsViewProps> = ({
               state={capsuleState}
               unlockDate={unlockDateTs}
               recordCount={flowRecords.length}
-              summary={summary ? {
-                headline: summary.headline,
-                body: summary.body,
-              } : undefined}
-              version={isDone ? `v.1 · ${startDate}` : undefined}
+              summary={summary ?? undefined}
+              version={isDone ? `v.${(detail?.summaryRegenerationCount ?? 0) + 1} · ${startDate}` : undefined}
               failed={summaryStatus === 'FAILED'}
-              onRegenerate={isDone ? handleSummarize : undefined}
+              regenerationRemaining={detail?.summaryRegenerationRemaining}
+              submitting={isSummarySubmitting}
+              feedbackSubmitting={isFeedbackSubmitting}
+              liked={detail?.summaryHelpful === true}
+              onLike={isDone ? handleSummaryFeedback : undefined}
+              onRegenerate={isDone && (detail?.summaryRegenerationRemaining ?? 0) > 0 ? handleSummarize : undefined}
               onRequest={capsuleState === 'idle' ? handleSummarize : undefined}
             />
           ) : null}
